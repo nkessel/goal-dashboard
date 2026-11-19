@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { getOwnWordsAction, saveOwnWordsAction, type OwnWords } from "@/app/actions";
 import { loadFx, patchFx, subscribeFx, type FxSettings } from "@/lib/celebration-fx";
+import { fromStartup } from "@/lib/startup";
 
 /** What of the welcome settings lives on your account rather than in this browser. */
 const pick = (fx: FxSettings): OwnWords => ({ lines: fx.welcomeOwnLines ?? "", linesOn: fx.welcomeOwnOn, reflect: fx.reflectQuestions, reflectOn: fx.welcomeReflectOn });
@@ -20,7 +21,7 @@ export function OwnWordsSync() {
     let last = "";
     let timer: number | undefined;
     let ready = false;
-    getOwnWordsAction()
+    fromStartup("ownWords", getOwnWordsAction)
       .then((acct) => {
         if (!live) return;
         const local = pick(loadFx());

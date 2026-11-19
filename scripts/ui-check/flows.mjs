@@ -42,6 +42,45 @@ export const FLOWS = [
     },
   },
   {
+    // The toucan's question (owner, Nov 19): just the toucan, over a grey mist, asking what's most important.
+    name: "toucanask",
+    timeoutMs: 300_000,
+    async run(h) {
+      await h.goto("/", { name: "toucanask" });
+      await h.page.evaluate(() => {
+        for (const k of ["daily-login", "welcome-pending", "daily-login-open", "welcome-back-at", "toucan-kept"]) localStorage.removeItem(k);
+        localStorage.setItem("evening-prompt-at", "off");
+        const fx = JSON.parse(localStorage.getItem("goalFxSaved") || "{}");
+        localStorage.setItem("goalFxSaved", JSON.stringify({ ...fx, welcomeMode: "toucan" }));
+      });
+      await h.page.reload();
+      await h.page.waitForSelector("[data-toucan-question]", { timeout: 15000 }).catch(() => {});
+      await h.settle(900);
+      if (!(await h.page.locator("[data-toucan-question]").count())) throw new Error("toucanask: the toucan's question didn't open on the day's first visit");
+      await h.check("the toucan's question");
+      await h.typeIn((p) => p.locator("[data-toucan-question] textarea").first(), "toucan's question answer");
+      await h.page.locator("[data-toucan-question] textarea").first().fill("Call Dad about Sunday");
+      await h.check("the toucan's question, answered");
+      await h.tap((p) => p.locator("[data-toucan-question]").getByRole("button", { name: /^keep it$/i }).first(), "keep it", { expectMove: true });
+      await h.settle(1200);
+      await h.check("kept: the floating target");
+      if (await h.tap((p) => p.getByRole("button", { name: /^what's most important today$/i }).first(), "open the kept target", { optional: true, expectMove: true })) {
+        await h.check("kept: open");
+        await h.tap((p) => p.locator("[data-kept-card]").getByRole("button", { name: /^close$/i }).first(), "kept: close asks", { optional: true, expectMove: true });
+        await h.check("kept: close asks first");
+        await h.tap((p) => p.locator("[data-kept-card]").getByRole("button", { name: /^shrink$/i }).first(), "kept: shrink", { optional: true, expectMove: true });
+      }
+      await h.goto("/settings?open=welcome-screen", { name: "toucanask-settings" });
+      await h.page.locator("[data-welcome-mode]").scrollIntoViewIfNeeded().catch(() => {});
+      await h.check("Settings › Welcome Screen: the toucan's question");
+      await h.goto("/settings?open=toucan-spirit", { name: "toucanask-look" });
+      if (await h.tap((p) => p.getByRole("button", { name: /^his look/i }).first(), "his look", { optional: true, expectMove: true })) {
+        await h.page.locator("[data-toucan-ask-bg]").scrollIntoViewIfNeeded().catch(() => {});
+        await h.check("Settings › His look: behind the toucan's question");
+      }
+    },
+  },
+  {
     name: "welcome",
     async run(h) {
       await h.goto("/", { welcome: true, name: "welcome" });
@@ -229,6 +268,15 @@ export const FLOWS = [
         // The XP amount: no box; tapping it selects and pulses the number, with a gold bar for a cursor (owner, Nov 9).
         if (await h.tap((p) => p.locator("[role=dialog] button", { hasText: /^\W*\d+ XP/ }).first(), "editor: XP pill", { optional: true, expectMove: true })) {
           if (await h.tap((p) => p.getByLabel("XP amount").first(), "editor: XP amount", { optional: true })) await h.check("quest editor: XP typed");
+          // Stats: share some of the XP with character stats (the tray under the XP bar), then the add-a-stat field.
+          if (await h.tap((p) => p.locator("[role=dialog] button", { hasText: /add to stats|XP to stats|^\w{3} \d+/i }).first(), "editor: stats tray", { optional: true, expectMove: true })) {
+            await h.tap((p) => p.getByRole("button", { name: /more xp to strength/i }).first(), "stats: strength +", { optional: true });
+            await h.tap((p) => p.getByRole("button", { name: /more xp to wisdom/i }).first(), "stats: wisdom +", { optional: true });
+            await h.check("quest editor: stats tray");
+            if (await h.tap((p) => p.getByRole("button", { name: /a new stat/i }).first(), "stats: new stat", { optional: true, expectMove: true })) await h.check("quest editor: new stat field");
+            await h.tap((p) => p.getByRole("button", { name: /^save$/i }).first(), "stats: save", { optional: true, expectMove: true });
+            await h.check("quest editor: stats saved");
+          }
           await h.tap((p) => p.locator("[role=dialog] button", { hasText: /^\W*\d+ XP/ }).first(), "editor: XP pill shut", { optional: true, expectMove: true });
         }
         // The extra pills (no "More" fold): open the scales, then the due panel with scheduling and early bonus.
@@ -524,6 +572,45 @@ export const FLOWS = [
           }
           await esc(h);
         }
+        await esc(h);
+      }
+    },
+  },
+  {
+    // "How do you feel?" (owner, Nov 19): five one-ink faces after a habit tick, a victory and a fail.
+    name: "faces",
+    async run(h) {
+      await h.goto("/", { name: "faces" });
+      await h.toggle(/daily habits/i, "daily habits");
+      if (await h.tap((p) => p.locator(".habit-row [role=checkbox][aria-label^='Done: ']:visible").first(), "tick a habit", { optional: true, expectMove: true })) {
+        await h.settle(1600);
+        await h.check("how do you feel, under the habit");
+        if (await h.tap((p) => p.locator("[data-felt-inline] [role=radio][aria-label=Good]").first(), "habit felt: good", { optional: true, expectMove: true })) await h.check("habit felt: kept");
+        await h.settle(1400);
+      }
+      // A victory: the celebration asks too, above Claim your reward · Continue Your Journey.
+      if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu for complete", { optional: true })) {
+        if (await h.tap((p) => p.getByRole("menuitem", { name: /^✓?\s*complete this/i }).first(), "complete from the menu", { optional: true, expectMove: true })) {
+          await h.settle(3500);
+          await h.check("celebration: how do you feel");
+          if (await h.tap((p) => p.locator("[data-felt-ask] [role=radio][aria-label=Great]").first(), "celebration: great", { optional: true, expectMove: true })) await h.check("celebration: felt kept");
+          await h.tap(/continue your journey/i, "continue your journey", { optional: true, expectMove: true });
+          await h.settle(800);
+        }
+        await esc(h);
+      }
+      // A fail: a wise line, the faces, then Try again · Continue.
+      if (await h.tap((p) => p.locator("li", { hasText: "AR class homework" }).getByRole("button", { name: /^quest actions$/i }).last(), "quest menu for fail")) {
+        if (await h.tap((p) => p.getByRole("menuitem", { name: /^archive/i }).first(), "archive choices (fail)", { optional: true, expectMove: true })) {
+          if (await h.tap((p) => p.getByRole("button", { name: /mark as failed/i }).first(), "fail form", { optional: true, expectMove: true })) {
+            if (await h.tap((p) => p.getByRole("button", { name: /^mark failed$/i }).first(), "mark failed", { optional: true, expectMove: true })) {
+              await h.settle(1200);
+              await h.check("fail: wise line and faces");
+              if (await h.tap((p) => p.locator("[data-fail-next]").getByRole("button", { name: /^try again$/i }).first(), "fail: try again", { optional: true, expectMove: true })) await h.check("fail: copy or new");
+            }
+          }
+        }
+        await esc(h);
         await esc(h);
       }
     },
@@ -840,7 +927,7 @@ export const FLOWS = [
       if (await h.tap((p) => p.locator("[data-sched-rate]").getByRole("button", { name: /^other/i }).first(), "rate: other", { optional: true, expectMove: true })) await h.check("rate: other open");
       // Quest details as the editor's pills (owner, Nov 6): XP & coins in one, Time, Due, ⚡ Tiny, 🔥 Importance (with difficulty and energy), Board.
       if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /xp/i }).first(), "attrs: xp", { optional: true, expectMove: true })) await h.check("attrs: xp open");
-      if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /^importance/i }).first(), "attrs: importance", { optional: true, expectMove: true })) await h.check("attrs: importance open");
+      if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /^(urgency|importance)/i }).first(), "attrs: importance", { optional: true, expectMove: true })) await h.check("attrs: importance open");
       if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /^time$|^\d+m$/i }).first(), "attrs: time", { optional: true, expectMove: true })) await h.check("attrs: time open");
       // One When pill (owner, Nov 18): Complete by, then Flexible · Fixed, then an optional time on the calendar.
       if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /^(when|within|by |around)/i }).first(), "attrs: when", { optional: true, expectMove: true })) {
@@ -1201,6 +1288,8 @@ export const FLOWS = [
       // Display settings: what quest cards show (creature, time, XP, coins).
       if (await h.tap((p) => p.getByRole("button", { name: /display settings|calendar settings/i }).first(), "calendar display", { optional: true, expectMove: true })) {
         await h.check("display settings");
+        // Calendar events as quests (owner, Nov 18–19): shows only with Google calendars, which the fake run has none of.
+        if (await h.page.locator("[data-event-quests]").count()) await h.check("display: calendar events as quests");
         await h.tap((p) => p.getByRole("button", { name: /^creature$/i }).first(), "hide creature", { optional: true });
         await h.check("cards without creatures");
         await h.tap((p) => p.getByRole("button", { name: /^creature$/i }).first(), "show creature", { optional: true });
@@ -1259,6 +1348,9 @@ export const FLOWS = [
             el.dispatchEvent(new Event("input", { bubbles: true }));
           });
           await h.settle(1800);
+          // The hours grow with the zoom at once (measured 70 ms after the change). A person's drag counts as input, but
+          // this scripted change doesn't, so the check took it for the page jumping by itself (Nov 19): drop those.
+          await h.page.evaluate(() => (window.__uiShifts || []).splice(0)).catch(() => {});
           await h.check("week: zoomed to 2½ days");
           const words = await h.page.locator("[data-days-zoom]").first().innerText().catch(() => "");
           if (!/2½ days/.test(words)) h.record({ kind: "zoom", severity: "error", target: "days zoom", detail: `The slider reads "${words}" after sliding to 2½ days` });
@@ -1290,7 +1382,8 @@ export const FLOWS = [
           for (const fx of [0.6, 0.3, 0.85, 0.15]) {
             const x = r.left + r.width * fx, y = r.top + Math.min(r.height / 2, 20);
             const at = document.elementFromPoint(x, y);
-            if (at && at.closest(".cal-days-scroll")) return { x, y };
+            // On the hold itself: a quest drawn over it (the fixtures' times follow the clock) would open the quest's menu.
+            if (at && at.closest(".cal-days-scroll") && at.closest("[data-hold-key=lunch]")) return { x, y };
           }
           return { covered: true };
         });

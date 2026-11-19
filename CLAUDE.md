@@ -10,17 +10,18 @@ Then read `docs/REPEAT-ASKS.md`: the owner's asks that came back 3+ times. Any w
 
 When you ship to `main`, log it in the same push: add an entry at the top of `docs/SHIPPED.md`, update `docs/PRIORITIES.md` and `docs/WAITING.md` for anything finished, new or waiting, and bump "Last updated" in `docs/HANDOFF.md`. Keep `docs/HANDOFF.md` short: it is loaded into every session, so only standing rules and pointers go there (see its "Keeping this file current"). The next session, on any account, picks up from those files.
 
-# Design review before shipping (owner, Nov 14: "Can we go thru a design review before shipping from now on?")
+# Design review before shipping (owner, Nov 19: "We should have design mockup reviews for any new UI/design changes. For other things like bug fixes there's no need for review before shipping.")
 
-Nothing that changes what's on screen goes to `main` until the owner has seen it and said OK. This replaces the old "ship straight to the live app" rule.
+**New UI or design changes** (a new screen, section, control or layout, a changed look, new wording on screen) get a design mockup review before they ship. **Everything else ships straight to `main`** after the build and UI check, with no review: bug fixes (including layout bugs and visible fixes that restore the intended design), data fixes, speed, code moves and splits that change no screen, scripts, docs. When unsure whether a change is a fix or a design change, treat it as a design change. This replaces the Nov 14 rule ("nothing that changes what's on screen goes to `main` until the owner has said OK").
 
+For a design change:
 1. Build it, run the UI check (below), fix its errors.
 2. Push the work to a branch `review/<short-topic>` (never `main`), so any session or account can pick it up.
-3. Show the owner the screens: publish (or update) a review page with the UI check's screenshots of every state that changed, phone first, before/after where useful, and one line per change saying what it is. For bigger changes, run the three UX teams (`.claude/agents/ux-team-*`) on the screenshots first and fix what they agree on.
+3. Show the owner the screens: publish (or update) a review page with the UI check's screenshots of every state that changed, phone first, before/after where useful, and one line per change saying what it is. For bigger changes, run the three UX teams (`.claude/agents/ux-team-*`) on the screenshots first and fix what they agree on. For a new design that isn't built yet, mockups on the review page are enough to get his pick before building.
 4. Wait for his OK or his notes. Notes: change, re-check, update the same review page. OK: merge to `main`, push, log it in `docs/SHIPPED.md`, mark the feedback notes.
 5. List what's waiting in `docs/WAITING.md` ("Waiting on the owner's design review": branch, review page link, date) and add its name to HANDOFF section 0a.
 
-Only changes with nothing visible (data fixes, server speed, docs) still ship straight to `main`.
+For a bug fix: UI check if it touches a screen, push to `main`, log it in `docs/SHIPPED.md`, and tell the owner in a line what was fixed.
 
 # Before every push to main: run the UI check
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { FeltInline } from "@/components/ui/FeltAsk";
 import { deleteCheckNoteAction, saveTrackedEventsAction, trackedEventsAction } from "@/app/actions";
 import { saveOrQueue } from "@/lib/offline";
 import { Fold } from "@/components/ui/Fold";
@@ -43,6 +44,9 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
   const [said, setSaid] = useState<{ text: string; undo?: () => void } | null>(null);
+  // "How do you feel?" under the event just logged (owner, Nov 19).
+  const [feltNote, setFeltNote] = useState<string | null>(null);
+  const closeFeltNote = useCallback(() => setFeltNote(null), []);
   const [removing, setRemoving] = useState<string | null>(null);
   const hold = useRef<number | null>(null);
   useEffect(() => {
@@ -69,8 +73,9 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
     }
     const at = stamp;
     const id = r.note?.id;
-    setSaid({ text: `✓ ${name} · ${at}`, undo: id ? () => void deleteCheckNoteAction(id).then(() => (setSaid({ text: "Taken back" }), onLogged?.())) : undefined });
+    setSaid({ text: `✓ ${name} · ${at}`, undo: id ? () => void deleteCheckNoteAction(id).then(() => (setSaid({ text: "Taken back" }), setFeltNote(null), onLogged?.())) : undefined });
     onLogged?.();
+    if (id) setFeltNote(id);
   };
   const add = () => {
     const t = draft.trim();
@@ -191,6 +196,7 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
           </button>
         </p>
       )}
+      {feltNote && <FeltInline key={feltNote} target={{ kind: "note", id: feltNote }} onClose={closeFeltNote} />}
     </div>
   );
 }

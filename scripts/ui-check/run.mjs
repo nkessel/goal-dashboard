@@ -197,12 +197,12 @@ async function walk({ browser, device, time, tz, cookie }) {
     await page.waitForTimeout(120);
   }
 
-  async function flushErrors() {
+  async function flushErrors(step) {
     for (const e of errors.splice(0)) record({ ...e, severity: "error", target: page.url().replace(base, "") });
     const shifts = await page.evaluate(() => (window.__uiShifts || []).splice(0)).catch(() => []);
     for (const s of shifts) {
       if (s.value < 0.02) continue;
-      record({ kind: "layout-shift", severity: s.value > 0.08 ? "error" : "warn", target: s.sources.map((x) => x.node).join(", ") || "page", detail: `page jumped with no tap (shift ${s.value.toFixed(3)}; ${s.sources.map((x) => `${x.node} moved ${x.dy}px${x.dh ? `, grew ${x.dh}px` : ""}`).join("; ")})` });
+      record({ ...(step ? { step: `up to ${step}` } : {}), kind: "layout-shift", severity: s.value > 0.08 ? "error" : "warn", target: s.sources.map((x) => x.node).join(", ") || "page", detail: `page jumped with no tap (shift ${s.value.toFixed(3)}; ${s.sources.map((x) => `${x.node} moved ${x.dy}px${x.dh ? `, grew ${x.dh}px` : ""}`).join("; ")})` });
     }
   }
 
@@ -225,7 +225,7 @@ async function walk({ browser, device, time, tz, cookie }) {
     await page.screenshot({ path: `${OUT}shots/${name}.png` });
     await page.evaluate(clearBoxes);
     steps.push({ device, time, screen, label, shot: name + ".png", issues: top.issues.length });
-    await flushErrors();
+    await flushErrors(label);
     if (scroll && !kb) {
       // The bottom of the page, and of every scroll box: anything still covered there can't be reached.
       const moved = await page.evaluate(() => {

@@ -142,7 +142,8 @@ export function StatSplitEditor({
                   maxLength={24}
                   placeholder="Name it, e.g. Creativity"
                   // bare-input: the parchment field look (a light wash) made this dark tray's field unreadable (owner, Nov 5).
-                  className="bare-input h-9 min-w-0 flex-1 rounded-full border px-3.5 text-[15px] placeholder:italic placeholder:text-[rgba(243,231,203,.45)]"
+                  // No browser focus ring (blue on iPhone, owner Nov 19): the gold rim brightens instead; 16px so iOS doesn't zoom.
+                  className="bare-input h-9 min-w-0 flex-1 rounded-full border px-3.5 text-[16px] outline-none placeholder:italic placeholder:text-[rgba(243,231,203,.45)] focus:outline-none focus:border-[#f2d58a]!"
                   style={{ borderColor: "#8a6c2c", background: "rgba(0,0,0,.25)", color: "#f3e7cb", boxShadow: "inset 0 1px 3px rgba(0,0,0,.5)" }}
                 />
                 <button type="button" onClick={add} disabled={!name.trim()} className="h-9 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
@@ -194,7 +195,7 @@ function StatRow({ stat, pct, xp, isAdventure, onPct }: { stat: string; pct: num
         {statAbbr(stat)}
       </span>
       {/* The whole name, wrapping if it must (it was cut off; owner, Nov 5). */}
-      <span className="w-[92px] shrink-0 text-[14px] leading-tight [overflow-wrap:anywhere]" style={{ color: "var(--t-ink)" }}>
+      <span className="min-w-0 flex-1 text-[14px] leading-tight [overflow-wrap:anywhere] sm:w-[92px] sm:flex-none sm:shrink-0" style={{ color: "var(--t-ink)" }}>
         {stat}
       </span>
       <button type="button" onClick={() => onPct(pct - 5)} disabled={pct <= 0} aria-label={`Less XP to ${stat}`} className={step} style={stepStyle}>
@@ -208,7 +209,8 @@ function StatRow({ stat, pct, xp, isAdventure, onPct }: { stat: string; pct: num
         value={pct}
         onChange={(e) => onPct(Number(e.target.value))}
         aria-label={`Share of XP to ${stat}`}
-        className={isAdventure ? "gilded-range h-8 min-w-0 flex-1" : "h-8 min-w-0 flex-1"}
+        // Phones: no room for a working slider beside the name (it shrank to its knob), so − and + do it (owner, Nov 19).
+        className={isAdventure ? "gilded-range hidden h-8 min-w-0 flex-1 sm:block" : "hidden h-8 min-w-0 flex-1 sm:block"}
         style={isAdventure ? { ["--p" as string]: `${pct}%` } : { accentColor: "var(--t-accent)" }}
       />
       <button type="button" onClick={() => onPct(pct + 5)} disabled={pct >= 100} aria-label={`More XP to ${stat}`} className={step} style={stepStyle}>

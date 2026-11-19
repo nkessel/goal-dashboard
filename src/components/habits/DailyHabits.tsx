@@ -1,8 +1,9 @@
 "use client";
 
 import { stepsComplete } from "@/lib/habit-steps";
+import { FeltInline, setFeltHabit, useFeltHabit } from "@/components/ui/FeltAsk";
 import { GearIcon, SnoozeIcon } from "@/components/ui/Icons";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -66,6 +67,9 @@ export function DailyHabits({
 }) {
   const day = useLocalDay();
   // Closed until opened (the header still shows how the day is going).
+  // "How do you feel?" under the habit just ticked (owner, Nov 19).
+  const feltFor = useFeltHabit();
+  const closeFelt = useCallback(() => setFeltHabit(null), []);
   const [open, setOpen] = useState(false);
   const [look, setLook] = useState<HeaderLook>("togo");
   const [mark, setMark] = useState<HabitMark>("seedling");
@@ -336,8 +340,15 @@ export function DailyHabits({
     startTransition(async () => {
       try {
         // Done and undone share one key, so only the latest waits when offline.
-        if (next) await saveOrQueue("completeRite", { id: h.id, day }, `rite:${h.id}:${day}`);
-        else await saveOrQueue("uncompleteRite", { id: h.id, day }, `rite:${h.id}:${day}`);
+        if (next) {
+          const out = await saveOrQueue("completeRite", { id: h.id, day }, `rite:${h.id}:${day}`);
+          // "How do you feel?" (owner, Nov 19), once it's saved.
+          if (!out.queued) setFeltHabit(h.id);
+        }
+        else {
+          await saveOrQueue("uncompleteRite", { id: h.id, day }, `rite:${h.id}:${day}`);
+          if (feltFor === h.id) setFeltHabit(null);
+        }
       } catch (e) {
         setOptimistic((o) => ({ ...o, [h.id]: !next }));
         setError(e instanceof Error ? e.message : "Couldn't save that.");
@@ -854,6 +865,7 @@ export function DailyHabits({
                       })}
                     </ul>
                   )}
+                  {feltFor === h.id && day && <FeltInline target={{ kind: "habit", riteId: h.id, day }} onClose={closeFelt} />}
                 </div>
                 </SwipeReveal>
                 {/learn(ing)? (a )?language|language practice/i.test(h.title) && <LanguagePractice />}

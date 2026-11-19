@@ -53,29 +53,40 @@ function isTaskOverdue(task: Task): boolean {
   return !!when && new Date(when).getTime() < Date.now();
 }
 
+/**
+ * Before the page has taken over on the device, due words are worked out in the owner's time zone, not
+ * the server's (UTC), so the first picture matches what the browser draws (owner, Nov 19: Today redrew
+ * itself on every open because "Tomorrow" on the phone was "Sat" on the server). On the device: its own zone.
+ */
+const FIRST_ZONE = "America/New_York";
+/** Days from today to `d`, in `zone` (or the device's own). */
+function daysAhead(d: Date, zone?: string): number {
+  const key = (x: Date) => {
+    const [y, m, dd] = x.toLocaleDateString("en-CA", { timeZone: zone }).split("-").map(Number);
+    return Date.UTC(y, m - 1, dd);
+  };
+  return Math.round((key(d) - key(new Date())) / 86_400_000);
+}
+
 /** "Due today, 3:00 PM" / "Due tomorrow" / "Due Fri, Oct 9" — read like the mockup's "Due today". */
-function dueLabel(iso: string): string {
+function dueLabel(iso: string, zone?: string): string {
   const d = new Date(iso);
-  const now = new Date();
-  const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const diff = Math.round((day(d) - day(now)) / 86_400_000);
-  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const diff = daysAhead(d, zone);
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone: zone });
   if (diff === 0) return `Due today, ${time}`;
   if (diff === 1) return `Due tomorrow, ${time}`;
-  if (diff > 1 && diff < 7) return `Due ${d.toLocaleDateString(undefined, { weekday: "long" })}`;
-  return `Due ${d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}`;
+  if (diff > 1 && diff < 7) return `Due ${d.toLocaleDateString(undefined, { weekday: "long", timeZone: zone })}`;
+  return `Due ${d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", timeZone: zone })}`;
 }
 
 /** The due day in a word, for the card's right column: "Today" / "Tomorrow" / "Thu" / "Nov 10" (no clock time: owner, Nov 2). */
-function dueShort(iso: string): string {
+function dueShort(iso: string, zone?: string): string {
   const d = new Date(iso);
-  const now = new Date();
-  const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const diff = Math.round((day(d) - day(now)) / 86_400_000);
+  const diff = daysAhead(d, zone);
   if (diff === 0) return "Today";
   if (diff === 1) return "Tomorrow";
-  if (diff > 1 && diff < 7) return d.toLocaleDateString(undefined, { weekday: "short" });
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  if (diff > 1 && diff < 7) return d.toLocaleDateString(undefined, { weekday: "short", timeZone: zone });
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: zone });
 }
 
 /** "25m" / "1h" / "1h 30m" — compact estimate format for the card's clock row. */
@@ -876,7 +887,7 @@ export function TaskRow({
             <span
               className="flex items-center gap-1 whitespace-nowrap text-[12px] font-semibold leading-none"
               style={{ color: isOverdue ? "var(--t-warn)" : isAdventure ? "#5a4a30" : metaColor }}
-              title={isOverdue ? `Overdue · ${new Date((task.due_at ?? task.scheduled_start)!).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : dueLabel((task.due_at ?? task.scheduled_start)!)}
+              title={isOverdue ? `Overdue · ${new Date((task.due_at ?? task.scheduled_start)!).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: onDevice ? undefined : FIRST_ZONE })}` : dueLabel((task.due_at ?? task.scheduled_start)!, onDevice ? undefined : FIRST_ZONE)}
             >
               {isAdventure ? (
                 // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
@@ -884,7 +895,7 @@ export function TaskRow({
               ) : (
                 "📅"
               )}
-              {isOverdue ? "Overdue" : dueShort((task.due_at ?? task.scheduled_start)!)}
+              {isOverdue ? "Overdue" : dueShort((task.due_at ?? task.scheduled_start)!, onDevice ? undefined : FIRST_ZONE)}
             </span>
           )}
         </div>

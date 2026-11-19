@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { addTaskSessionAction, completeTaskAction, createQuestAction, reopenTaskAction, unscheduleTaskAction } from "@/app/actions";
+import { addTaskSessionAction, createQuestAction, reopenTaskAction, unscheduleTaskAction } from "@/app/actions";
 import { FailQuest } from "@/components/tasks/FailQuest";
-import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
+import { completeQuestNow } from "@/lib/complete-quest-now";
+import { clearQuestNow, markReopenedNow, questSig, useQuestNow } from "@/lib/failed-now";
 import { SlotPickerDialog } from "@/components/tasks/SlotPickerDialog";
 import { sessionRef } from "@/lib/calendar-task-window";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
@@ -24,6 +25,8 @@ export type MenuTarget = { kind: "task"; task: Task; start: Date; end: Date } | 
  */
 export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: MenuTarget; x: number; y: number; theme: "calm" | "adventure"; onClose: () => void }) {
   const router = useRouter();
+  // Completed, failed or reopened a moment ago on this page: the menu offers what fits the card as it looks now.
+  const shown = useQuestNow(target.kind === "task" ? target.task : undefined);
   const ref = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<"menu" | "followup" | "look" | "place" | "fail">("menu");
   const place = useQuestPlace(target.kind === "task" ? target.task.id : undefined);
@@ -115,7 +118,7 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
               <button type="button" role="menuitem" data-mi="open" className={item} style={{ color: "var(--t-ink)" }} onClick={() => setEditing(target.task)}>
                 Edit quest
               </button>
-              {target.task.status !== "completed" && (
+              {shown?.status !== "completed" && (
                 <button
                   type="button"
                   role="menuitem"
@@ -123,18 +126,11 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
                   className={item}
                   style={{ color: "var(--t-ink)" }}
                   disabled={pending}
-                  onClick={() =>
-                    startTransition(async () => {
-                      const t = target.task;
-                      const fd = new FormData();
-                      fd.set("taskId", t.id);
-                      const res = await completeTaskAction(fd).catch(() => null);
-                      if (!res) return setError("Couldn't complete it. Try again.");
-                      celebrateQuest({ taskId: t.id, title: t.title, description: t.description ?? null, xp: t.xp_value, iconSrc: t.icon_source === "ai" || t.icon_source === "library" ? t.icon_key : null, totalXp: res?.totalXp ?? null, coinsEarned: res?.coinsEarned ?? 0 });
-                      router.refresh();
-                      onClose();
-                    })
-                  }
+                  onClick={() => {
+                    // The check lands on the card at once; the menu closes and the celebration follows.
+                    void completeQuestNow(target.task, () => router.refresh());
+                    onClose();
+                  }}
                 >
                   Complete quest
                 </button>
@@ -178,12 +174,12 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
             Schedule follow-up quest
           </button>
           {/* Below the last divider (owner, Nov 13): failing a quest, or taking a failure back. */}
-          {target.kind === "task" && target.task.status !== "completed" && (
+          {target.kind === "task" && shown?.status !== "completed" && (
             <button type="button" role="menuitem" data-mi="fail" className={`${item} border-t`} style={{ color: "#8a2a1c", borderColor: "rgba(139,112,64,.25)" }} onClick={() => setMode("fail")}>
               ✕ Quest failure
             </button>
           )}
-          {target.kind === "task" && target.task.status === "completed" && target.task.failed_at && (
+          {target.kind === "task" && shown?.status === "completed" && shown.failed_at && (
             <button
               type="button"
               role="menuitem"
@@ -191,13 +187,15 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
               className={`${item} border-t`}
               style={{ color: "var(--t-ink)", borderColor: "rgba(139,112,64,.25)" }}
               disabled={pending}
-              onClick={() =>
-                startTransition(async () => {
-                  await reopenTaskAction(target.task.id).catch(() => {});
-                  router.refresh();
-                  onClose();
-                })
-              }
+              onClick={async () => {
+                // Shown open at once and the menu closes; back to failed if the server says no.
+                const t = target.task;
+                markReopenedNow(t.id, questSig(t));
+                onClose();
+                const ok = await reopenTaskAction(t.id).then(() => true, () => false);
+                if (!ok) clearQuestNow(t.id);
+                router.refresh();
+              }}
             >
               Undo quest failure
             </button>

@@ -2934,6 +2934,18 @@ button.night-time:focus-visible { outline: none; border-color: #a88a3f; box-shad
 .qe-fact:hover { border-color: #a88a3f; }
 .qe-fact[data-open="true"] { background: rgba(217, 180, 95, 0.35); border-color: #8a6116; box-shadow: 0 0 0 2px rgba(217, 180, 95, 0.3); }
 .qe-fact-panel { border: 1px solid rgba(139, 112, 64, 0.35); background: rgba(255, 250, 238, 0.45); }
+/* A pill's tray opens right under the pill's own line, with a point aimed at it (owner picked "the pointer", Nov 19). See ui/PillTrays.tsx. */
+.pill-trays > [data-pill-tray] { flex-basis: 100%; min-width: 0; }
+.pill-tray-box { position: relative; border: 1px solid rgba(138, 97, 22, 0.55); background: #faefd2; box-shadow: 0 3px 10px rgba(74, 57, 19, 0.15); }
+.pill-trays > .pill-tray-box { margin-top: 4px; }
+.pill-tray-pad { padding-top: 8px; }
+/* The editors' trays slide in with `reveal`, whose clip would cut off the point: same motion, with room for it. */
+.pill-tray-box.reveal { animation-name: pill-tray-reveal; }
+@keyframes pill-tray-reveal {
+  from { opacity: 0; transform: translateY(-6px); clip-path: inset(-10px -12px 100% -12px); }
+  to { opacity: 1; transform: none; clip-path: inset(-10px -12px -12px -12px); }
+}
+.pill-tray-box::before { content: ""; position: absolute; top: -7.5px; left: clamp(10px, calc(var(--tray-x, 28px) - 7px), calc(100% - 24px)); width: 14px; height: 14px; background: #faefd2; border-left: 1px solid rgba(138, 97, 22, 0.55); border-top: 1px solid rgba(138, 97, 22, 0.55); border-top-left-radius: 3px; transform: rotate(45deg); transition: left 0.2s ease; pointer-events: none; }
 /* Check-in −/+ beside each slider; a 44px touch area around a small mark. */
 .ec-step { color: var(--ec-gold, #f2d27e); border: 1px solid var(--ec-line, rgba(217,180,95,.5)); background: rgba(255, 250, 238, 0.12); }
 .ec-step::before { content: ""; position: absolute; inset: -8px; }
@@ -3531,3 +3543,34 @@ html[data-tour-open] [data-perched-owl] { visibility: hidden; }
 /* Quest Drop: the falling card shakes when it can't go that way. */
 @keyframes quest-drop-shake { 0%, 100% { translate: 0 0; } 25% { translate: -4px 0; } 75% { translate: 4px 0; } }
 .quest-drop-shake { animation: quest-drop-shake 0.18s ease-in-out; }
+
+/* "How do you feel?" in place under a ticked habit or a logged event (owner, Nov 19): slides open and closed. */
+.felt-in { animation: felt-in 0.28s cubic-bezier(.2,.8,.2,1) both; overflow: hidden; }
+.felt-out { animation: felt-out 0.26s ease both; overflow: hidden; }
+@keyframes felt-in { from { max-height: 0; opacity: 0; } to { max-height: 120px; opacity: 1; } }
+@keyframes felt-out { from { max-height: 120px; opacity: 1; } to { max-height: 0; opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .felt-in, .felt-out { animation-duration: 0.01s; } }
+
+/* The toucan's question (owner, Nov 19): a grey mist like the old welcome fog, its look set in Settings. */
+.tq-in { animation: tq-in 0.45s ease both; }
+.tq-out { animation: tq-out 0.32s ease both; }
+@keyframes tq-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tq-out { from { opacity: 1; } to { opacity: 0; } }
+.tq-in .tq-card { animation: card-pop-in 0.42s cubic-bezier(.2,.8,.2,1) 0.12s both; }
+.tq-mist { --mist: 0.7; backdrop-filter: blur(calc(3px + var(--mist) * 8px)) saturate(.4); -webkit-backdrop-filter: blur(calc(3px + var(--mist) * 8px)) saturate(.4); }
+.tq-mist[data-bg="mist"] { background: radial-gradient(ellipse 80% 70% at 50% 45%, rgba(206, 212, 216, calc(.35 + var(--mist) * .5)), rgba(132, 140, 146, calc(.5 + var(--mist) * .45))); }
+.tq-mist[data-bg="fog"][data-fog="dawn"] { background: radial-gradient(ellipse 80% 70% at 50% 45%, rgba(255, 243, 236, calc(.35 + var(--mist) * .55)), rgba(226, 212, 214, calc(.5 + var(--mist) * .45))); }
+.tq-mist[data-bg="fog"][data-fog="day"] { background: radial-gradient(ellipse 80% 70% at 50% 45%, rgba(250, 252, 255, calc(.35 + var(--mist) * .55)), rgba(214, 224, 232, calc(.5 + var(--mist) * .45))); }
+.tq-mist[data-bg="fog"][data-fog="dusk"] { background: radial-gradient(ellipse 80% 70% at 50% 45%, rgba(255, 230, 220, calc(.35 + var(--mist) * .55)), rgba(210, 186, 196, calc(.5 + var(--mist) * .45))); }
+.tq-mist[data-bg="fog"][data-fog="night"] { background: radial-gradient(ellipse 80% 70% at 50% 45%, rgba(196, 206, 240, calc(.35 + var(--mist) * .55)), rgba(120, 132, 176, calc(.5 + var(--mist) * .45))); }
+.tq-mist[data-bg="forest"] { background: radial-gradient(ellipse at 50% 60%, rgba(10, 28, 22, calc(.5 + var(--mist) * .35)), rgba(4, 12, 10, calc(.7 + var(--mist) * .25))); }
+.tq-mist[data-bg="clear"] { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(0, 0, 0, calc(var(--mist) * .25)); }
+.tq-mist[data-bg="mist"]::after, .tq-mist[data-bg="fog"]::after {
+  content: ""; position: absolute; inset: 0; opacity: calc(.4 + var(--mist) * .6);
+  background:
+    radial-gradient(ellipse 40% 22% at 30% 40%, rgba(255, 255, 255, 0.5), transparent 70%),
+    radial-gradient(ellipse 36% 20% at 72% 62%, rgba(255, 255, 255, 0.4), transparent 70%),
+    radial-gradient(ellipse 50% 24% at 50% 88%, rgba(255, 255, 255, 0.35), transparent 70%);
+  animation: fog-breathe 6s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) { .tq-mist::after { animation: none; } }

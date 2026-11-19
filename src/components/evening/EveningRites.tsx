@@ -1,9 +1,10 @@
 "use client";
 
 import { stepsComplete } from "@/lib/habit-steps";
+import { FeltInline, setFeltHabit, useFeltHabit } from "@/components/ui/FeltAsk";
 import { stopKeysButSave } from "@/lib/stop-keys";
 import { progressWords } from "@/lib/progress-words";
-import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { SettingsGear } from "@/components/ui/SettingsGear";
 import {
   DndContext,
@@ -191,6 +192,9 @@ export function EveningRites({
   const day = useLocalDay();
   const now = useSyncExternalStore(subscribeMinute, () => Math.floor(Date.now() / 60_000) * 60_000, () => 0);
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({});
+  // "How do you feel?" under the rite just completed (owner, Nov 19).
+  const feltFor = useFeltHabit();
+  const closeFelt = useCallback(() => setFeltHabit(null), []);
   const [editing, setEditing] = useState<RiteView | { new: true; core: boolean } | null>(null);
   const [miniOpen, setMiniOpen] = useState(false);
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -259,8 +263,15 @@ export function EveningRites({
     }
     startTransition(async () => {
       try {
-        if (next) await saveOrQueue("completeRite", { id: r.id, day, pct }, `rite:${r.id}:${day}`);
-        else await saveOrQueue("uncompleteRite", { id: r.id, day }, `rite:${r.id}:${day}`);
+        if (next) {
+          const out = await saveOrQueue("completeRite", { id: r.id, day, pct }, `rite:${r.id}:${day}`);
+          // "How do you feel?" (owner, Nov 19), once it's saved.
+          if (!out.queued) setFeltHabit(r.id);
+        }
+        else {
+          await saveOrQueue("uncompleteRite", { id: r.id, day }, `rite:${r.id}:${day}`);
+          if (feltFor === r.id) setFeltHabit(null);
+        }
       } catch (e) {
         setOptimistic((o) => ({ ...o, [r.id]: !next }));
         setError(e instanceof Error ? e.message : "Couldn't save that.");
@@ -665,6 +676,7 @@ export function EveningRites({
           })}
         </ul>
       )}
+      {!overlay && feltFor === r.id && day && <FeltInline target={{ kind: "habit", riteId: r.id, day }} onClose={closeFelt} />}
       </div>
     );
     // Swipe right to skip it tonight; swipe left to snooze it until tomorrow, after a quick "sure?" (owner, Nov 3: no delete on a swipe).

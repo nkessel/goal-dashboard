@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file is the map: the standing rules, how to ship, and where everything else lives. It is loaded into every session, so **keep it short** (see "Keeping this file current"). If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-11-19 (import card: one When pill, Flexible · Fixed; Quest Drop shipped; latest shipped work is the top entry of `docs/SHIPPED.md`). `main` @ see `git log`.
+- **Last updated:** 2026-11-19 (calendar events as quests live, XP by length; calendar quest completion fix; stat XP: new-stat field ring fixed, cleanup mockups sent; opening the app steadier: walkthrough taps, no reload after deploys, Today hydration, one startup request; Run B handoff in `docs/RUN-B-HANDOFF.md`; import card: one When pill, Flexible · Fixed; Quest Drop shipped; latest shipped work is the top entry of `docs/SHIPPED.md`). `main` @ see `git log`.
 - **Live app:** https://goal-dashboard-kappa.vercel.app (the owner does NOT have tinyquest.win; never send links on it)
 - **Pending in-app feedback:** the database is the full list (query in section 3; by screen in `docs/FEEDBACK-BY-SCREEN.md`). 316 open on Nov 12; many are already built but were never marked: check the code and `docs/SHIPPED.md` before building one again, and mark it. If the Supabase connector is missing, ask the owner to connect it (claude.ai Settings › Connectors).
 
@@ -13,6 +13,7 @@ Read these only when you need them. Don't load them all at the start.
 | Open | When |
 |---|---|
 | `docs/PRIORITIES.md` | Choosing what to build: the owner's top dev priorities (Nov 11), the ranked table, his "Next up" queue, the "Needs a real-iPhone look" list. Some items have shipped since; check `docs/SHIPPED.md` first. |
+| `docs/RUN-B-HANDOFF.md` | **Starting Run B (Sonnet) of the dev plan, on any account:** status, what's in flight, access, the prompt. The dev plans themselves are copied into `docs/plans/`. |
 | `docs/BUILD-PLAN.md` | **Lighter-model sessions work from this, top to bottom.** Next there: task 9 (language window), then 11–16. |
 | `docs/REPEAT-ASKS.md` | Before work that touches an ask the owner has made 3+ times (see `CLAUDE.md`). |
 | `docs/FEEDBACK-BY-SCREEN.md` | Before changing any screen: its open notes and the `universal` ones (see `CLAUDE.md`). |
@@ -31,12 +32,14 @@ The owner's Claude project also keeps a priorities list by model (Nov 16) in its
 Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Read the topic's entry there before touching it. When something new waits on him (a design review, a pick), add it there with its branch, review page link and date, and add its name to this list.
 
 - `review/prioritize-bars` (taller Prioritize bars): built Nov 14, not UI-checked or reviewed.
+- `review/subquests-sequence`, `review/insights-nov19` (quest editor's one Sub-quests & sequence pill; Insights check-in log, Wheel of Time by hand): built Nov 19, review page sent.
 - `review/boards-nov18` (calendar and boards batch, incl. the owner's two new calendar ideas): built Nov 19, review page sent.
 - `review/additional-habits` (habits not on today in an "Additional habits" fold, still tickable): built Nov 18, review page sent.
 - `review/time-ranges-lesson-button` (time ranges for habits and quests, chosen habits in the auto-scheduler, Complete lesson button): built Nov 16, review page sent, waiting on his OK or notes.
 - Insights on one graph for every metric (owner, Nov 16): not built. The toucan offering habits: on hold (both in WAITING).
 - Merging Daily Habits and Today's Quests on Today: brainstorm with him first.
-- The welcome screen is paused (off by default); a toucan-only version is next: mock it up first.
+- `review/stat-xp-under-slider` (each stat's XP under the quest editor's XP slider, his idea): built Nov 19, review page sent.
+- The welcome screen is paused (off by default); toucan-only mockups A/B/C sent Nov 19: build his pick.
 - The email to Daniel about his Champion title: needs his OK and wording.
 - Waiting on his iPhone: a list of things cloud sessions can't check (in `docs/WAITING.md` and `docs/PRIORITIES.md`).
 - When weekly / monthly / yearly reviews are built: remind him of the lines he saved (in `docs/WAITING.md`).
@@ -67,15 +70,15 @@ Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Rea
 - Data layer: `src/lib/data/*.ts` (all `server-only`).
 - Pure logic: `src/lib/*.ts`.
 - UI: `src/components/<area>/`.
-- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0089_event_faces.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
-- `profiles.life_wheel` (jsonb) is a catch-all for per-profile extras, read through `readExtras()` in `actions.ts`. **Always merge into it, never overwrite it.**
+- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0090_life_wheel_guard.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
+- `profiles.life_wheel` (jsonb) is a catch-all for per-profile extras, read through `readExtras()` in `actions.ts`. **Always merge into it, never overwrite it.** A trigger keeps top-level keys a write leaves out and logs them in `life_wheel_drops` (check it if settings vanish).
 - `app_defaults` table holds "default for all accounts" settings plus server-only `secret.*` keys (never shown as settings).
 
 ---
 
 ## 3. How to ship (the loop)
 
-**Design review first (owner, Nov 14, replaces "ship straight to the live app"):** anything that changes what's on screen waits on a `review/<topic>` branch until the owner has seen its screenshots on a review page and said OK; then merge to `main`. Steps in `CLAUDE.md` › "Design review before shipping". Changes with nothing visible still ship straight. When the owner says "update the site", build the pending feedback, then send it for review.
+**Design review for design changes only (owner, Nov 19, replaces the Nov 14 rule):** new UI or design changes wait on a `review/<topic>` branch with a mockup/screenshot review page until the owner says OK; then merge to `main`. Bug fixes and everything else ship straight to `main` after the build and UI check. Steps in `CLAUDE.md` › "Design review before shipping". When the owner says "update the site", ship the pending feedback's fixes straight and send its design changes for review.
 
 1. **Sync.** `git fetch origin main` and start from the latest `main`. Other sessions ship to it several times a day.
 2. **Read pending feedback** (in-app notes live in `journal_entries` with `kind = 'feedback'`):

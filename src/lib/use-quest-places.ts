@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { questPlacesAction, setQuestPlaceAction } from "@/app/actions";
+import { fromStartup } from "@/lib/startup";
 
 // Where each quest happens ("Natick library"), read once per page load and shared by the cards and the editor.
 // Kept on the account (`life_wheel.questPlaces`, by quest id) until quests have a column for it (owner, Nov 3).
@@ -12,7 +13,7 @@ const emit = () => subs.forEach((f) => f());
 
 function subscribe(cb: () => void) {
   subs.add(cb);
-  loading ??= questPlacesAction()
+  loading ??= fromStartup("questPlaces", questPlacesAction)
     .then((p) => {
       places = { ...p, ...places };
       emit();

@@ -10,6 +10,7 @@ import { SnoozeIcon } from "@/components/ui/Icons";
 import { AVATAR_STYLE_OPTIONS, DEFAULT_AVATAR_STYLE, SAMPLE_AVATAR_PROMPTS } from "@/lib/avatar-prompts";
 import { readTour, subscribeTour, writeTour } from "@/lib/tour-store";
 import { useTourLook } from "@/lib/tour-look";
+import { fromStartup } from "@/lib/startup";
 
 /**
  * The new-adventurer walkthrough, guided by the Great Toucan Spirit (owner, Nov 13–15; every account goes
@@ -265,7 +266,7 @@ export function Walkthrough() {
   // The account's place in the walkthrough wins over this device's (latest change wins); the name it goes by
   // is offered when the toucan asks what to call you.
   useEffect(() => {
-    tourAction()
+    fromStartup("tour", tourAction)
       .then((t) => {
         const here = readTour();
         if (!t) {
@@ -273,7 +274,7 @@ export function Walkthrough() {
         } else if (!here || (t.at ?? 0) >= (here.at ?? 0)) writeTour(t, false);
       })
       .catch(() => {});
-    tourNameAction()
+    fromStartup("tourName", tourNameAction)
       .then((n) => n && setNameDraft((d) => d || readTour()?.name || n))
       .catch(() => {});
   }, []);
@@ -485,6 +486,8 @@ export function Walkthrough() {
   }, [step]);
 
   if (!s || !showing) return null;
+  // A tap in the dark around a show-and-tell step: his card gives a small bow, so you know where to look.
+  const nudge = () => cardRef.current?.animate([{ scale: "1" }, { scale: "1.025" }, { scale: "1" }], { duration: 280, easing: "ease-out" });
 
   const vw = typeof window === "undefined" ? 390 : window.innerWidth;
   const vh = typeof window === "undefined" ? 800 : window.innerHeight;
@@ -590,6 +593,19 @@ export function Walkthrough() {
         data-dark={step === "intro" ? "true" : undefined}
         style={{ left: 0, top: 0, ...(rect ? { transform: `translate(${rect.left - 6}px, ${rect.top - 6}px)`, width: rect.width + 12, height: rect.height + 12 } : { transform: `translate(${vw / 2}px, ${vh / 2}px)`, width: 0, height: 0 }) }}
       />
+      {/* A step that only shows and tells (no "press" line) keeps taps in the dark from reaching the screen
+          behind it (owner, Nov 19: tapping around the tutorial opened the avatar, the menu, other screens).
+          The lit part stays tappable; a tap in the dark nudges his card instead. Scrolling still passes. */}
+      {!s.press &&
+        (rect
+          ? [
+              { left: 0, top: 0, width: "100vw", height: Math.max(0, rect.top - 6) },
+              { left: 0, top: rect.bottom + 6, width: "100vw", height: `max(0px, calc(100vh - ${rect.bottom + 6}px))` },
+              { left: 0, top: rect.top - 6, width: Math.max(0, rect.left - 6), height: rect.height + 12 },
+              { left: rect.right + 6, top: rect.top - 6, width: `max(0px, calc(100vw - ${rect.right + 6}px))`, height: rect.height + 12 },
+            ]
+          : [{ left: 0, top: 0, width: "100vw", height: "100vh" }]
+        ).map((box, i) => <div key={i} aria-hidden data-tour-guard className="tour-guard fixed z-[133]" style={box} onClick={nudge} onContextMenu={(e) => e.preventDefault()} />)}
       {/* Placed by transform, so following the control as it scrolls never counts as the page jumping. */}
       <Remember value={bottom} onChange={setLastB} />
       {/* One instruction at a time, floating right by what to tap: its own look, apart from his card. */}

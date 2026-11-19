@@ -1,5 +1,6 @@
 "use client";
 
+import { PillTrays } from "@/components/ui/PillTrays";
 import { XpGuide } from "@/components/tour/XpGuide";
 import { IconScale } from "./IconScale";
 import { sessionRef } from "@/lib/calendar-task-window";
@@ -2699,8 +2700,8 @@ export function QuestEditorDialog({
               const facts = layout.order.filter((x) => FACT_KEYS.includes(x) && !layout.folded.includes(x) && partShown[x]);
               if (facts[0] !== k) return null;
               return (
-                <Fragment key="facts">
-                  <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Quick details">
+                <PillTrays key="facts" open={!!factOpen}>
+                  <div className="contents" role="group" aria-label="Quick details">
                     {facts.map((f) => (
                       <button
                         key={f}
@@ -2744,12 +2745,12 @@ export function QuestEditorDialog({
 
                   </div>
                   {factOpen === "look" && task && (
-                    <div key="look" className="reveal qe-fact-panel rounded-xl p-3">
+                    <div key="look" data-pill-tray className="reveal qe-fact-panel pill-tray-box rounded-xl p-3">
                       <CardLookPicker task={task} />
                     </div>
                   )}
                   {factOpen === "place" && task && (
-                    <div key="place" className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
+                    <div key="place" data-pill-tray className="reveal qe-fact-panel pill-tray-box flex flex-col gap-2 rounded-xl p-3">
                     <div className="flex items-center gap-2">
                       <PinGlyph />
                       <input
@@ -2773,7 +2774,7 @@ export function QuestEditorDialog({
                     </div>
                   )}
                   {factOpen === "due" && (
-                    <div key="due" className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3" data-tour="panel-due">
+                    <div key="due" data-pill-tray className="reveal qe-fact-panel pill-tray-box flex flex-col gap-2 rounded-xl p-3" data-tour="panel-due">
                       <div className="flex flex-wrap items-center gap-1">
                         {dueQuickPicks().map((q) => (
                           <button key={q.label} type="button" aria-pressed={dueDate === q.day} onClick={() => setDueDate(q.day)} className="qe-fact h-8 rounded-full px-2.5 text-[13px] font-semibold" data-open={dueDate === q.day ? "true" : undefined}>
@@ -2815,11 +2816,11 @@ export function QuestEditorDialog({
                   )}
 
                   {factOpen && factOpen !== "due" && factOpen !== "bonus" && factOpen !== "place" && factOpen !== "look" && facts.includes(factOpen) && (
-                    <div key={factOpen} className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3" data-tour={`panel-${factOpen}`}>
+                    <div key={factOpen} data-pill-tray className="reveal qe-fact-panel pill-tray-box flex flex-col gap-2 rounded-xl p-3" data-tour={`panel-${factOpen}`}>
                       {partNodes[factOpen]}
                     </div>
                   )}
-                </Fragment>
+                </PillTrays>
               );
             }
             return <Fragment key={k}>{partNodes[k]}</Fragment>;
