@@ -1471,7 +1471,8 @@ export function QuestEditorDialog({
                     type="button"
                     onClick={() => setSeqMenu((o) => !o)}
                     aria-expanded={seqMenu}
-                    className="qe-fact flex min-h-8 items-center gap-1.5 self-start"
+                    className="qe-fact flex h-9 items-center gap-1.5 self-start rounded-full px-3"
+                    data-open={seqMenu ? "true" : undefined}
                     title="Sub-quests inside this quest, or quests before and after it"
                   >
                     <StepsGlyph size={15} />
