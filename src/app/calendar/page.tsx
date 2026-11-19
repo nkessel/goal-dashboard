@@ -19,6 +19,7 @@ import { timedHabitsFrom } from "@/lib/timed-habits";
 import { cleanRepeat } from "@/lib/habit-repeat";
 import { CalendarSlide, SlideLink } from "@/components/calendar/CalendarNav";
 import { SchedulingDrawer } from "@/components/calendar/SchedulingList";
+import { QuestDropButton } from "@/components/calendar/quest-drop/QuestDropButton";
 import { getSchedulingFolders, listSchedulingList } from "@/lib/data/scheduling";
 import {
   addDays,
@@ -268,6 +269,8 @@ export default async function CalendarPage({
                 >
                   Plan the month
                 </Link>
+                {/* Quest Drop (owner, Nov 18): the scheduling list as a falling-blocks game. */}
+                <QuestDropButton tasks={toSchedule} theme={theme} />
                 {withMom && (
                   <Link
                     href="/plan?mode=mom"
