@@ -715,7 +715,7 @@ function Bars({ value, onPick, big = false }: { value: number; onPick: (n: numbe
       aria-valuenow={value}
       data-prioritize-bars
       className="flex cursor-pointer touch-none select-none items-center outline-offset-4"
-      style={{ gap: big ? 5 : 3, width: big ? 230 : 96, height: big ? 40 : 30 }}
+      style={{ gap: big ? 6 : 3, width: big ? 230 : 96, height: big ? 44 : 30 }}
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId);
         drag.current = { x: e.clientX, moved: false, start: value };
@@ -748,8 +748,9 @@ function Bars({ value, onPick, big = false }: { value: number; onPick: (n: numbe
         <span
           key={n}
           aria-hidden
-          className="pointer-events-none block flex-1 rounded-full transition-[background] duration-150"
-          style={{ height: big ? 14 : 9, background: n <= value ? "linear-gradient(180deg,#f6dc8e,#c9a24a)" : "rgba(139,112,64,.18)", border: `1px solid ${n <= value ? "#8a6116" : "rgba(139,112,64,.35)"}` }}
+          className={`pointer-events-none block flex-1 transition-[background] duration-150 ${big ? "rounded-lg" : "rounded-full"}`}
+          // Taller bars, easier to read and tap (owner, Nov 14: "the bars should be taller").
+          style={{ height: big ? 30 : 14, background: n <= value ? "linear-gradient(180deg,#f6dc8e,#c9a24a)" : "rgba(139,112,64,.18)", border: `1px solid ${n <= value ? "#8a6116" : "rgba(139,112,64,.35)"}` }}
         />
       ))}
     </div>
