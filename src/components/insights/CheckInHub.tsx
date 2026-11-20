@@ -304,7 +304,8 @@ function CheckInLog({ readings, metrics, starred, onEdit }: { readings: Reading[
         <h3 className="m-0 text-[12.5px] font-bold uppercase tracking-wide" style={{ color: "var(--ec-soft, rgba(239,230,204,.7))" }}>
           Check-ins
         </h3>
-        <button type="button" onClick={() => setPicking((p) => !p)} aria-expanded={picking} className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold" style={{ border: "1px solid var(--ec-line, rgba(217,180,95,.4))", color: "var(--t-cream)" }}>
+        {/* Just the words and the caret, no pill (owner, Nov 19). */}
+        <button type="button" onClick={() => setPicking((p) => !p)} aria-expanded={picking} className="flex h-7 items-center gap-1 px-1 text-[12.5px] font-semibold" style={{ color: "var(--t-cream)" }}>
           {label}
           <svg width="10" height="10" viewBox="0 0 12 12" aria-hidden style={{ transform: picking ? "rotate(180deg)" : undefined, transition: "transform 200ms" }}>
             <path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
