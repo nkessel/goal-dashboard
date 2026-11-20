@@ -1087,6 +1087,9 @@ export const FLOWS = [
             await h.settle(400);
             await h.check("chart: split, the time panel taller");
           }
+          await h.tap((p) => p.getByRole("button", { name: /^show/i }).first(), "chart: what's shown", { optional: true, expectMove: true });
+          await h.check("chart: the Show list");
+          await h.page.keyboard.press("Escape");
           await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), "chart gear, back", { optional: true, expectMove: true });
           await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: /^merged$/i }).first(), "chart: merged", { optional: true });
           await h.page.keyboard.press("Escape");
