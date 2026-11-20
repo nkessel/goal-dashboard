@@ -1088,6 +1088,14 @@ export const FLOWS = [
               await h.settle(400);
               if (g !== "Some") await h.check(`chart: a month, ${g.toLowerCase()} grid lines`);
             }
+            // XP as coins (owner, Nov 19: off by default, toggled on in the gear).
+            for (const on of [true, false]) {
+              await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), `chart gear, coins ${on}`, { optional: true, expectMove: true });
+              await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByText(/xp as coins/i).first(), `XP as coins ${on ? "on" : "off"}`, { optional: true });
+              await h.page.keyboard.press("Escape");
+              await h.settle(400);
+              if (on) await h.check("chart: a month, XP as coins");
+            }
           }
           await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), "chart gear, week again", { optional: true, expectMove: true });
           await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: /^week$/i }).first(), "chart: week again", { optional: true });

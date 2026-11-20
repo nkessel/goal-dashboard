@@ -53,6 +53,8 @@ type View = {
   timeH?: number;
   /** How many level and hour lines (owner, Nov 19: "a setting to change the density of the lines and labels"). */
   grid?: "few" | "some" | "many";
+  /** XP drawn as stacked coins instead of bars, where "+n XP" won't fit under the days (owner, Nov 19: off by default). */
+  xpCoins?: boolean;
 };
 const GRID_LEVELS = { few: [1, 5, 10], some: [1, 4, 7, 10], many: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] } as const;
 const GRID_LABELS = { few: [1, 5, 10], some: [1, 4, 7, 10], many: [1, 4, 7, 10] } as const;
@@ -516,6 +518,8 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
   const dayW = (W - L - R) / (v1 - v0);
   // A day's width on screen: 18px or more and every day gets its own date (owner, Nov 19).
   const everyDay = dayW >= 14 || dayW * scale >= 18;
+  // One choice for the whole view: if the biggest day's "+n XP" won't fit under it, every day's XP rises into the chart.
+  const xpRises = everyDay && `+${xpMaxShown} XP`.length * (dayW >= 22 ? 10 : 9) * 0.56 > dayW * 0.94;
 
   const tickEvery = visDays <= 7 ? 1 : visDays <= 30 ? 7 : 14;
   const hd = hover !== null ? days[hover] : null;
@@ -640,6 +644,10 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
               <label className="relative z-[1] flex min-h-8 items-center gap-2 text-[14px]" style={{ color: INK }}>
                 <input type="checkbox" checked={view.dots} onChange={() => setV({ dots: !view.dots })} />
                 Show each point
+              </label>
+              <label className="relative z-[1] flex min-h-8 items-center gap-2 text-[14px]" style={{ color: INK }}>
+                <input type="checkbox" checked={!!view.xpCoins} onChange={() => setV({ xpCoins: !view.xpCoins })} />
+                XP as coins (when zoomed out)
               </label>
             </div>
           )}
@@ -872,20 +880,15 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
                     const fs = dayW >= 22 ? 10 : 9;
                     const base = split ? xpY : footY + 25;
                     // Always "+n XP" (owner, Nov 19); where it won't fit, a small gold bar as tall as the day's XP, its number on hover or tap.
-                    if (words.length * fs * 0.56 <= (span > 1 ? dayW * span : dayW) * 0.94)
+                    if (!xpRises)
                       return (
                         <text x={xDay(i)} y={base} textAnchor="middle" fontSize={fs} fontWeight="700" fill={XP_EDGE}>
                           <title>{tip}</title>
                           {words}
                         </text>
                       );
-                    const bh = Math.max(2, 13 * (sum / xpMaxShown));
-                    const bw = Math.min(6, dayW * 0.45);
-                    return (
-                      <rect x={xDay(i) - bw / 2} y={base + 2 - bh} width={bw} height={bh} rx={Math.min(2, bw / 2)} fill={XP_FILL} stroke={XP_EDGE} strokeWidth=".8" data-xp-bar>
-                        <title>{tip}</title>
-                      </rect>
-                    );
+                    // Too narrow for the words: the day's XP rises into the chart instead (drawn behind the lines, below).
+                    return null;
                   })()}
                 </g>
               );
@@ -893,6 +896,35 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
           </g>
           {hover !== null && <line x1={xDay(hover)} x2={xDay(hover)} y1={T} y2={sleepY - 10} stroke={INK_SOFT} strokeWidth="1" strokeDasharray="3 3" />}
 
+          {/* Where "+n XP" won't fit under the days (owner, Nov 19): each day's XP rises into the chart from its foot, a soft
+              gold column behind the lines, up to about two-fifths of the way; or stacked coins (one per 10 XP), from the gear. */}
+          {xpRises && (
+            <g clipPath="url(#plot-clip)" data-xp-rise>
+              {xpByDay.map((v, i) => {
+                if (!v || !inView(i)) return null;
+                const cx = xDay(i);
+                const foot = T + plotH;
+                const tip = `+${v} XP`;
+                if (view.xpCoins) {
+                  const rx = Math.min(7, dayW * 0.38);
+                  return (
+                    <g key={i}>
+                      <title>{tip}</title>
+                      {Array.from({ length: Math.max(1, Math.round(v / 10)) }, (_, k) => (
+                        <ellipse key={k} cx={cx} cy={foot - 3 - k * 5} rx={rx} ry="2.8" fill={XP_FILL} stroke={XP_EDGE} strokeWidth=".9" />
+                      ))}
+                    </g>
+                  );
+                }
+                const h = plotH * 0.42 * (v / xpMaxShown);
+                return (
+                  <rect key={i} x={cx - dayW * 0.32} y={foot - h} width={dayW * 0.64} height={h} rx="2" fill={XP_FILL} opacity={hover === i ? 0.6 : 0.38}>
+                    <title>{tip}</title>
+                  </rect>
+                );
+              })}
+            </g>
+          )}
           {/* Lines */}
           <g clipPath="url(#plot-clip)">
           {visible.map((s) => {
