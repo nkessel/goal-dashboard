@@ -214,8 +214,17 @@ self.addEventListener("fetch", (event) => {
   if (same && (url.pathname.startsWith("/api/") || url.pathname === "/sw.js")) return;
 
   if (req.mode === "navigate" && same) {
-    // A reload asks for the newest on purpose.
-    event.respondWith(req.cache === "reload" || req.cache === "no-cache" || req.cache === "no-store" ? fromNetworkFirst(event) : fromKeptFirst(event));
+    // A reload asks for the newest on purpose. So does a navigation from inside the app (a page loading the new
+    // version after a deploy, a full-page link): the kept copy is only for opening the app. Serving it there put
+    // last night's calendar back on screen mid-use, without a quest made since and a fail just made (owner, Nov 20).
+    const fromApp = (() => {
+      try {
+        return !!req.referrer && new URL(req.referrer).origin === self.location.origin;
+      } catch {
+        return false;
+      }
+    })();
+    event.respondWith(fromApp || req.cache === "reload" || req.cache === "no-cache" || req.cache === "no-store" ? fromNetworkFirst(event) : fromKeptFirst(event));
     return;
   }
   if (same && url.pathname.startsWith("/_next/static/")) {
