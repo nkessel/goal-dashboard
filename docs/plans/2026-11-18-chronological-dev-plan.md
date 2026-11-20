@@ -120,6 +120,7 @@ Say OK, give notes, or drop each of these, so the splits don't have to work arou
    - the Insights, boards and anti-habits batches
    - **the Insights timeline** (round 3 on the chart page, once the owner OKs it; spec in `docs/WAITING.md` › Insights chart): merged chart by default, split as an option, and **zooming in and out of the dates** (owner, Nov 19): pinch on a phone, trackpad pinch or Ctrl+scroll on a computer, and the range picker; times on the axis only once zoomed in. Plus the "How do you feel?" faces on celebrations, fails, logged events, journal entries, tracked events and habit ticks
    - **the FAB's check-in** [5156ffbe] (owner, Nov 16: "should be more developed… doesn't even have an option to add your own metrics"): the same check-in as on Insights (your own metrics, + metric, journal, faces), with the Insights check-in notes [a6fdd579, bd692d57, 78004f71] since they share the code. Asked about again Nov 19.
+   - **the toucan's question can carry parts of the full welcome screen** (owner, Nov 20): its gear (settings in context) offers the big welcome screen's sections (sleep check-in, mood check-in, and the rest), each added as a button on the toucan's screen in the order chosen there (drag to order, eye to hide, as in `WelcomeArrange`). Builds on `review/faces-feel`'s `ToucanQuestion`.
    - habits in the day's plan, part 2
    - tests for the XP and coin math
 
