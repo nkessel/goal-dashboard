@@ -98,5 +98,17 @@
   {
     "match": "^insights\\|layout-shift\\|.*\\|up to check-in: kept from earlier$",
     "reason": "Nov 20: a check-in started earlier is kept on this device (localStorage), which only the browser can read, so its ratings open the form after load. Only when a draft exists. Follow-up in docs/WAITING.md: keep the draft in a cookie so the server draws it."
+  },
+  {
+    "match": "\\|(covered-by-bar|floating-overlap)\\|.*kept-target|\"What's most important today\"",
+    "reason": "The kept target (owner, Nov 19, after 'Keep it' on the toucan's question): a small floating marker you drag anywhere, like the feedback bubble; it can sit over whatever is under it. By design."
+  },
+  {
+    "match": "\\|(covered-by-bar|floating-overlap)\\|.*🈲 Language",
+    "reason": "The Language chip (on main before Nov 20): a floating chip you can drag aside, like the feedback bubble. By design."
+  },
+  {
+    "match": "^today\\|layout-shift\\|.*\\|up to check-in open$",
+    "reason": "Nov 20 (merge of the check-in work): the check-in's 'Last night' card shows only on the day's first check-in, which the browser decides after load, so Today's Quests move down once. Follow-up in docs/WAITING.md (with the kept draft): let the server know, via a cookie, so it draws both."
   }
 ]
