@@ -14,6 +14,8 @@ Related: `docs/BUILD-PLAN.md` (tasks for lighter models), `docs/REPEAT-ASKS.md`,
 
 Take them in order. Each is the owner's own ask (note id prefix in brackets; read the full note with the section 3 query, `where id::text like 'xxxx%'`).
 
+0. **Check-in drawn by the server (fix, Sonnet):** the saved draft and the "Last night" card come from the browser after load, so Insights and Today move once. Details in `docs/WAITING.md` top section.
+
 1. **Bug: adding a quest in "Choose tomorrow's quests" clears the whole list** [2664d546], and the quest creator button there is faulty [234f0d70]. Loses work, so first. (`evening/TomorrowQuests.tsx`: local `ticked`/`rowsLocal` state is likely reset when `queued` changes after the add.)
 2. **Right-click menus open as popup menus, not inline trays** [841971c2] (app-wide; quest card ⋯ / right-click, habits, rites).
 3. **Today's "auto-scheduler"/calendar sheet** [a3fe0686]: movable, the calendars' colours as on the calendar screen, choose which calendars show.

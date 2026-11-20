@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file is the map: the standing rules, how to ship, and where everything else lives. It is loaded into every session, so **keep it short** (see "Keeping this file current"). If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-11-20 (stat XP under the XP slider shipped; calendar events as quests live, XP by length; calendar quest completion fix; stat XP: new-stat field ring fixed, cleanup mockups sent; opening the app steadier: walkthrough taps, no reload after deploys, Today hydration, one startup request; Run B handoff in `docs/RUN-B-HANDOFF.md`; import card: one When pill, Flexible · Fixed; Quest Drop shipped; latest shipped work is the top entry of `docs/SHIPPED.md`). `main` @ see `git log`.
+- **Last updated:** 2026-11-20 (review branches merged; stat XP under the XP slider shipped; calendar events as quests live, XP by length; calendar quest completion fix; stat XP: new-stat field ring fixed, cleanup mockups sent; opening the app steadier: walkthrough taps, no reload after deploys, Today hydration, one startup request; Run B handoff in `docs/RUN-B-HANDOFF.md`; import card: one When pill, Flexible · Fixed; Quest Drop shipped; latest shipped work is the top entry of `docs/SHIPPED.md`). `main` @ see `git log`.
 - **Live app:** https://goal-dashboard-kappa.vercel.app (the owner does NOT have tinyquest.win; never send links on it)
 - **Pending in-app feedback:** the database is the full list (query in section 3; by screen in `docs/FEEDBACK-BY-SCREEN.md`). 316 open on Nov 12; many are already built but were never marked: check the code and `docs/SHIPPED.md` before building one again, and mark it. If the Supabase connector is missing, ask the owner to connect it (claude.ai Settings › Connectors).
 
@@ -32,13 +32,11 @@ The owner's Claude project also keeps a priorities list by model (Nov 16) in its
 Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Read the topic's entry there before touching it. When something new waits on him (a design review, a pick), add it there with its branch, review page link and date, and add its name to this list.
 
 - `review/prioritize-bars` (taller Prioritize bars): built Nov 14, not UI-checked or reviewed.
-- `review/subquests-sequence`, `review/insights-nov19` (quest editor's one Sub-quests & sequence pill; Insights check-in log, Wheel of Time by hand): built Nov 19, review page sent.
 - `review/boards-nov18` (calendar and boards batch, incl. the owner's two new calendar ideas): built Nov 19, review page sent.
 - `review/additional-habits` (habits not on today in an "Additional habits" fold, still tickable): built Nov 18, review page sent.
 - `review/time-ranges-lesson-button` (time ranges for habits and quests, chosen habits in the auto-scheduler, Complete lesson button): built Nov 16, review page sent, waiting on his OK or notes.
 - Insights on one graph for every metric (owner, Nov 16): not built. The toucan offering habits: on hold (both in WAITING).
 - Merging Daily Habits and Today's Quests on Today: brainstorm with him first.
-- `review/faces-feel` (faces + How do you feel?, the toucan's question) and `review/insights-timeline` (the merged chart): built Nov 19, review page sent.
 - The email to Daniel about his Champion title: needs his OK and wording.
 - Waiting on his iPhone: a list of things cloud sessions can't check (in `docs/WAITING.md` and `docs/PRIORITIES.md`).
 - When weekly / monthly / yearly reviews are built: remind him of the lines he saved (in `docs/WAITING.md`).
