@@ -8,9 +8,11 @@ import { statAbbr } from "@/lib/stats";
  *   block — a stat block's ability row: the strip framed by tapered gold rules above and below, "+6" like a modifier
  *   boxes — a character sheet's ability boxes: the "+6" large in a small framed box, the stat's mark on a tab at its foot
  *   bands — one row of grouped cells told apart by soft parchment bands instead of rules
+ *   board — (C1, kept to compare) up to five across, mark above amount
+ *   strip — (C3, kept to compare) rows split by thin gold rules
  * Rows: 3 (boxes 4) on phones, 5 on wider screens.
  */
-export type StatXpLook = "block" | "boxes" | "bands";
+export type StatXpLook = "board" | "strip" | "block" | "boxes" | "bands";
 
 const MARK = "#8a6116";
 const RULE = "rgba(168,138,63,.45)";
@@ -52,6 +54,46 @@ export function StatXpLine({
       <span className="mt-1 text-[15px] font-semibold tabular-nums" style={{ color: xpInk }}>+{left}</span>
     </span>
   );
+
+  if (look === "board") {
+    return (
+      <button {...common} className="due-in -mt-0.5 flex items-start text-center tabular-nums">
+        <span className="ml-[50px] grid flex-1 gap-y-2.5" style={{ gridTemplateColumns: `repeat(${Math.min(parts.length, 5)}, minmax(0, 1fr))` }}>
+          {parts.map((s) => (
+            <span key={s.stat} className="flex flex-col items-center leading-none" title={s.stat}>
+              <span className={mark} style={{ color: MARK }}>{statAbbr(s.stat)}</span>
+              <span className="mt-1 text-[15px] font-semibold" style={{ color: "var(--t-ink)" }}>{s.amount}</span>
+            </span>
+          ))}
+        </span>
+        <span className="ml-[50px] flex w-[64px] shrink-0 flex-col items-center leading-none">
+          <span className={mark} style={{ color: xpInk }}>Level</span>
+          <span className="mt-1 text-[15px] font-semibold" style={{ color: xpInk }}>{left}</span>
+        </span>
+      </button>
+    );
+  }
+
+  if (look === "strip") {
+    return (
+      <button {...common} className="due-in -mt-0.5 flex items-center text-center tabular-nums">
+        <span className="ml-[50px] flex-1 overflow-hidden">
+          <span className={`-ml-px gap-y-1 ${grid}`} style={cols(3)}>
+            {parts.map((s) => (
+              <span key={s.stat} className="flex items-baseline justify-center gap-1.5 whitespace-nowrap text-[13.5px] leading-6" style={{ borderLeft: `1px solid ${RULE}` }} title={s.stat}>
+                <span className={mark} style={{ color: MARK }}>{statAbbr(s.stat)}</span>
+                <span className="font-semibold" style={{ color: "var(--t-ink)" }}>{s.amount}</span>
+              </span>
+            ))}
+          </span>
+        </span>
+        <span className="ml-[50px] flex w-[64px] shrink-0 items-baseline justify-center gap-1 self-start whitespace-nowrap text-[13.5px] leading-6">
+          <span className={mark} style={{ color: xpInk }}>Lvl</span>
+          <span className="font-semibold" style={{ color: xpInk }}>{left}</span>
+        </span>
+      </button>
+    );
+  }
 
   if (look === "block") {
     return (

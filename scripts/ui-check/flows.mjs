@@ -236,7 +236,7 @@ export const FLOWS = [
           const openTray = async () => { const ok = await h.tap((p) => p.locator("[role=dialog] button", { hasText: /add to stats|^stats$/i }).first(), "editor: stats tray", { optional: true, expectMove: true }); if (ok) await h.settle(700); return ok; };
           const saveTray = () => h.tap((p) => p.getByRole("button", { name: /^save$/i }).first(), "stats: save", { optional: true, expectMove: true });
           const looks = async (n) => {
-            for (const look of ["block", "boxes", "bands"]) {
+            for (const look of ["board", "strip", "block", "boxes", "bands"]) {
               const shown = await h.page.evaluate((l) => { const all = [...document.querySelectorAll("[data-stat-look]")]; all.forEach((el) => (el.style.display = el.dataset.statLook === l ? "" : "none")); return all.length; }, look).catch(() => 0);
               if (shown) { await h.settle(300); await h.check(`quest editor: stats ${n} look ${look}`); }
             }
