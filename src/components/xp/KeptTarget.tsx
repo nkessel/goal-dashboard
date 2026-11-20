@@ -127,14 +127,15 @@ function TargetArrow({ size }: { size: number }) {
   // Quieter colours (owner, Nov 19: "slightly less colorful"): parchment and gold rings, a deep-gold heart, an ink arrow.
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden>
-      <circle cx="22" cy="26" r="19" fill="#fbf3dc" stroke="#6b4a14" strokeWidth="1.6" />
-      <circle cx="22" cy="26" r="14.5" fill="#e6cf95" stroke="#8a6116" strokeWidth="1" />
-      <circle cx="22" cy="26" r="10" fill="#fbf3dc" stroke="#8a6116" strokeWidth="1" />
-      <circle cx="22" cy="26" r="5.5" fill="#a88a3f" stroke="#6b4a14" strokeWidth="1" />
-      <circle cx="22" cy="26" r="1.6" fill="#fbf3dc" />
+      {/* Softer still (owner, Nov 20: "slightly less contrast"): close golds, lighter rims. */}
+      <circle cx="22" cy="26" r="19" fill="#f6ecd2" stroke="#9a7c45" strokeWidth="1.4" />
+      <circle cx="22" cy="26" r="14.5" fill="#e8d6a6" stroke="#b0925a" strokeWidth=".9" />
+      <circle cx="22" cy="26" r="10" fill="#f3e6c4" stroke="#b0925a" strokeWidth=".9" />
+      <circle cx="22" cy="26" r="5.5" fill="#c9ad6e" stroke="#9a7c45" strokeWidth=".9" />
+      <circle cx="22" cy="26" r="1.6" fill="#f6ecd2" />
       {/* The arrow, struck in the centre from the upper right, its feathers at the tail. */}
-      <path d="M22 26L41 7" stroke="#3b2a14" strokeWidth="2.2" strokeLinecap="round" />
-      <path d="M34 14L39.5 8.5L44 10.5L38.5 16Z M34 14L39.5 8.5L37.5 4L32 9.5Z" fill="#7a5a2a" stroke="#3b2a14" strokeWidth=".8" strokeLinejoin="round" />
+      <path d="M22 26L41 7" stroke="#5a4527" strokeWidth="2.1" strokeLinecap="round" />
+      <path d="M34 14L39.5 8.5L44 10.5L38.5 16Z M34 14L39.5 8.5L37.5 4L32 9.5Z" fill="#9a7a4a" stroke="#5a4527" strokeWidth=".8" strokeLinejoin="round" />
     </svg>
   );
 }
