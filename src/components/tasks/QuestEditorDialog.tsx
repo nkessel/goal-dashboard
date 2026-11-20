@@ -319,8 +319,6 @@ export function QuestEditorDialog({
   const [seqOpen, setSeqOpen] = useState(() => mode.kind === "create" && !!mode.after);
   const [seqAdding, setSeqAdding] = useState<"after" | "before" | null>(null);
   const [seqDialog, setSeqDialog] = useState(false);
-  /** The one "Sub-quests & sequence" pill's choices, open. */
-  const [seqMenu, setSeqMenu] = useState(false);
   /** The sequence window opens by adding "Follow-up work" after this quest (and opening it to edit). */
   const [seqFollow, setSeqFollow] = useState(false);
   const initialSlot =
@@ -1467,109 +1465,60 @@ export function QuestEditorDialog({
                   accessible from the same pill"): a checklist inside this quest, or quests one after another. */}
               {!doingNow && !review && (
                 <div className="flex flex-col gap-1.5" data-subseq>
-                  <button
-                    type="button"
-                    onClick={() => setSeqMenu((o) => !o)}
-                    aria-expanded={seqMenu}
-                    className="qe-fact flex h-9 items-center gap-1.5 self-start rounded-full px-3"
-                    data-open={seqMenu ? "true" : undefined}
-                    title="Sub-quests inside this quest, or quests before and after it"
-                  >
-                    <StepsGlyph size={15} />
-                    <span className="text-[13.5px] font-semibold" style={{ color: "var(--t-ink)" }}>
-                      Sub-quests & sequence
-                    </span>
-                    {(() => {
-                      const n = (steps ?? []).length || (steps === null ? (task?.steps_total ?? 0) : 0);
-                      const waiting = task ? (task.behind?.length ?? 0) : seqLinks.length;
-                      const words = [n ? `${n} sub-quest${n === 1 ? "" : "s"}` : "", waiting ? (task ? `${waiting} after this` : `${waiting} linked`) : ""].filter(Boolean).join(" · ");
-                      return words ? (
-                        <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-                          {words}
+                  {/* Two pills, side by side (owner, Nov 20: "the two pills for each, sub-quests and sequence"): one tap
+                      each, no menu of choices. Sequence opens the sequence window (or, on a new quest, its panel here). */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {!stepsUnavailable && !isCompleted && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStepsFolded(false);
+                          setAddingStep(true);
+                          requestAnimationFrame(() => newStepRef.current?.focus());
+                        }}
+                        className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-3"
+                        title="A checklist inside this quest"
+                      >
+                        <StepsGlyph size={15} />
+                        <span className="text-[13.5px] font-semibold" style={{ color: "var(--t-ink)" }}>
+                          Sub-quests
                         </span>
-                      ) : null;
-                    })()}
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: seqMenu ? "rotate(90deg)" : undefined, color: "var(--t-ink-soft)" }}>
-                      <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                  <Fold open={seqMenu}>
-                    <div className="flex flex-wrap gap-1.5 pb-0.5" data-subseq-choices>
-                      {!stepsUnavailable && !isCompleted && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSeqMenu(false);
-                            setStepsFolded(false);
-                            setAddingStep(true);
-                            requestAnimationFrame(() => newStepRef.current?.focus());
-                          }}
-                          className="hover-glow flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold"
-                          style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)" }}
-                        >
-                          ＋ Sub-quest
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSeqMenu(false);
-                          if (task) setSeqDialog(true);
-                          else {
-                            setSeqOpen(true);
-                            setSeqAdding("before");
-                          }
-                        }}
-                        className="hover-glow flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold"
-                        style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)" }}
-                      >
-                        ＋ Quest after this
+                        {(() => {
+                          const n = (steps ?? []).length || (steps === null ? (task?.steps_total ?? 0) : 0);
+                          return n ? (
+                            <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                              {n}
+                            </span>
+                          ) : null;
+                        })()}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSeqMenu(false);
-                          // Follow-up work in one tap (owner, Nov 15), named so you can rename it.
-                          if (task) {
-                            setSeqFollow(true);
-                            setSeqDialog(true);
-                          } else {
-                            setSeqOpen(true);
-                            setSeqLinks((ls) => [...ls, { rel: "before", pick: { title: "Follow-up work" } }]);
-                          }
-                        }}
-                        className="hover-glow flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold"
-                        style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)" }}
-                      >
-                        ＋ Follow-up work
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSeqMenu(false);
-                          if (task) setSeqDialog(true);
-                          else {
-                            setSeqOpen(true);
-                            setSeqAdding("after");
-                          }
-                        }}
-                        className="hover-glow flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold"
-                        style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)" }}
-                      >
-                        Comes after a quest…
-                      </button>
-                      {task && (task.behind?.length ?? 0) > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => (setSeqMenu(false), setSeqDialog(true))}
-                          className="hover-glow flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold"
-                          style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)" }}
-                        >
-                          See the sequence
-                        </button>
-                      )}
-                    </div>
-                  </Fold>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => (task ? setSeqDialog(true) : setSeqOpen((o) => !o))}
+                      aria-expanded={task ? undefined : seqOpen}
+                      data-open={!task && seqOpen ? "true" : undefined}
+                      className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-3"
+                      title="Quests before or after this one"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden style={{ color: "var(--t-ink-soft)" }}>
+                        <circle cx="5" cy="12" r="2.6" stroke="currentColor" strokeWidth="1.8" />
+                        <circle cx="19" cy="12" r="2.6" stroke="currentColor" strokeWidth="1.8" />
+                        <path d="M8 12h8M13.5 9.2 16.3 12l-2.8 2.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span className="text-[13.5px] font-semibold" style={{ color: "var(--t-ink)" }}>
+                        Sequence
+                      </span>
+                      {(() => {
+                        const n = task ? (task.behind?.length ?? 0) : seqLinks.length;
+                        return n ? (
+                          <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                            {n}
+                          </span>
+                        ) : null;
+                      })()}
+                    </button>
+                  </div>
                   {!task && seqOpen && (
                     <div className="reveal flex flex-col gap-2 rounded-xl px-3 py-2.5" style={{ border: "1px dashed rgba(139,112,64,.5)" }}>
                       <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
