@@ -22,14 +22,28 @@ export function ToucanQuestion({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [ready, setReady] = useState(false);
+  // The part of the screen you can see (smaller with a phone's keyboard up), so the card stays centred in it.
+  const [view, setView] = useState<{ top: number; h: number } | null>(null);
   const boxRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- portals need the browser's document
     setReady(true);
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const on = () => setView({ top: vv.offsetTop, h: vv.height });
+    on();
+    vv.addEventListener("resize", on);
+    vv.addEventListener("scroll", on);
+    return () => {
+      vv.removeEventListener("resize", on);
+      vv.removeEventListener("scroll", on);
+    };
   }, []);
   const hour = new Date().getHours();
   const hello = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const thick = Math.max(0, Math.min(1, Number(mist) || 0));
+  // Nothing of the page shows through (owner, Nov 19: "should completely obscure what's behind it").
+  const bgKey = bg === "clear" ? "mist" : bg;
   const fog = hour < 5 || hour >= 21 ? "night" : hour < 9 ? "dawn" : hour < 17 ? "day" : "dusk";
 
   const finish = (keep: boolean) => {
@@ -60,10 +74,10 @@ export function ToucanQuestion({ onClose }: { onClose: () => void }) {
   });
   if (!ready) return null;
   return createPortal(
-    <div className={`tq-root fixed inset-0 z-[80] flex flex-col items-center px-4 ${leaving ? "tq-out" : "tq-in"}`}
-      // High on the screen, so the card and its buttons stay above a phone's keyboard.
-      style={{ paddingTop: "max(calc(env(safe-area-inset-top, 0px) + 28px), 7vh)" }} role="dialog" aria-modal="true" aria-label="What's most important right now?" data-toucan-question>
-      <div aria-hidden className="tq-mist absolute inset-0" data-bg={bg} data-fog={fog} style={{ ["--mist" as string]: String(thick) }} />
+    <div className={`tq-root fixed inset-0 z-[80] ${leaving ? "tq-out" : "tq-in"}`} role="dialog" aria-modal="true" aria-label="What's most important right now?" data-toucan-question>
+      <div aria-hidden className="tq-mist absolute inset-0" data-bg={bgKey} data-fog={fog} style={{ ["--mist" as string]: String(thick) }} />
+      {/* Centred in what you can see (owner, Nov 19: "more centered"), above a phone's keyboard. */}
+      <div className="absolute inset-x-0 flex flex-col items-center justify-center px-4" style={view ? { top: view.top, height: view.h } : { top: 0, bottom: 0 }}>
       <div className="relative flex w-full max-w-[400px] flex-col items-center">
         <div className="tq-toucan mb-2">
           <ToucanArt size={92} />
@@ -85,8 +99,8 @@ export function ToucanQuestion({ onClose }: { onClose: () => void }) {
             }}
             rows={1}
             aria-label="What's most important right now?"
-            className="bare-input font-display mt-3 block w-full resize-none bg-transparent text-[20px] italic leading-snug outline-none"
-            style={{ color: "#f6dc8e", borderBottom: "1.5px solid #c9a24a", paddingBottom: 4, fieldSizing: "content" } as React.CSSProperties}
+            className="bare-input mt-3 block w-full resize-none bg-transparent text-[18px] leading-snug outline-none"
+            style={{ color: "#f8ecc8", fontFamily: "Inter, system-ui, sans-serif", borderBottom: "1.5px solid #c9a24a", paddingBottom: 4, fieldSizing: "content" } as React.CSSProperties}
           />
           {error && (
             <p className="m-0 mt-2 text-[12.5px]" style={{ color: "#f2b8a8" }}>
@@ -102,6 +116,7 @@ export function ToucanQuestion({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         </div>
+      </div>
       </div>
     </div>,
     document.body,

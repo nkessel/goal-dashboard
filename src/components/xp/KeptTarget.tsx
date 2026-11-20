@@ -9,14 +9,13 @@ const LINES = ["Do the thing in front of you, and do it well.", "One thing, done
 
 /**
  * The floating target after "Keep it" (owner, Nov 19): drag it anywhere; tap it to see your words. Like the
- * feedback box, – shrinks it back to the target and × closes it (asking once first). No other buttons. A wise line
+ * feedback box, – shrinks it back to the target and × puts it away (no asking, owner Nov 19). No other buttons. A wise line
  * sits under your words; "hide" turns it off (back on in Settings › Toucan Spirit › His look).
  */
 export function KeptTarget() {
   const kept = useSyncExternalStore(subscribeKept, readKept, () => null);
   const quoteOn = useSyncExternalStore(subscribeFx, () => loadFx().toucanKeptQuote !== false, () => true);
   const [open, setOpen] = useState(false);
-  const [asking, setAsking] = useState(false);
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
   const start = useRef<{ px: number; py: number; x: number; y: number; moved: boolean } | null>(null);
   if (!kept) return null;
@@ -35,8 +34,8 @@ export function KeptTarget() {
         aria-label={open ? "Shrink what's most important today" : "What's most important today"}
         aria-expanded={open}
         title="Most important today (drag to move)"
-        className="kept-target fixed z-[38] touch-none rounded-full"
-        style={{ left: pos.x, top: pos.y, width: size, height: size, background: "radial-gradient(circle, #fbf3dc 0 22%, #d9b45f 23% 30%, #fbf3dc 31% 48%, #d9b45f 49% 56%, #fbf3dc 57%)", border: "1.5px solid #8a6116", boxShadow: "0 6px 14px rgba(0,0,0,.35)", cursor: drag ? "grabbing" : "grab" }}
+        className="kept-target fixed z-[38] touch-none rounded-full p-0"
+        style={{ left: pos.x, top: pos.y, width: size, height: size, filter: "drop-shadow(0 5px 8px rgba(0,0,0,.35))", cursor: drag ? "grabbing" : "grab" }}
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           start.current = { px: e.clientX, py: e.clientY, x: pos.x, y: pos.y, moved: false };
@@ -59,10 +58,11 @@ export function KeptTarget() {
             return;
           }
           setDrag(null);
-          setAsking(false);
           setOpen((o) => !o);
         }}
-      />
+      >
+        <TargetArrow size={size} />
+      </button>
       {open && !drag && (
         <div
           className="card-pop-in fixed z-[38] rounded-2xl px-4 pb-3 pt-2.5"
@@ -76,32 +76,26 @@ export function KeptTarget() {
               Most important today
             </span>
             <span className="flex items-center">
-              <button type="button" aria-label="Shrink" title="Shrink to the target" onClick={() => (setOpen(false), setAsking(false))} className="flex h-8 w-8 items-center justify-center rounded-full text-[18px]" style={{ color: "#d9b45f" }}>
+              <button type="button" aria-label="Shrink" title="Shrink to the target" onClick={() => setOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-full text-[18px]" style={{ color: "#d9b45f" }}>
                 –
               </button>
               <button
                 type="button"
-                aria-label={asking ? "Put it away" : "Close"}
+                aria-label="Close"
+                title="Put it away (it stays in today's journal)"
                 onClick={() => {
-                  if (!asking) return setAsking(true);
                   setOpen(false);
-                  setAsking(false);
                   putAwayKept();
                 }}
                 className="flex h-8 w-8 items-center justify-center rounded-full text-[18px]"
-                style={{ color: "#d9b45f", background: asking ? "rgba(217,180,95,.2)" : undefined }}
+                style={{ color: "#d9b45f" }}
               >
                 ×
               </button>
             </span>
           </div>
           <div className="font-display mt-0.5 text-[19px] leading-snug">{kept.text}</div>
-          {asking ? (
-            <p className="reveal m-0 mt-2 text-[12.5px]" style={{ color: "rgba(243,231,198,.75)" }}>
-              Tap × again to put it away. It stays in today&rsquo;s journal.
-            </p>
-          ) : (
-            quoteOn && (
+          {quoteOn && (
               <div className="mt-2.5 flex items-start gap-2 pt-2" style={{ borderTop: "1px solid rgba(217,180,95,.3)" }}>
                 <span className="font-display flex-1 text-[14.5px] italic" style={{ color: "rgba(243,231,198,.82)" }}>
                   &ldquo;{line}&rdquo;
@@ -110,10 +104,25 @@ export function KeptTarget() {
                   hide
                 </button>
               </div>
-            )
           )}
         </div>
       )}
     </>
+  );
+}
+
+/** A gilded bullseye with an arrow struck in its heart (owner, Nov 19: "a much better target and arrow icon"). */
+function TargetArrow({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden>
+      <circle cx="22" cy="26" r="19" fill="#fbf3dc" stroke="#6b4a14" strokeWidth="1.6" />
+      <circle cx="22" cy="26" r="14.5" fill="#d9b45f" stroke="#8a6116" strokeWidth="1" />
+      <circle cx="22" cy="26" r="10" fill="#fbf3dc" stroke="#8a6116" strokeWidth="1" />
+      <circle cx="22" cy="26" r="5.5" fill="#b5452e" stroke="#6b2a1a" strokeWidth="1" />
+      <circle cx="22" cy="26" r="1.6" fill="#fbf3dc" />
+      {/* The arrow, struck in the centre from the upper right: its shaft, and two pairs of red feathers at the tail. */}
+      <path d="M22 26L41 7" stroke="#3b2a14" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M34 14L39.5 8.5L44 10.5L38.5 16Z M34 14L39.5 8.5L37.5 4L32 9.5Z" fill="#b5452e" stroke="#6b2a1a" strokeWidth=".8" strokeLinejoin="round" />
+    </svg>
   );
 }

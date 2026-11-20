@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { setFeltAction, type FeltTarget } from "@/app/felt-actions";
 import { FaceRating, type FaceValue } from "@/components/ui/FaceRating";
 
 /**
  * "How do you feel?" (owner, Nov 19): one row of five faces, always optional. Tapping a face saves it at once and
- * the row folds away with a quiet ✓; no extra button. Used inline on the celebration and the fail screen, and as a
- * row in place under a ticked habit or a logged event (`FeltInline`).
+ * shows "✓ Saved" with an Undo; no other button. On the celebrations (quests, habits) and the fail scene, and as a
+ * row in place under a logged event (`FeltInline`).
  */
 export function FeltAsk({ target, light = false, onDone, size }: { target: FeltTarget; light?: boolean; onDone?: () => void; size?: number }) {
   const [value, setValue] = useState<FaceValue | null>(null);
@@ -16,28 +16,30 @@ export function FeltAsk({ target, light = false, onDone, size }: { target: FeltT
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
   const ink = light ? "#efe6cc" : "var(--t-ink, #2a1c10)";
+  const pick = (v: FaceValue | null) => {
+    setValue(v);
+    setError(null);
+    clearTimeout(timer.current);
+    setFeltAction(target, v)
+      .then(() => {
+        setSaved(v != null);
+        // Long enough to take it back with Undo before a row in place folds away.
+        if (v != null && onDone) timer.current = setTimeout(onDone, 4000);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Couldn't save it."));
+  };
   return (
     <div className="flex flex-col items-center gap-1" data-felt-ask>
-      <span className="font-display text-[16px]" style={{ color: ink }}>
-        {saved ? "✓ Kept" : "How do you feel?"}
+      {/* "Saved", with Undo to its right (owner, Nov 19). */}
+      <span className="font-display flex items-center gap-2.5 text-[16px]" style={{ color: ink }}>
+        {saved ? "✓ Saved" : "How do you feel?"}
+        {saved && (
+          <button type="button" onClick={() => pick(null)} className="text-[13px] underline underline-offset-2" style={{ color: light ? "#d9c79a" : "var(--t-ink-soft)" }}>
+            Undo
+          </button>
+        )}
       </span>
-      <FaceRating
-        value={value}
-        light={light}
-        size={size}
-        onChange={(v) => {
-          setValue(v);
-          setError(null);
-          setFeltAction(target, v)
-            .then(() => {
-              if (v == null) return;
-              setSaved(true);
-              clearTimeout(timer.current);
-              timer.current = setTimeout(() => onDone?.(), 900);
-            })
-            .catch((e) => setError(e instanceof Error ? e.message : "Couldn't save it."));
-        }}
-      />
+      <FaceRating value={value} light={light} size={size} onChange={pick} />
       {error && (
         <span className="text-[12px]" style={{ color: light ? "#f2b8a8" : "var(--t-warn)" }}>
           {error}
@@ -80,22 +82,3 @@ export function FeltInline({ target, onClose, light = false }: { target: FeltTar
   );
 }
 
-/**
- * Which habit is waiting for its face, kept outside the list so a redraw (the save refreshing Today) doesn't lose it.
- */
-let pendingHabit: string | null = null;
-const listeners = new Set<() => void>();
-export function setFeltHabit(id: string | null) {
-  pendingHabit = id;
-  for (const l of listeners) l();
-}
-export function useFeltHabit(): string | null {
-  return useSyncExternalStore(
-    (cb) => {
-      listeners.add(cb);
-      return () => void listeners.delete(cb);
-    },
-    () => pendingHabit,
-    () => null,
-  );
-}

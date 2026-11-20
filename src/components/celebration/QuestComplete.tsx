@@ -459,12 +459,6 @@ export function QuestComplete(props: QuestCompleteProps) {
             </div>
           </div>
 
-          {/* "How do you feel?" (owner, Nov 19): optional; a tap saves it, and it folds to a quiet ✓. */}
-          {taskId && !preview && (
-            <div className="qc-fade mt-1 w-full">
-              <FeltAsk target={{ kind: "quest", id: taskId }} light size={28} />
-            </div>
-          )}
           {/* Actions */}
           <div className="qc-btns mt-1 flex w-full gap-2.5">
             <button
@@ -485,6 +479,12 @@ export function QuestComplete(props: QuestCompleteProps) {
               Continue Your Journey
             </button>
           </div>
+          {/* "How do you feel?" (owner, Nov 19): optional; between Claim / Continue and Undo (owner, Nov 19). A tap saves it: "✓ Saved" with its own Undo. */}
+          {taskId && !preview && (
+            <div className="qc-fade w-full">
+              <FeltAsk target={{ kind: "quest", id: taskId }} light size={28} />
+            </div>
+          )}
           {/* Completed by mistake? Take it back: the quest returns open and its XP and coins come back out. */}
           {taskId && !preview && (
             <button

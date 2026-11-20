@@ -107,11 +107,11 @@ export function FailNext({ task, onDone }: { task: FailTask; onDone: () => void 
             ✓ {again}
           </span>
         ) : retry ? (
-          <div className="reveal flex flex-col gap-1.5" data-fail-retry>
+          <div className="reveal flex gap-2" data-fail-retry>
             <button
               type="button"
               disabled={pending}
-              className="min-h-10 rounded-full px-4 text-left text-[14px] font-semibold disabled:opacity-60"
+              className="min-h-10 flex-1 rounded-full px-3 text-center text-[14px] font-semibold disabled:opacity-60"
               style={{ border: "1px solid #b39a6a", color: "var(--t-ink)" }}
               onClick={() =>
                 startTransition(async () => {
@@ -141,7 +141,7 @@ export function FailNext({ task, onDone }: { task: FailTask; onDone: () => void 
             </button>
             <button
               type="button"
-              className="min-h-10 rounded-full px-4 text-left text-[14px] font-semibold"
+              className="min-h-10 flex-1 rounded-full px-3 text-center text-[14px] font-semibold"
               style={{ border: "1px solid #b39a6a", color: "var(--t-ink)" }}
               onClick={() => {
                 onDone();

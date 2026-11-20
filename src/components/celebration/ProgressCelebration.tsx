@@ -2,6 +2,8 @@
 
 import { useEffect, useEffectEvent, useState } from "react";
 import { createPortal } from "react-dom";
+import type { FeltTarget } from "@/app/felt-actions";
+import { FeltAsk } from "@/components/ui/FeltAsk";
 import { CoinIcon } from "@/components/ui/Icons";
 import { loadFx } from "@/lib/celebration-fx";
 
@@ -18,6 +20,8 @@ export type ProgressCelebrationDetail = {
   heading?: string;
   /** Replaces the line under the bar. */
   barCaption?: string;
+  /** Ask "How do you feel?" about it (a habit ticked, owner Nov 19); the card then stays until closed. */
+  felt?: FeltTarget;
 };
 
 const CONFETTI_COLORS = ["#f2c94c", "#e2bf63", "#58a04a", "#c0503a", "#4d7fc0", "#f6e6bb"];
@@ -50,6 +54,7 @@ export function ProgressCelebration({
   fromPct,
   toPct,
   steps,
+  felt,
   heading = "Progress made!",
   barCaption,
   extra,
@@ -66,7 +71,7 @@ export function ProgressCelebration({
 }) {
   const [shown, setShown] = useState(0);
   const [leaving, setLeaving] = useState(false);
-  const [pinned, setPinned] = useState(!AUTO_DISMISS);
+  const [pinned, setPinned] = useState(!AUTO_DISMISS || !!felt);
   const hasExtra = !!extra;
   // Settings › Visual effects: the full card, or a slim banner across the top.
   const [banner] = useState(() => (card || typeof window === "undefined" ? false : loadFx().cardStyle === "banner"));
@@ -173,6 +178,11 @@ export function ProgressCelebration({
             <p className="m-0 flex items-center gap-1.5 text-[14px]" style={{ color: "#5a4a30" }}>
               <CoinIcon size={16} /> +{coinsEarned} {coinsEarned === 1 ? "coin" : "coins"}
             </p>
+          )}
+          {felt && (
+            <div className="mt-1 w-full">
+              <FeltAsk target={felt} size={26} />
+            </div>
           )}
           <button
             type="button"
