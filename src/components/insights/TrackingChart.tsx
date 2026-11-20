@@ -554,38 +554,34 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
             className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold"
             style={{ border: `1px solid ${extrasOn ? "#8a6116" : GRID}`, background: extrasOn ? "rgba(217,180,95,.3)" : undefined, color: INK }}
           >
-            <svg aria-hidden width="14" height="14" viewBox="0 0 24 24">
-              <circle cx="9" cy="9" r="4" fill="#e7b43c" />
-              <path d="M8 19h9.5a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6 1.5A2.8 2.8 0 0 0 8 19z" fill="#f6f1e4" stroke="#7d8aa0" strokeWidth="1.4" />
-            </svg>
             Show{shownCount ? ` (${shownCount})` : ""}
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path d="M5 9l7 7 7-7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           {more && (
-            <div role="dialog" aria-label="What the chart shows" className="pop parchment absolute right-0 top-full z-[6] mt-1.5 flex max-h-[70vh] w-[230px] flex-col overflow-y-auto py-1.5" style={{ borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 28px rgba(0,0,0,.3)" }}>
+            <div role="dialog" aria-label="What the chart shows" className="pop parchment absolute right-0 top-full z-[6] mt-1.5 flex max-h-[min(46vh,340px)] w-[230px] flex-col overflow-y-auto py-1" style={{ borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 28px rgba(0,0,0,.3)" }}>
               {series.map((m) => (
-                <label key={m.metric} className="relative z-[1] flex min-h-9 items-center gap-2 px-3 text-[14px]" style={{ color: INK }}>
+                <label key={m.metric} className="relative z-[1] flex min-h-8 items-center gap-2 px-3 text-[14px]" style={{ color: INK }}>
                   <input type="checkbox" checked={isOn(m.metric)} onChange={() => flip(m.metric)} />
                   <span aria-hidden className="inline-block h-[3px] w-3.5 rounded-full" style={{ background: m.color }} />
                   {m.metric}
                 </label>
               ))}
               {series.length > 0 && <span aria-hidden className="mx-3 my-1 block h-px" style={{ background: GRID }} />}
-              <label className="relative z-[1] flex min-h-9 items-center gap-2 px-3 text-[14px]" style={{ color: INK }}>
+              <label className="relative z-[1] flex min-h-8 items-center gap-2 px-3 text-[14px]" style={{ color: INK }}>
                 <input type="checkbox" checked={showWeather} onChange={() => flip("weather")} />
-                <svg aria-hidden width="16" height="16" viewBox="0 0 24 24">
-                  <circle cx="9" cy="9" r="4" fill="#e7b43c" />
-                  <path d="M8 19h9.5a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6 1.5A2.8 2.8 0 0 0 8 19z" fill="#f6f1e4" stroke="#7d8aa0" strokeWidth="1.4" />
+                <svg aria-hidden width="16" height="14" viewBox="-9 -7 20 12">
+                  <path d={CLOUD} fill="none" stroke={INK_SOFT} strokeWidth="1.2" />
                 </svg>
                 Weather
               </label>
               {EVENTS.map((e) => (
-                <label key={e.key} className="relative z-[1] flex min-h-9 items-center gap-2 px-3 text-[14px]" style={{ color: INK }}>
+                <label key={e.key} className="relative z-[1] flex min-h-8 items-center gap-2 px-3 text-[14px]" style={{ color: INK }}>
                   <input type="checkbox" checked={isOn(e.key)} onChange={() => flip(e.key)} />
                   <svg aria-hidden width="14" height="14" viewBox="-7 -7 14 14">
-                    <EventMark k={e.key} color={e.color} size={12} />
+                    {/* One ink for the list's marks (owner, Nov 14: flat, single-colour icons). */}
+                    <EventMark k={e.key} color={INK_SOFT} size={12} />
                   </svg>
                   {e.label}
                 </label>
