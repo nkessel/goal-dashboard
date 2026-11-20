@@ -16,3 +16,4 @@ Waves once he picks: 1 (Sonnet) data: rename board, seed items, import cards, li
 - Still open: #d3 (courses), #d6 (reflect). Card moves/deletes wait for wave 1.
 - #d6 (owner, Nov 20 23:01): reflect screen stays ("What stayed with you?"), plus a "Worth a replay" tick and an "Add notes" button (opens a notes box inline). No Keep it / Skip buttons: autosave, × closes. Every part editable in place from a gear (drag to reorder, ✎ to rename/options, eye to hide; when it opens in a strip above), per the app's settings-in-context rule. Saved on the item and in Journal under Listening.
 - Still open: #d3 (courses).
+- #d6 more (owner, Nov 20 23:04): add a Save button (× closes without saving); add a Rating pill (1–5 stars, picked inline); no checkbox beside the title on the reflect screen (it read as tickable), just "Finished · XP earned".
