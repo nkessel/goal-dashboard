@@ -77,7 +77,8 @@ export function ToucanQuestion({ onClose }: { onClose: () => void }) {
     <div className={`tq-root fixed inset-0 z-[80] ${leaving ? "tq-out" : "tq-in"}`} role="dialog" aria-modal="true" aria-label="What's most important right now?" data-toucan-question>
       <div aria-hidden className="tq-mist absolute inset-0" data-bg={bgKey} data-fog={fog} style={{ ["--mist" as string]: String(thick) }} />
       {/* Centred in what you can see (owner, Nov 19: "more centered"), above a phone's keyboard. */}
-      <div className="absolute inset-x-0 flex flex-col items-center justify-center px-4" style={view ? { top: view.top, height: view.h } : { top: 0, bottom: 0 }}>
+      <div className="absolute inset-x-0 flex flex-col items-center justify-center px-4" // Glides with the keyboard as it opens and closes, instead of jumping (owner, Nov 19).
+        style={{ ...(view ? { top: view.top, height: view.h } : { top: 0, height: "100%" }), transition: "top 280ms cubic-bezier(.2,.8,.2,1), height 280ms cubic-bezier(.2,.8,.2,1)" }}>
       <div className="relative flex w-full max-w-[400px] flex-col items-center">
         <div className="tq-toucan mb-2">
           <ToucanArt size={92} />
