@@ -83,7 +83,7 @@ export async function AppShell({
       {profileId && <script dangerouslySetInnerHTML={{ __html: FOG_SHELL_SCRIPT }} />}
       <ThemeOnBody theme={theme} palette={palette ?? null} />
       {profileId && <SettingsDefaultsSeed />}
-      {profileId && <DailyLogin levelCap={cap} />}
+      {profileId && <DailyLogin levelCap={cap} name={profile?.name?.trim().split(/\s+/)[0] || null} />}
       {profileId && <OwnWordsSync />}
       {profileId && <WelcomeLayoutSync />}
       {profileId && <OfflineSync profileId={profileId} />}

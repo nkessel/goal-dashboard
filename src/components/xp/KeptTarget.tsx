@@ -28,6 +28,7 @@ export function KeptTarget() {
   };
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
   const start = useRef<{ px: number; py: number; x: number; y: number; moved: boolean } | null>(null);
+  const dragged = useRef(false);
   if (!kept) return null;
   const size = 46;
   const vw = typeof window === "undefined" ? 390 : window.innerWidth;
@@ -64,10 +65,17 @@ export function KeptTarget() {
           start.current = null;
           if (s?.moved && drag) {
             moveKept(drag.x, drag.y);
-            setDrag(null);
-            return;
+            dragged.current = true;
           }
           setDrag(null);
+        }}
+        // Opens on the click, not on lifting the finger: the card opens over the target, and the click that follows a
+        // lifted finger landed on its × and put the words away (found Nov 20).
+        onClick={() => {
+          if (dragged.current) {
+            dragged.current = false;
+            return;
+          }
           setOpen((o) => !o);
         }}
       >
@@ -105,7 +113,9 @@ export function KeptTarget() {
               </button>
             </span>
           </div>
-          <div className="font-display relative z-[1] mt-1 text-[19px] leading-snug">{kept.text}</div>
+          <div className="relative z-[1] mt-1 text-[19px] leading-snug" style={{ fontFamily: "var(--font-cardo), Georgia, serif" }}>
+            {kept.text}
+          </div>
           {quoteOn && (
               <div className="relative z-[1] mt-2.5 flex items-start gap-2 pt-2" style={{ borderTop: "1px solid rgba(139,112,64,.35)" }}>
                 <span className="font-display flex-1 text-[14.5px] italic" style={{ color: "var(--t-ink-soft, #6b5631)" }}>

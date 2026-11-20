@@ -14,7 +14,7 @@ import { keepImportant } from "@/lib/toucan-kept";
  * small floating target you can open all day (KeptTarget). Its background and mist are set in Settings › Toucan
  * Spirit › His look.
  */
-export function ToucanQuestion({ onClose }: { onClose: () => void }) {
+export function ToucanQuestion({ onClose, name = null }: { onClose: () => void; name?: string | null }) {
   const bg = useSyncExternalStore(subscribeFx, () => loadFx().toucanAskBg ?? "mist", () => "mist");
   const mist = useSyncExternalStore(subscribeFx, () => loadFx().toucanAskMist ?? 0.7, () => 0.7);
   const [text, setText] = useState("");
@@ -66,6 +66,16 @@ export function ToucanQuestion({ onClose }: { onClose: () => void }) {
     setTimeout(onClose, 320);
   };
   useEffect(() => {
+    // It stands in for the welcome screen, so the page treats it as one: the feedback bubble moves to the top right
+    // (off the Continue button), the perched toucan and his notes wait, and a note sent now is tagged "welcome".
+    const e = document.documentElement;
+    e.setAttribute("data-welcome-open", "");
+    return () => {
+      e.removeAttribute("data-welcome-open");
+      e.dataset.welcomeClosedAt = String(Date.now());
+    };
+  }, []);
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
     };
@@ -84,10 +94,12 @@ export function ToucanQuestion({ onClose }: { onClose: () => void }) {
           <ToucanArt size={92} />
         </div>
         <div className="tq-card w-full rounded-[18px] px-5 pb-4 pt-4" style={{ background: "linear-gradient(160deg, rgba(18,51,47,.95), rgba(10,32,29,.97))", border: "1.2px solid rgba(217,180,95,.75)", boxShadow: "0 16px 36px rgba(0,0,0,.45)", color: "#f3e7c6" }}>
-          <div className="text-[11.5px] uppercase tracking-[.16em]" style={{ color: "#d9b45f" }}>
-            {hello}
+          {/* The owner's picks (Nov 19–20): a soft italic greeting with your name (H), the question in italic Garamond, and
+              your answer in Cardo 20 (V12) on one gold line that grows as you write (L1). */}
+          <div className="text-[15px] italic" style={{ fontFamily: "var(--font-eb-garamond), Georgia, serif", fontWeight: 400, color: "#d9b45f" }}>
+            {name ? `${hello}, ${name}` : hello}
           </div>
-          <h2 className="font-display m-0 mt-1 text-[24px] font-semibold leading-tight">What&rsquo;s most important right now?</h2>
+          <h2 className="m-0 mt-1 text-[23px] italic leading-tight" style={{ fontFamily: "var(--font-eb-garamond), Georgia, serif", fontWeight: 400 }}>What&rsquo;s most important right now?</h2>
           <textarea
             ref={boxRef}
             value={text}
@@ -100,8 +112,8 @@ export function ToucanQuestion({ onClose }: { onClose: () => void }) {
             }}
             rows={1}
             aria-label="What's most important right now?"
-            className="bare-input mt-3 block w-full resize-none bg-transparent text-[18px] leading-snug outline-none"
-            style={{ color: "#f8ecc8", fontFamily: "Inter, system-ui, sans-serif", borderBottom: "1.5px solid #c9a24a", paddingBottom: 4, fieldSizing: "content" } as React.CSSProperties}
+            className="bare-input mt-3 block w-full resize-none bg-transparent text-[20px] leading-snug outline-none"
+            style={{ fontFamily: "var(--font-cardo), Georgia, serif", color: "#f8ecc8", borderBottom: "1.5px solid #c9a24a", paddingBottom: 4, fieldSizing: "content" } as React.CSSProperties}
           />
           {error && (
             <p className="m-0 mt-2 text-[12.5px]" style={{ color: "#f2b8a8" }}>

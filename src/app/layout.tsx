@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Cinzel, EB_Garamond, Manrope, Noto_Naskh_Arabic } from "next/font/google";
+import { Geist, Geist_Mono, Cinzel, EB_Garamond, Manrope, Noto_Naskh_Arabic, Cardo } from "next/font/google";
 import { ViewTransitionProvider } from "@/components/ui/ViewTransitionProvider";
 import { KeyboardViewport } from "@/components/ui/KeyboardViewport";
 import { ScrollLock } from "@/components/ui/ScrollLock";
@@ -51,6 +51,14 @@ const naskh = Noto_Naskh_Arabic({
   preload: false,
 });
 
+/** The toucan's question: your answer, in Cardo (owner's pick V12, Nov 20). Fetched when used. */
+const cardo = Cardo({
+  variable: "--font-cardo",
+  weight: ["400"],
+  subsets: ["latin"],
+  preload: false,
+});
+
 const manrope = Manrope({
   variable: "--font-manrope",
   // Not the adventure theme's fonts: fetched when used, not on every first load.
@@ -83,7 +91,7 @@ export default function RootLayout({ children, drawer }: LayoutProps<"/">) {
       lang="en"
       // The welcome screen's fog is set on it before the app loads.
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} ${ebGaramond.variable} ${manrope.variable} ${naskh.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} ${ebGaramond.variable} ${manrope.variable} ${cardo.variable} ${naskh.variable} h-full antialiased`}
     >
       <head>
         {/* The welcome fog, set before the first paint (so Today never shows before the mist). */}

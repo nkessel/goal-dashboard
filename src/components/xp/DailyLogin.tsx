@@ -95,7 +95,7 @@ type Shown = { mode: "day" | "back"; award: WelcomeAward | null; ctx: Awaited<Re
  * you check in or close it. What it shows is chosen in Settings. The server
  * ignores repeat daily check-ins; the per-browser flags just avoid asking again.
  */
-export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
+export function DailyLogin({ levelCap = 10, name = null }: { levelCap?: number; name?: string | null }) {
   const router = useRouter();
   const [shown, setShownRaw] = useState<Shown | null>(null);
   const [ask, setAsk] = useState(false);
@@ -349,7 +349,7 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
     };
   }, [router, levelCap, wake]);
 
-  if (ask) return <ToucanQuestion onClose={() => setAsk(false)} />;
+  if (ask) return <ToucanQuestion name={name} onClose={() => setAsk(false)} />;
   if (!shown) return null;
   const fx = loadFx();
   // A fresh greeting each time the screen opens (kept while it's open).
