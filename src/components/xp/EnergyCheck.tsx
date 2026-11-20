@@ -970,21 +970,19 @@ export function EnergyCheck({
             {/* After a check-in: Edit it, or a new one behind its own button (owner, Nov 18: "check in again" was too faint;
                 no "+ event/tag" by a finished check-in, an "Edit check-in" button instead). */}
             <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-[13px]" style={{ color: "var(--t-cream)" }}>
-              {mounted && savedAt && <span className="w-full text-center font-semibold">✓ Checked in at {clock(savedAt)}</span>}
-              {full ? (
-                <button
-                  type="button"
-                  onClick={() => window.dispatchEvent(new CustomEvent("checkin-edit-latest"))}
-                  className="hover-glow h-8 rounded-full px-3.5 text-[13.5px] font-semibold"
-                  style={{ border: "1.5px solid var(--ec-line, rgba(217,180,95,.6))", color: "var(--t-cream)" }}
-                >
-                  Edit check-in
-                </button>
-              ) : (
-                <Link href="/insights#edit-checkin" className="hover-glow flex h-8 items-center rounded-full px-3.5 text-[13.5px] font-semibold" style={{ border: "1.5px solid var(--ec-line, rgba(217,180,95,.6))", color: "var(--t-cream)" }}>
-                  Edit check-in
-                </Link>
-              )}
+              {/* Edit is a small word to the right of the confirmation (owner, Nov 20), not a button of its own. */}
+              <span className="flex w-full items-baseline justify-center gap-2.5">
+                {mounted && savedAt && <span className="font-semibold">✓ Checked in at {clock(savedAt)}</span>}
+                {full ? (
+                  <button type="button" aria-label="Edit check-in" onClick={() => window.dispatchEvent(new CustomEvent("checkin-edit-latest"))} className="min-h-8 px-1 text-[13px] underline decoration-[#c9a24a] underline-offset-[3px]" style={{ color: "var(--t-cream)", opacity: 0.85 }}>
+                    Edit
+                  </button>
+                ) : (
+                  <Link href="/insights#edit-checkin" aria-label="Edit check-in" className="flex min-h-8 items-center px-1 text-[13px] underline decoration-[#c9a24a] underline-offset-[3px]" style={{ color: "var(--t-cream)", opacity: 0.85 }}>
+                    Edit
+                  </Link>
+                )}
+              </span>
               <button type="button" onClick={() => setEditing(true)} className="hover-glow h-8 rounded-full px-3.5 text-[13.5px] font-bold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
                 Check in again
               </button>
