@@ -560,7 +560,7 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
             </svg>
           </button>
           {more && (
-            <div role="dialog" aria-label="What the chart shows" className="pop parchment absolute right-0 top-full z-[6] mt-1.5 flex max-h-[min(46vh,340px)] w-[230px] flex-col overflow-y-auto py-1" style={{ borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 28px rgba(0,0,0,.3)" }}>
+            <div role="dialog" aria-label="What the chart shows" className="pop parchment absolute bottom-full right-0 z-[6] mb-1.5 flex max-h-[min(46vh,340px)] w-[230px] flex-col overflow-y-auto py-1" style={{ borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 28px rgba(0,0,0,.3)" }}>
               {series.map((m) => (
                 <label key={m.metric} className="relative z-[1] flex min-h-8 items-center gap-2 px-3 text-[14px]" style={{ color: INK }}>
                   <input type="checkbox" checked={isOn(m.metric)} onChange={() => flip(m.metric)} />
