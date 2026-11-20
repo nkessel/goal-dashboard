@@ -55,6 +55,8 @@ type View = {
   grid?: "few" | "some" | "many";
   /** XP drawn as stacked coins instead of bars, where "+n XP" won't fit under the days (owner, Nov 19: off by default). */
   xpCoins?: boolean;
+  /** The lines between days (owner, Nov 19): dotted with solid weeks, all dotted, all solid, weeks only, or none. */
+  dayLines?: "dotWeek" | "dotted" | "solid" | "weeks" | "off";
 };
 const GRID_LEVELS = { few: [1, 5, 10], some: [1, 4, 7, 10], many: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] } as const;
 const GRID_LABELS = { few: [1, 5, 10], some: [1, 4, 7, 10], many: [1, 4, 7, 10] } as const;
@@ -285,6 +287,7 @@ function ResizeEdge({ y, x1, x2, label, svgRef, W, value, min, max, onChange }: 
 export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metrics: string[]; readings: Reading[]; wins: WinLite[]; onAdd?: () => void; /** Sleep by the morning it ended (Wheel of Time), shown on the day's card (owner, Nov 9). */ nights?: Record<string, { bed: string | null; wake: string | null }> }) {
   const [view, setView] = useState<View>(DEFAULT_VIEW);
   const gridD = view.grid ?? "some";
+  const dayLines = view.dayLines ?? "dotWeek";
   const [more, setMore] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState<Record<string, boolean>>({});
@@ -639,6 +642,7 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
               <Seg label="Points" value={view.detail} options={[["daily", "Daily average"], ["every", "Every check-in"]]} onPick={(v) => setV({ detail: v as View["detail"] })} />
               <Seg label="Lines" value={view.smooth ? "smooth" : "straight"} options={[["smooth", "Smooth"], ["straight", "Straight"]]} onPick={(v) => setV({ smooth: v === "smooth" })} />
               <Seg label="Grid lines" value={gridD} options={[["few", "Few"], ["some", "Some"], ["many", "Many"]]} onPick={(v) => setV({ grid: v as View["grid"] })} />
+              <Seg label="Lines between days" wrap value={dayLines} options={[["dotWeek", "Dotted, weeks solid"], ["dotted", "Dotted"], ["solid", "Solid"], ["weeks", "Weeks only"], ["off", "None"]]} onPick={(v) => setV({ dayLines: v as View["dayLines"] })} />
               <Seg label="Layout" value={view.layout ?? "merged"} options={[["merged", "Merged"], ["split", "Split"]]} onPick={(v) => setV({ layout: v as View["layout"] })} />
               {!split && <Seg label="Things you did" value={view.marks ?? "onLine"} options={[["onLine", "On the chart"], ["lines", "Marker lines"], ["lanes", "Own rows"]]} onPick={(v) => setV({ marks: v as View["marks"] })} />}
               <label className="relative z-[1] flex min-h-8 items-center gap-2 text-[14px]" style={{ color: INK }}>
@@ -816,13 +820,16 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
           ))}
           {/* Days divided by a thin line, faint when zoomed out and dotted when zoomed in; the hours, dotted and fainter, with their times, once a day is wide enough (owner, Nov 19). */}
           <g clipPath="url(#plot-clip)">
-            {/* Squished (a month or more): every day gets a light dashed line (owner, Nov 19), and the labelled stretches a solid one. */}
-            {days.map((_, i) => {
-              if (i === 0 || !inView(i)) return null;
-              const stretch = everyDay || (n - 1 - i) % tickEvery === tickEvery - 1;
-              const dash = close ? "2 3" : stretch ? undefined : "2 3";
-              const op = close ? 1 : stretch ? 0.7 : 0.4;
-              const w = stretch ? 1.1 : 0.8;
+            {/* The lines between days, as chosen in the gear (owner, Nov 19); by default dotted, with a solid line where a
+                week begins (on Monday, or where a labelled stretch begins once the dates are spaced out). */}
+            {days.map((d, i) => {
+              if (i === 0 || !inView(i) || dayLines === "off") return null;
+              const week = everyDay ? d.getDay() === 1 : (n - 1 - i) % tickEvery === tickEvery - 1;
+              if (dayLines === "weeks" && !week) return null;
+              const solid = dayLines === "solid" || ((dayLines === "dotWeek" || dayLines === "weeks") && week);
+              const dash = solid ? undefined : "2 3";
+              const op = solid ? (week ? 0.75 : 0.55) : 0.5;
+              const w = week && dayLines !== "dotted" ? 1.1 : 0.8;
               return (
                 <g key={i}>
                   <line x1={xu(i)} x2={xu(i)} y1={T} y2={T + plotH} stroke="rgba(110,85,40,.42)" strokeWidth={w} strokeDasharray={dash} opacity={op} />
@@ -1136,13 +1143,13 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
   );
 }
 
-function Seg({ label, value, options, onPick }: { label: string; value: string; options: [string, string][]; onPick: (v: string) => void }) {
+function Seg({ label, value, options, onPick, wrap = false }: { label: string; value: string; options: [string, string][]; onPick: (v: string) => void; wrap?: boolean }) {
   return (
     <div className="relative z-[1] flex flex-col gap-1">
       <span className="text-[12.5px] font-semibold" style={{ color: INK_SOFT }}>
         {label}
       </span>
-      <div role="radiogroup" aria-label={label} className="flex rounded-full p-0.5" style={{ background: "rgba(110,85,40,.14)" }}>
+      <div role="radiogroup" aria-label={label} className={wrap ? "flex flex-wrap gap-0.5 rounded-2xl p-0.5" : "flex rounded-full p-0.5"} style={{ background: "rgba(110,85,40,.14)" }}>
         {options.map(([v, l]) => {
           const on = v === value;
           return (
@@ -1152,7 +1159,7 @@ function Seg({ label, value, options, onPick }: { label: string; value: string; 
               role="radio"
               aria-checked={on}
               onClick={() => onPick(v)}
-              className="h-8 flex-1 rounded-full px-1.5 text-[12.5px] font-semibold"
+              className={`h-8 rounded-full px-2 text-[12.5px] font-semibold ${wrap ? "grow" : "flex-1"}`}
               style={on ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", boxShadow: "0 1px 2px rgba(60,40,10,.3)" } : { color: INK }}
             >
               {l}

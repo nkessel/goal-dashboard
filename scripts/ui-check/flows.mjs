@@ -1088,6 +1088,14 @@ export const FLOWS = [
               await h.settle(400);
               if (g !== "Some") await h.check(`chart: a month, ${g.toLowerCase()} grid lines`);
             }
+            // Lines between days (owner, Nov 19): each choice in the gear, then back to the default.
+            for (const ln of ["Dotted", "Solid", "Weeks only", "None", "Dotted, weeks solid"]) {
+              await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), `chart gear, day lines ${ln}`, { optional: true, expectMove: true });
+              await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: ln, exact: true }).first(), `day lines: ${ln}`, { optional: true });
+              await h.page.keyboard.press("Escape");
+              await h.settle(400);
+              if (ln !== "Dotted, weeks solid") await h.check(`chart: a month, day lines ${ln.toLowerCase()}`);
+            }
             // XP as coins (owner, Nov 19: off by default, toggled on in the gear).
             for (const on of [true, false]) {
               await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), `chart gear, coins ${on}`, { optional: true, expectMove: true });
