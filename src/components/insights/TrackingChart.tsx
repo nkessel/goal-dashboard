@@ -385,12 +385,13 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
   const eventsH = activeEvents.length && marks === "lanes" ? 14 + activeEvents.length * 16 : 0;
   const timesH = close ? 16 : 0;
   const footY = T + plotH + timesH + eventsH;
-  const footH = split ? 0 : 30;
+  // Coins stack under the dates (owner, Nov 20), so they get a little more room there.
+  const footH = split ? 0 : view.xpCoins ? 46 : 30;
   const plotEnd = footY + footH;
   const tP = plotEnd + (split ? 6 : 12);
   const timeH = split ? Math.max(90, Math.min(400, view.timeH ?? 200)) : 0;
   const xpY = tP + timeH + 22;
-  const sleepY = (split ? xpY + 4 : plotEnd) + 16;
+  const sleepY = (split ? xpY + (view.xpCoins ? 18 : 4) : plotEnd) + 16;
   const H = sleepY + (nights ? 8 : -6);
   const uOf = (t: number) => {
     const d = new Date(t);
@@ -894,8 +895,19 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
                           {words}
                         </text>
                       );
-                    // Too narrow for the words: the day's XP rises into the chart instead (drawn behind the lines, below).
-                    return null;
+                    // Too narrow for the words: coins stacked under the date (one per 10 XP, owner Nov 20), or else the
+                    // day's XP rises into the chart as a column (drawn behind the lines, below).
+                    if (!view.xpCoins) return null;
+                    const bottom = split ? xpY + 12 : footY + 40;
+                    const rx = Math.min(7, dayW * 0.38);
+                    return (
+                      <g data-xp-coins>
+                        <title>{tip}</title>
+                        {Array.from({ length: Math.min(6, Math.max(1, Math.round(sum / 10))) }, (_, k) => (
+                          <ellipse key={k} cx={xDay(i)} cy={bottom - k * 4} rx={rx} ry="2.6" fill={XP_FILL} stroke={XP_EDGE} strokeWidth=".9" />
+                        ))}
+                      </g>
+                    );
                   })()}
                 </g>
               );
@@ -905,24 +917,13 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
 
           {/* Where "+n XP" won't fit under the days (owner, Nov 19): each day's XP rises into the chart from its foot, a soft
               gold column behind the lines, up to about two-fifths of the way; or stacked coins (one per 10 XP), from the gear. */}
-          {xpRises && (
+          {xpRises && !view.xpCoins && (
             <g clipPath="url(#plot-clip)" data-xp-rise>
               {xpByDay.map((v, i) => {
                 if (!v || !inView(i)) return null;
                 const cx = xDay(i);
                 const foot = T + plotH;
                 const tip = `+${v} XP`;
-                if (view.xpCoins) {
-                  const rx = Math.min(7, dayW * 0.38);
-                  return (
-                    <g key={i}>
-                      <title>{tip}</title>
-                      {Array.from({ length: Math.max(1, Math.round(v / 10)) }, (_, k) => (
-                        <ellipse key={k} cx={cx} cy={foot - 3 - k * 5} rx={rx} ry="2.8" fill={XP_FILL} stroke={XP_EDGE} strokeWidth=".9" />
-                      ))}
-                    </g>
-                  );
-                }
                 const h = plotH * 0.42 * (v / xpMaxShown);
                 return (
                   <rect key={i} x={cx - dayW * 0.32} y={foot - h} width={dayW * 0.64} height={h} rx="2" fill={XP_FILL} opacity={hover === i ? 0.6 : 0.38}>
