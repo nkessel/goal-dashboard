@@ -3574,3 +3574,8 @@ html[data-tour-open] [data-perched-owl] { visibility: hidden; }
   animation: fog-breathe 6s ease-in-out infinite alternate;
 }
 @media (prefers-reduced-motion: reduce) { .tq-mist::after { animation: none; } }
+
+/* The kept card shrinking back into its target (owner, Nov 19). */
+.kept-shrink { animation: kept-shrink 0.28s cubic-bezier(.5,0,.75,0) both; }
+@keyframes kept-shrink { from { transform: scale(1); opacity: 1; } to { transform: scale(0.12); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .kept-shrink { animation-duration: 0.01s; } }

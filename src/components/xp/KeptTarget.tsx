@@ -16,6 +16,16 @@ export function KeptTarget() {
   const kept = useSyncExternalStore(subscribeKept, readKept, () => null);
   const quoteOn = useSyncExternalStore(subscribeFx, () => loadFx().toucanKeptQuote !== false, () => true);
   const [open, setOpen] = useState(false);
+  // Shrinking back into the target (owner, Nov 19: "minimize with an animation"); then it closes.
+  const [shrinking, setShrinking] = useState<null | "min" | "away">(null);
+  const shrink = (then: "min" | "away") => {
+    setShrinking(then);
+    setTimeout(() => {
+      setShrinking(null);
+      setOpen(false);
+      if (then === "away") putAwayKept();
+    }, 280);
+  };
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
   const start = useRef<{ px: number; py: number; x: number; y: number; moved: boolean } | null>(null);
   if (!kept) return null;
@@ -65,12 +75,12 @@ export function KeptTarget() {
       </button>
       {open && !drag && (
         <div
-          className="card-pop-in parchment fixed z-[45] rounded-2xl px-3.5 pb-3 pt-2"
+          className={`${shrinking ? "kept-shrink" : "card-pop-in"} parchment fixed z-[45] rounded-2xl px-3.5 pb-3 pt-2`}
           role="dialog"
           aria-label="Most important today"
           data-kept-card
           // Parchment (owner, Nov 19), opening where the target sits, with the target in its top corner.
-          style={{ top: pos.y, ...(left ? { left: Math.max(8, pos.x) } : { right: Math.max(8, vw - pos.x - size) }), width: "min(300px, calc(100vw - 16px))", border: "1.2px solid #b39a6a", boxShadow: "0 12px 28px rgba(40,25,5,.35)", color: "var(--t-ink, #2a1c10)" }}
+          style={{ transformOrigin: left ? "22px 22px" : "calc(100% - 22px) 22px", top: pos.y, ...(left ? { left: Math.max(8, pos.x) } : { right: Math.max(8, vw - pos.x - size) }), width: "min(300px, calc(100vw - 16px))", border: "1.2px solid #b39a6a", boxShadow: "0 12px 28px rgba(40,25,5,.35)", color: "var(--t-ink, #2a1c10)" }}
         >
           <div className="relative z-[1] flex items-center justify-between gap-2">
             <span className="flex items-center gap-2">
@@ -80,17 +90,14 @@ export function KeptTarget() {
               </span>
             </span>
             <span className="flex items-center">
-              <button type="button" aria-label="Shrink" title="Shrink to the target" onClick={() => setOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-full text-[18px]" style={{ color: "#8a6116" }}>
+              <button type="button" aria-label="Shrink" title="Shrink to the target" onClick={() => shrink("min")} className="flex h-8 w-8 items-center justify-center rounded-full text-[18px]" style={{ color: "#8a6116" }}>
                 –
               </button>
               <button
                 type="button"
                 aria-label="Close"
                 title="Put it away (it stays in today's journal)"
-                onClick={() => {
-                  setOpen(false);
-                  putAwayKept();
-                }}
+                onClick={() => shrink("away")}
                 className="flex h-8 w-8 items-center justify-center rounded-full text-[18px]"
                 style={{ color: "#8a6116" }}
               >
