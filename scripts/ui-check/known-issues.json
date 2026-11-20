@@ -90,5 +90,13 @@
   {
     "match": "^faces\\|layout-shift\\|<div> \"Daily Habits",
     "reason": "The faces flow opens Daily Habits by script (no tap) after a tick, because the check's save reloads Today; the tray sliding open is that, not a jump."
+  },
+  {
+    "match": "^insights\\|layout-shift\\|.*\\|up to after checking in$",
+    "reason": "An answer to the Submit tap (Nov 20): the check-in folds to its done line and the log gains the new check-in once the server has saved it, just over the check's 500 ms 'after a tap' window."
+  },
+  {
+    "match": "^insights\\|layout-shift\\|.*\\|up to check-in: kept from earlier$",
+    "reason": "Nov 20: a check-in started earlier is kept on this device (localStorage), which only the browser can read, so its ratings open the form after load. Only when a draft exists. Follow-up in docs/WAITING.md: keep the draft in a cookie so the server draws it."
   }
 ]

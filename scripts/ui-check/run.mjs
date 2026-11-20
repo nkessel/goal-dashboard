@@ -185,7 +185,7 @@ async function walk({ browser, device, time, tz, cookie }) {
 
   const record = (issue) => {
     const key = `${screen}|${issue.kind}|${issue.target}`;
-    const isKnown = known.some((k) => (k.key ? key.includes(k.key) : false) || (k.match && new RegExp(k.match).test(`${key}|${issue.detail}`)));
+    const isKnown = known.some((k) => (k.key ? key.includes(k.key) : false) || (k.match && new RegExp(k.match).test(`${key}|${issue.detail}|${issue.step ?? ""}`)));
     results.push({ device, time, screen, ...issue, key, known: isKnown, keyboard: kb > 0 });
   };
 
