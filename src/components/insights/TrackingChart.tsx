@@ -387,7 +387,8 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
     m.setHours(0, 0, 0, 0);
     const i = Math.round((m.getTime() - start) / DAY);
     const h = d.getHours() + d.getMinutes() / 60;
-    return i + Math.max(0, Math.min(1, (h - H0) / (H1 - H0)));
+    // Before 7 AM or after 11:30 PM: just inside the day's edge, never on the line between days (owner, Nov 19).
+    return i + Math.max(0.06, Math.min(0.94, (h - H0) / (H1 - H0)));
   };
   const xu = (u: number) => L + ((u - v0) / (v1 - v0)) * (W - L - R);
   const x = (t: number) => xu(uOf(t));
