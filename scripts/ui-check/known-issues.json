@@ -108,7 +108,7 @@
     "reason": "The Language chip (on main before Nov 20): a floating chip you can drag aside, like the feedback bubble. By design."
   },
   {
-    "match": "^today\\|layout-shift\\|.*\\|up to check-in open$",
-    "reason": "Nov 20 (merge of the check-in work): the check-in's 'Last night' card shows only on the day's first check-in, which the browser decides after load, so Today's Quests move down once. Follow-up in docs/WAITING.md (with the kept draft): let the server know, via a cookie, so it draws both."
+    "match": "^today\\|layout-shift\\|.*\\|up to (check-in open|habit sub-habits open)$",
+    "reason": "Nov 20 (merge of the check-in work): the check-in's 'Last night' card shows only on the day's first check-in, which the browser decides after load, so Today's Quests move down once. Follow-up in docs/WAITING.md (with the kept draft): let the server know, via a cookie, so it draws both. The same shift is first seen at the next step, 'habit sub-habits open' (shift 0.06-0.09, under or just over the error line depending on timing)."
   }
 ]

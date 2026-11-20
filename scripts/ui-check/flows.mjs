@@ -707,6 +707,9 @@ export const FLOWS = [
         if (await h.page.evaluate(() => { const el = document.querySelector('[aria-label="Done: Water the garden beds"]'); el?.click(); return !!el; })) {
           await h.settle(900);
           await h.check("additional habit done");
+          // The "Habit kept!" card stays until closed (it asks how it felt): close it, as a person would, before the next step.
+          await h.tap((p) => p.locator(".pc-card").getByRole("button", { name: /^close$/i }).first(), "close habit kept", { optional: true });
+          await h.settle(400);
         }
         await h.tap(/^additional habits/i, "close additional habits", { optional: true, expectMove: true });
       }
