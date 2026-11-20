@@ -1969,14 +1969,8 @@ export function QuestEditorDialog({
                     </span>
                   </span>
                 </div>
-                {/* Each stat's XP under the slider (owner, Nov 19). Review build: the three looks he's choosing between; hidden while the tray (which lists them) is open, so the editor doesn't jump as you tap. */}
-                {!doingNow && statTotal > 0 && !statsOpen && (
-                  <>
-                    {(["board", "strip", "block", "boxes"] as const).flatMap((look) =>
-                      [false, true].map((plus) => <StatXpLine key={`${look}${plus}`} look={look} plus={plus} xp={xp} split={statSplit} isAdventure={isAdventure} onOpen={() => setStatsOpen(true)} />)
-                    )}
-                  </>
-                )}
+                {/* Each stat's XP under the slider (owner, Nov 19: C3, divided, no "+"); hidden while the tray (which lists them) is open, so the editor doesn't jump as you tap. */}
+                {!doingNow && statTotal > 0 && !statsOpen && <StatXpLine xp={xp} split={statSplit} isAdventure={isAdventure} onOpen={() => setStatsOpen(true)} />}
                 <div className="flex flex-wrap items-center gap-2">
                   {!doingNow && (
                     <span className="ml-auto flex h-9 shrink-0 items-center gap-0.5 rounded-lg border px-1" style={fieldStyle} title="Coins earned on completion">

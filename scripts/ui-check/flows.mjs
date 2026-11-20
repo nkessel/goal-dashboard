@@ -230,40 +230,36 @@ export const FLOWS = [
         if (await h.tap((p) => p.locator("[role=dialog] button", { hasText: /^\W*\d+ XP/ }).first(), "editor: XP pill", { optional: true, expectMove: true })) {
           if (await h.tap((p) => p.getByLabel("XP amount").first(), "editor: XP amount", { optional: true })) await h.check("quest editor: XP typed");
           // Stats: share some of the XP with character stats (the tray under the XP bar), then the add-a-stat field.
-          // Review build (owner, Nov 19): the stats under the XP slider with 2, 5 and 10 stats, in the two looks he's choosing between.
+          // Each stat's share shows under the XP slider (owner's pick, Nov 19: C3, divided, no "+"): checked with 2, 5 and 10 stats.
           await h.page.getByLabel("XP amount").first().fill("60").catch(() => {});
-          const more = (st) => h.tap((p) => p.getByRole("button", { name: new RegExp(`^more xp to ${st}$`, "i") }).first(), `stats: ${st} +`, { optional: true });
+          // With many stats the tray scrolls, so a + can scroll into view as it's tapped.
+          const more = (st, expectMove = false) => h.tap((p) => p.getByRole("button", { name: new RegExp(`^more xp to ${st}$`, "i") }).first(), `stats: ${st} +`, { optional: true, expectMove });
           const openTray = async () => { const ok = await h.tap((p) => p.locator("[role=dialog] button", { hasText: /add to stats|^stats$/i }).first(), "editor: stats tray", { optional: true, expectMove: true }); if (ok) await h.settle(700); return ok; };
           const saveTray = () => h.tap((p) => p.getByRole("button", { name: /^save$/i }).first(), "stats: save", { optional: true, expectMove: true });
-          const looks = async (n) => {
-            for (const look of ["board", "board-plus", "strip", "strip-plus", "block", "block-plus", "boxes", "boxes-plus"]) {
-              const shown = await h.page.evaluate((l) => { const all = [...document.querySelectorAll("[data-stat-look]")]; all.forEach((el) => (el.style.display = el.dataset.statLook === l ? "" : "none")); return all.length; }, look).catch(() => 0);
-              if (shown) { await h.settle(300); await h.check(`quest editor: stats ${n} look ${look}`); }
-            }
-          };
+          const line = async (n) => { await h.settle(300); await h.check(`quest editor: stats ${n} under the slider`); };
           if (await openTray()) {
             await more("strength"); await more("strength"); await more("wisdom");
             await h.check("quest editor: stats tray");
             await saveTray();
-            await looks(2);
+            await line(2);
             if (await openTray()) {
               for (const st of ["intelligence", "charisma", "dexterity"]) await more(st);
               await saveTray();
-              await looks(5);
+              await line(5);
             }
             if (await openTray()) {
-              await more("constitution");
+              await more("constitution", true);
               for (const name of ["Creativity", "Courage", "Focus", "Kindness"]) {
                 if (await h.tap((p) => p.getByRole("button", { name: /a new stat/i }).first(), "stats: new stat", { optional: true, expectMove: true })) {
                   await h.page.getByPlaceholder(/name it/i).first().fill(name).catch(() => {});
                   await h.page.keyboard.press("Enter").catch(() => {});
                   await h.settle(300);
-                  await more(name.toLowerCase());
+                  await more(name.toLowerCase(), true);
                 }
               }
               await h.check("quest editor: new stats added");
               await saveTray();
-              await looks(10);
+              await line(10);
             }
           }
           await h.tap((p) => p.locator("[role=dialog] button", { hasText: /^\W*\d+ XP/ }).first(), "editor: XP pill shut", { optional: true, expectMove: true });
