@@ -367,17 +367,19 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
   // Zoomed in to a few days: the times show along the bottom and the days are divided by dotted lines.
   const close = visDays <= 3;
   // Above the chart: each day's rating and rain. Its date and "+n XP" sit underneath it (owner, Nov 19).
-  const headH = 22;
+  // Split (owner, Nov 19): the date sits with its weekday above the chart, and the XP at the very bottom, under the time panel.
+  const headH = split ? 36 : 22;
   const T = headH + 4;
   const plotH = Math.max(90, Math.min(360, view.chartH ?? 190));
   const eventsH = activeEvents.length && marks === "lanes" ? 14 + activeEvents.length * 16 : 0;
   const timesH = close ? 16 : 0;
   const footY = T + plotH + timesH + eventsH;
-  const footH = 30;
+  const footH = split ? 0 : 30;
   const plotEnd = footY + footH;
-  const tP = plotEnd + 12;
+  const tP = plotEnd + (split ? 6 : 12);
   const timeH = split ? Math.max(90, Math.min(400, view.timeH ?? 200)) : 0;
-  const sleepY = (split ? tP + timeH : plotEnd) + 16;
+  const xpY = tP + timeH + 22;
+  const sleepY = (split ? xpY + 4 : plotEnd) + 16;
   const H = sleepY + (nights ? 8 : -6);
   const uOf = (t: number) => {
     const d = new Date(t);
@@ -847,7 +849,7 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
                     : `${d.getMonth() + 1}/${d.getDate()}`;
               return (
                 <g key={i}>
-                  <text x={xDay(i)} y={footY + 12} textAnchor="middle" fontSize={dayW >= 30 ? 11 : 10} fill={hover === i ? INK : INK_SOFT} fontWeight={i === n - 1 ? 700 : 400} fontFamily="var(--font-display, Georgia), serif">
+                  <text x={xDay(i)} y={split ? 31 : footY + 12} textAnchor="middle" fontSize={dayW >= 30 ? 11 : 10} fill={hover === i ? INK : INK_SOFT} fontWeight={i === n - 1 ? 700 : 400} fontFamily="var(--font-display, Georgia), serif">
                     {/* The date at the bottom (owner, Nov 19), the weekday above the chart. */}
                     {label}
                   </text>
@@ -857,7 +859,7 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
                     const sum = xpByDay.slice(Math.max(0, i - span + 1), i + 1).reduce((a, b) => a + (b ?? 0), 0);
                     if (!sum) return null;
                     return (
-                      <text x={xDay(i)} y={footY + 25} textAnchor="middle" fontSize={dayW >= 22 ? 10 : 8.5} fontWeight="700" fill={XP_EDGE}>
+                      <text x={xDay(i)} y={split ? xpY : footY + 25} textAnchor="middle" fontSize={dayW >= 22 ? 10 : 8.5} fontWeight="700" fill={XP_EDGE}>
                         <title>{span > 1 ? `${sum} XP over these ${span} days` : `${sum} XP that day`}</title>
                         {dayW >= 40 ? `+${sum} XP` : span === 1 && dayW < 22 ? sum : `+${sum}`}
                       </text>
