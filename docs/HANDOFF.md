@@ -102,6 +102,8 @@ Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Rea
 7. **Log it:** add an entry at the top of `docs/SHIPPED.md`, and update this file only if a rule, a pointer or section 0a changed (see "Keeping this file current"), in the same push or right after.
 8. Tell the owner in a few lines what changed. Cloud sessions can't sign in to the live app (Google sign-in), so say what you checked and how.
 
+**Docs-only pushes don't deploy** (`vercel.json` `ignoreCommand`: only `docs/` and `*.md` changed → no build).
+
 **Commits:** one line saying what the user sees, then your session's attribution trailers.
 
 **Feedback builds from the app:** the toucan ("implement my feedback") or Settings › App feedback › Build now fires the owner's Claude scheduled task "Build app feedback (toucan)" (`src/lib/data/feedback-run.ts`). That run follows this same loop. Without a token the app writes `secret.feedback_build_requested` in `app_defaults`; the task runs hourly (:37), exits at once unless that row exists, and deletes it when it starts. With a token (`secret.feedback_run_token`) it fires the task's API at once; 15-minute cooldown via `secret.feedback_run_last`.

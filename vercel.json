@@ -1,4 +1,5 @@
 {
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- . ':(exclude)docs' ':(exclude)*.md'",
   "crons": [
     {
       "path": "/api/cron/reschedule-reminders",

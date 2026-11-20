@@ -1,6 +1,6 @@
 # Run B handoff (Sonnet 5.5, another Claude account)
 
-Written Nov 19, 2026 for a fresh session on a different Claude account. Everything it needs is in this repo: the plans that used to live only in the owner's Claude project files are copied to `docs/plans/`. If anything here disagrees with `git log origin/main`, the log wins.
+Written Nov 19, 2026 (updated Nov 20) for a fresh session on a different Claude account. Everything it needs is in this repo: the plans that used to live only in the owner's Claude project files are copied to `docs/plans/`. If anything here disagrees with `git log origin/main`, the log wins.
 
 ## 1. Paste this to start
 
@@ -62,7 +62,7 @@ Waiting on the owner's review, **don't merge** without his OK: `review/boards-no
 |---|---|---|---|
 | Thread "Fix buggy app loading" (owner's account) | Tutorial dark area blocks taps; new versions switch over only while the app is in the background; Today's server uses the user's time zone (no redraw); one request on open instead of 10 | `tour/Walkthrough.tsx`, `public/sw.js`, `src/app/page.tsx` and the startup data loaders, likely `actions.ts` | **Shipped Nov 19** (see `docs/SHIPPED.md`) |
 | Thread "Design a tray that opens from its pill" (owner's account) | Pointer tray (B) for every `.qe-fact` pill row; the import card gets an Urgency scale beside When, like the quest card | `imports/ImportTriage.tsx`, the quest editor's pill row and panels, the habit editor, `globals.css` | `main` (owner asked to ship it live) |
-| Session claude-2d (Opus, owner's account) | Waiting on review: `review/boards-nov18`, `review/subquests-sequence`, `review/insights-nov19` | boards, calendar, quest editor (sub-quests), Insights | After his OK |
+| Session claude-2d (Opus, owner's account) | Nov 20: merging `review/insights-timeline` (with `insights-nov19`, `faces-feel`) and `review/subquests-sequence` into `main` via branch `merge-nov20` (owner: "do what you think is best"). Once that's on `main`, L2 is free to start. `review/boards-nov18` stays waiting on his review: don't merge it. | quest editor, Insights, faces, toucan question, CheckInHub | `main`, Nov 20 |
 
 `docs/WAITING.md`'s top section is the live list of claimed work: add your own line when you start ("Run B, Sonnet, other account: …"), and remove it when you finish.
 
