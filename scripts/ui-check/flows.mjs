@@ -1072,6 +1072,17 @@ export const FLOWS = [
           await h.page.keyboard.press("Escape");
           await h.settle(500);
           await h.check("chart: the week, merged");
+          // A month and three months: the dates squish together (owner, Nov 19).
+          for (const [span, name] of [["month", "a month"], ["3 months", "three months"]]) {
+            await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), `chart gear for ${name}`, { optional: true, expectMove: true });
+            await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: new RegExp(`^${span}$`, "i") }).first(), `chart: ${name}`, { optional: true });
+            await h.page.keyboard.press("Escape");
+            await h.settle(500);
+            await h.check(`chart: ${name}, squished`);
+          }
+          await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), "chart gear, week again", { optional: true, expectMove: true });
+          await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: /^week$/i }).first(), "chart: week again", { optional: true });
+          await h.page.keyboard.press("Escape");
           await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), "chart gear again", { optional: true, expectMove: true });
           await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: /^split$/i }).first(), "chart: split", { optional: true });
           await h.page.keyboard.press("Escape");

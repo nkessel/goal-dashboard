@@ -59,6 +59,10 @@ export function makeFixtures() {
     task("Clear out the shed someday", { schedule_rank: 3 }),
     task("Finished: return library books", { status: "completed", completed_at: inHours(-3), xp_awarded: 20, felt: 2 }),
     // Failed yesterday, and how it felt (owner, Nov 19): a fail on the Insights chart.
+    // Quests done earlier in the month (owner, Nov 19: XP under each day on the Insights chart, and the squished month view).
+    ...[1, 2, 3, 4, 6, 8, 9, 11, 13, 15, 16, 19, 22, 24, 27].map((d, k) =>
+      task(`Done ${d} days ago`, { status: "completed", completed_at: inHours(-24 * d - 2), xp_value: [15, 20, 30, 25, 40][k % 5], felt: [1, 2, 0, -1, 2][k % 5] }),
+    ),
     task("Morning run", { status: "completed", completed_at: inHours(-20), failed_at: inHours(-20), felt: -1 }),
   ];
   // The calendar: quests placed on it today and this week, one done, and a mini-quest with a time (Nov 3).

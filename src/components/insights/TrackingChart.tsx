@@ -817,18 +817,24 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
               if (!inView(i)) return null;
               if (dayW < 30 && (n - 1 - i) % tickEvery !== 0) return null;
               const wide = dayW >= 58;
-              const xp = xpByDay[i] ?? 0;
               return (
                 <g key={i}>
                   <text x={xDay(i)} y={footY + 12} textAnchor="middle" fontSize="11" fill={hover === i ? INK : INK_SOFT} fontWeight={i === n - 1 ? 700 : 400} fontFamily="var(--font-display, Georgia), serif">
                     {/* The date at the bottom (owner, Nov 19), the weekday above the chart. */}
                     {d.toLocaleDateString(undefined, wide ? { month: "short", day: "numeric" } : { month: "numeric", day: "numeric" })}
                   </text>
-                  {xp > 0 && dayW >= 22 && (
-                    <text x={xDay(i)} y={footY + 25} textAnchor="middle" fontSize="10" fontWeight="700" fill={XP_EDGE}>
-                      {dayW >= 40 ? `+${xp} XP` : `+${xp}`}
-                    </text>
-                  )}
+                  {/* XP under each date; squished (a month or more), the XP of the days up to this date. */}
+                  {(() => {
+                    const span = dayW >= 22 ? 1 : tickEvery;
+                    const sum = xpByDay.slice(Math.max(0, i - span + 1), i + 1).reduce((a, b) => a + (b ?? 0), 0);
+                    if (!sum) return null;
+                    return (
+                      <text x={xDay(i)} y={footY + 25} textAnchor="middle" fontSize="10" fontWeight="700" fill={XP_EDGE}>
+                        <title>{span > 1 ? `${sum} XP over these ${span} days` : `${sum} XP that day`}</title>
+                        {dayW >= 40 ? `+${sum} XP` : `+${sum}`}
+                      </text>
+                    );
+                  })()}
                 </g>
               );
             })}
