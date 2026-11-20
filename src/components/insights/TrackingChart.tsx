@@ -473,6 +473,18 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
     }
     return out;
   })();
+  // In the split panel: each day's things on the right of its column, at their time, nudged down so none hides another.
+  const splitPlaced: Placed[] = (() => {
+    if (!split) return [];
+    const taken: [number, number][] = [];
+    return placed.map((p) => {
+      const px = xu(Math.floor(p.u) + 0.68);
+      let py = tY(p.hour);
+      while (taken.some(([tx, ty]) => Math.abs(tx - px) < itemR * 2 && Math.abs(ty - py) < itemR * 2 + 1)) py += itemR * 2 + 1;
+      taken.push([px, py]);
+      return { ...p, x: px, y: py };
+    });
+  })();
 
   const showXp = isOn("xp");
   const xpByDay = days.map((d) => (eventsByDay.get(dayKey(d)) ?? []).reduce((a, w) => a + (w.xp || 0), 0));
@@ -579,6 +591,39 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
                   {e.label}
                 </label>
               ))}
+            </div>
+          )}
+        </div>
+        {/* The chart's gear, in the row above it, so changing the layout never moves it (owner, Nov 19). */}
+        <div ref={gearRef} className="relative z-[6] shrink-0">
+          <button
+            type="button"
+            onClick={() => setSettings((o) => !o)}
+            aria-expanded={settings}
+            aria-label="Chart view settings"
+            title="View settings"
+            className="flex h-8 w-8 items-center justify-center rounded-full"
+            style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10", boxShadow: "0 2px 6px rgba(60,40,10,.3)" }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+              {Array.from({ length: 8 }, (_, i) => (
+                <rect key={i} x="10.4" y="1.6" width="3.2" height="4.6" rx="1" fill="currentColor" transform={`rotate(${i * 45} 12 12)`} />
+              ))}
+              <circle cx="12" cy="12" r="6.9" fill="currentColor" />
+              <circle cx="12" cy="12" r="2.7" fill="#e3c06e" />
+            </svg>
+          </button>
+          {settings && (
+            <div role="dialog" aria-label="Chart view settings" className="pop parchment absolute right-0 top-full mt-2 flex w-[250px] flex-col gap-2.5 p-3" style={{ borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 28px rgba(0,0,0,.3)" }}>
+              <Seg label="Time span" value={String(view.range)} options={[["7", "Week"], ["30", "Month"], ["90", "3 months"]]} onPick={(v) => setV({ range: Number(v) as View["range"] })} />
+              <Seg label="Points" value={view.detail} options={[["daily", "Daily average"], ["every", "Every check-in"]]} onPick={(v) => setV({ detail: v as View["detail"] })} />
+              <Seg label="Lines" value={view.smooth ? "smooth" : "straight"} options={[["smooth", "Smooth"], ["straight", "Straight"]]} onPick={(v) => setV({ smooth: v === "smooth" })} />
+              <Seg label="Layout" value={view.layout ?? "merged"} options={[["merged", "Merged"], ["split", "Split"]]} onPick={(v) => setV({ layout: v as View["layout"] })} />
+              {!split && <Seg label="Things you did" value={view.marks ?? "onLine"} options={[["onLine", "On the chart"], ["lines", "Marker lines"], ["lanes", "Own rows"]]} onPick={(v) => setV({ marks: v as View["marks"] })} />}
+              <label className="relative z-[1] flex min-h-8 items-center gap-2 text-[14px]" style={{ color: INK }}>
+                <input type="checkbox" checked={view.dots} onChange={() => setV({ dots: !view.dots })} />
+                Show each point
+              </label>
             </div>
           )}
         </div>
@@ -857,8 +902,8 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
                       </path>
                     );
                   })}
-                {placed.map((p) => (
-                  <ItemMark key={p.key} p={{ ...p, x: xu(Math.floor(p.u) + 0.68), y: tY(p.hour) }} r={close ? 9 : 7.5} badge />
+                {splitPlaced.map((p) => (
+                  <ItemMark key={p.key} p={p} r={itemR} badge />
                 ))}
               </g>
             </g>
@@ -973,39 +1018,6 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
           </div>
         )}
 
-        {/* Settings, lower right */}
-        <div ref={gearRef} className="absolute bottom-1.5 right-1.5 z-[4]">
-          <button
-            type="button"
-            onClick={() => setSettings((o) => !o)}
-            aria-expanded={settings}
-            aria-label="Chart view settings"
-            title="View settings"
-            className="flex h-9 w-9 items-center justify-center rounded-full"
-            style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10", boxShadow: "0 2px 6px rgba(60,40,10,.3)" }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-              {Array.from({ length: 8 }, (_, i) => (
-                <rect key={i} x="10.4" y="1.6" width="3.2" height="4.6" rx="1" fill="currentColor" transform={`rotate(${i * 45} 12 12)`} />
-              ))}
-              <circle cx="12" cy="12" r="6.9" fill="currentColor" />
-              <circle cx="12" cy="12" r="2.7" fill="#e3c06e" />
-            </svg>
-          </button>
-          {settings && (
-            <div role="dialog" aria-label="Chart view settings" className="pop parchment absolute bottom-full right-0 mb-2 flex w-[250px] flex-col gap-2.5 p-3" style={{ borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 28px rgba(0,0,0,.3)" }}>
-              <Seg label="Time span" value={String(view.range)} options={[["7", "Week"], ["30", "Month"], ["90", "3 months"]]} onPick={(v) => setV({ range: Number(v) as View["range"] })} />
-              <Seg label="Points" value={view.detail} options={[["daily", "Daily average"], ["every", "Every check-in"]]} onPick={(v) => setV({ detail: v as View["detail"] })} />
-              <Seg label="Lines" value={view.smooth ? "smooth" : "straight"} options={[["smooth", "Smooth"], ["straight", "Straight"]]} onPick={(v) => setV({ smooth: v === "smooth" })} />
-              <Seg label="Layout" value={view.layout ?? "merged"} options={[["merged", "Merged"], ["split", "Split"]]} onPick={(v) => setV({ layout: v as View["layout"] })} />
-              {!split && <Seg label="Things you did" value={view.marks ?? "onLine"} options={[["onLine", "On the chart"], ["lines", "Marker lines"], ["lanes", "Own rows"]]} onPick={(v) => setV({ marks: v as View["marks"] })} />}
-              <label className="relative z-[1] flex min-h-8 items-center gap-2 text-[14px]" style={{ color: INK }}>
-                <input type="checkbox" checked={view.dots} onChange={() => setV({ dots: !view.dots })} />
-                Show each point
-              </label>
-            </div>
-          )}
-        </div>
       </figure>
       {(zoom || showXp) && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]" style={{ color: INK_SOFT }}>
