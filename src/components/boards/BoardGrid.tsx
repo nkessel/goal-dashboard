@@ -989,8 +989,12 @@ function ScrollPull({ shown, total, onChange, label }: { shown: number; total: n
       }}
     >
       {hidden > 0 && (
+        // "↓ 3 more", lettered on the roller itself: a bare number said nothing about what it counted (owner, Nov 20).
         <span aria-hidden className="scroll-pull-count">
-          {hidden}
+          <svg width="9" height="9" viewBox="0 0 12 12" aria-hidden>
+            <path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          {hidden} more
         </span>
       )}
     </button>
