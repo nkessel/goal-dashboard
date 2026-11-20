@@ -752,7 +752,6 @@ export function EnergyCheck({
                   {/* The journal: how you feel on five faces, your words written on the card (no white box), and the
                       event / #tag and supplement buttons inside it (owner, Nov 18). */}
                   <div className="flex flex-col gap-2 rounded-xl px-2.5 py-2" style={{ background: "rgba(217,180,95,.08)", border: "1px solid var(--ec-line, rgba(217,180,95,.3))" }} data-checkin-journal>
-                    <FaceRating value={journalFace} onChange={(v) => setJournalFace(v)} label="How you feel" light />
                     <textarea
                       value={journalText}
                       onChange={(e) => setJournalText(e.target.value.slice(0, 4000))}
@@ -789,7 +788,10 @@ export function EnergyCheck({
                       <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="3.5" y="8.5" width="17" height="7" rx="3.5" transform="rotate(-35 12 12)" stroke="currentColor" strokeWidth="1.8" /><path d="M10.2 9.6l4.2 4.8" stroke="currentColor" strokeWidth="1.8" /></svg>
                       <span>Supplement</span>
                     </button>
-                      <span className="ml-auto flex items-center gap-2">
+                    </span>
+                    {/* The faces sit under the event buttons, above Save (owner, Nov 20). */}
+                    <FaceRating value={journalFace} onChange={(v) => setJournalFace(v)} label="How you feel" light />
+                    <span className="flex items-center justify-end gap-2">
                         <button type="button" onClick={() => setJournaling(false)} className="h-8 rounded-full px-3 text-[13px]" style={{ color: "var(--ec-soft, rgba(239,230,204,.75))" }}>
                           Close
                         </button>
@@ -812,7 +814,6 @@ export function EnergyCheck({
                         >
                           Save to journal
                         </button>
-                      </span>
                     </span>
                   </div>
                 </Fold>
