@@ -59,6 +59,7 @@ import { IconPicker } from "./IconPicker";
 import { CheckMark } from "./TaskRow";
 import { WhenPicker } from "@/components/calendar/WhenPicker";
 import { Fold } from "@/components/ui/Fold";
+import { useCalCardLook } from "@/lib/use-quest-cal";
 import { ScheduleWithin, withinLabel } from "./ScheduleWithin";
 import { BoardPicker } from "./BoardPicker";
 import { useEscape } from "@/lib/use-escape";
@@ -1348,6 +1349,7 @@ export function QuestEditorDialog({
   );
   /** The sub-quests drawer: out of the "+ Sub-quests" pill, with a caret pointing up at it. */
   const subPillRef = useRef<HTMLButtonElement>(null);
+  const cardLook = useCalCardLook(task?.id);
   const stepsHas = (steps ?? []).length > 0 || (steps === null && (task?.steps_total ?? 0) > 0);
   const stepsOpen = !stepsFolded && (addingStep || stepsHas);
   const stepsDrawer = (
@@ -2354,7 +2356,8 @@ export function QuestEditorDialog({
       <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="More details">
         {pillKeys.map((k) => (
           <button key={k} type="button" onClick={() => setMorePick((o) => (o === k ? null : k))} aria-expanded={morePick === k} className="qe-fact flex h-8 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold" data-open={morePick === k ? "true" : undefined}>
-            {morePick !== k && !(k === "tags" && tags.length > 0) && <PlusMark />}
+            {/* Each + pill has its own line icon (owner's picks, Nov 20); a pill without one keeps the +. */}
+            {k in PILL_ICONS ? <PillIcon k={k} color={k === "color" ? cardLook?.color : undefined} /> : morePick !== k && !(k === "tags" && tags.length > 0) && <PlusMark />}
             {pillName(k)}
             {(morePick === k || (k === "tags" && tags.length > 0)) && <FactCaret open={morePick === k} />}
           </button>
@@ -3187,6 +3190,37 @@ function PlusMark({ minus = false }: { minus?: boolean }) {
   return (
     <svg aria-hidden width="9" height="9" viewBox="0 0 10 10" className="shrink-0 opacity-70" style={{ marginRight: 1 }}>
       <path d={minus ? "M1.5 5h7" : "M1.5 5h7M5 1.5v7"} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** The + pills' icons, flat lines in the pill's ink (owner's picks, Nov 20). */
+const PILL_ICONS: Record<string, string> = {
+  // Importance & effort: a flame.
+  scales: "M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-3 2-4 2-7 1 1 2 2 3 2 0-2-1-3 0-5z",
+  // Progress: a rising line (c).
+  progress: "M4 20l5-6 4 3 7-9M15 8h5v5",
+  // Matrix: arrowed axes with faint quarters and a dot (b4.1); the quarters and dot are drawn below.
+  matrix: "M5 5v14h14M5 5l-1.5 2M5 5l1.5 2M19 19l-2-1.5M19 19l-2 1.5",
+  // Tags: a # (b).
+  tags: "M9 4 7 20M17 4l-2 16M4 9h16M3 15h16",
+  // Add a file: a paperclip (b).
+  file: "M20 11l-8 8a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-3-3l7-7",
+  // Color: the card's own colour, filled (drawn below).
+  color: "",
+};
+function PillIcon({ k, color }: { k: string; color?: string | null }) {
+  if (k === "color")
+    return <span aria-hidden className="h-3.5 w-3.5 shrink-0 rounded-full" style={{ border: "1.4px solid #8a6116", background: color ?? "linear-gradient(180deg, #fbf3dc, #e6cf98)" }} />;
+  return (
+    <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 opacity-80">
+      <path d={PILL_ICONS[k]} />
+      {k === "matrix" && (
+        <>
+          <path d="M12 5v14M5 12h14" strokeOpacity=".3" />
+          <circle cx="15.5" cy="8.5" r="2" fill="currentColor" stroke="none" />
+        </>
+      )}
     </svg>
   );
 }
