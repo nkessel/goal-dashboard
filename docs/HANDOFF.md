@@ -39,7 +39,7 @@ Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Rea
 - Insights on one graph for every metric (owner, Nov 16): not built. The toucan offering habits: on hold (both in WAITING).
 - Merging Daily Habits and Today's Quests on Today: brainstorm with him first.
 - `review/stat-xp-under-slider` (each stat's XP under the quest editor's XP slider, his idea): built Nov 19, review page sent.
-- The welcome screen is paused (off by default); toucan-only mockups A/B/C sent Nov 19: build his pick.
+- `review/faces-feel` (faces + How do you feel?, the toucan's question) and `review/insights-timeline` (the merged chart): built Nov 19, review page sent.
 - The email to Daniel about his Champion title: needs his OK and wording.
 - Waiting on his iPhone: a list of things cloud sessions can't check (in `docs/WAITING.md` and `docs/PRIORITIES.md`).
 - When weekly / monthly / yearly reviews are built: remind him of the lines he saved (in `docs/WAITING.md`).
@@ -70,8 +70,8 @@ Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Rea
 - Data layer: `src/lib/data/*.ts` (all `server-only`).
 - Pure logic: `src/lib/*.ts`.
 - UI: `src/components/<area>/`.
-- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0089_event_faces.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
-- `profiles.life_wheel` (jsonb) is a catch-all for per-profile extras, read through `readExtras()` in `actions.ts`. **Always merge into it, never overwrite it.**
+- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0091_felt.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
+- `profiles.life_wheel` (jsonb) is a catch-all for per-profile extras, read through `readExtras()` in `actions.ts`. **Always merge into it, never overwrite it.** A trigger keeps top-level keys a write leaves out and logs them in `life_wheel_drops` (check it if settings vanish).
 - `app_defaults` table holds "default for all accounts" settings plus server-only `secret.*` keys (never shown as settings).
 
 ---

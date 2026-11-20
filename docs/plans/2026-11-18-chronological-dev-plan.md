@@ -118,6 +118,7 @@ Say OK, give notes, or drop each of these, so the splits don't have to work arou
    - right-click menus as popups app-wide
    - a smaller toucan chat (the toucan is split by now)
    - the Insights, boards and anti-habits batches
+   - **the Insights timeline** (round 3 on the chart page, once the owner OKs it; spec in `docs/WAITING.md` › Insights chart): merged chart by default, split as an option, and **zooming in and out of the dates** (owner, Nov 19): pinch on a phone, trackpad pinch or Ctrl+scroll on a computer, and the range picker; times on the axis only once zoomed in. Plus the "How do you feel?" faces on celebrations, fails, logged events, journal entries, tracked events and habit ticks
    - habits in the day's plan, part 2
    - tests for the XP and coin math
 

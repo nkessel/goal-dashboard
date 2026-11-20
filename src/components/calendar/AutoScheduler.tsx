@@ -989,6 +989,7 @@ function ReviewStrip({ day, current, accepted, busy, holds, extras, from, to, is
     const h = Math.floor(m / 60) % 24;
     return h === 0 ? "12a" : h < 12 ? `${h}a` : h === 12 ? "12p" : `${h - 12}p`;
   };
+  // A short quest at the very end of the strip keeps its 18px block inside the strip, not cut at the edge.
   const wide = pos(current.start.getTime(), current.end.getTime());
   return (
     <div className="flex flex-col gap-0.5">
@@ -1023,7 +1024,7 @@ function ReviewStrip({ day, current, accepted, busy, holds, extras, from, to, is
           type="button"
           aria-label={`${current.title}: drag to move, or use the arrow keys`}
           className="absolute inset-y-0.5 flex cursor-grab touch-none items-center justify-center overflow-hidden rounded-md px-1 text-[11px] font-bold active:cursor-grabbing"
-          style={{ ...wide, minWidth: 18, background: "linear-gradient(180deg,#f6dc8e,#d9b45f)", color: "#2a1c10", border: "2px solid #6b4f1d", boxShadow: "0 2px 6px rgba(0,0,0,.25)" }}
+          style={{ ...wide, left: `min(${wide.left}, calc(100% - 18px))`, minWidth: 18, background: "linear-gradient(180deg,#f6dc8e,#d9b45f)", color: "#2a1c10", border: "2px solid #6b4f1d", boxShadow: "0 2px 6px rgba(0,0,0,.25)" }}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => {
             e.stopPropagation();

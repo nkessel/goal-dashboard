@@ -17,10 +17,16 @@ export function FloatingWindow({ storageKey, width, minimized, onRestore, chip, 
   const sizing = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
+  // The app's bottom bar: the window stops above it, so it never sits on the tabs (UI check, Nov 19).
+  const [floor, setFloor] = useState(0);
+  const navGap = () => {
+    const r = document.querySelector("[data-app-nav]")?.getBoundingClientRect();
+    return r && r.height > 0 && r.top < window.innerHeight ? Math.max(0, Math.round(window.innerHeight - r.top)) : 0;
+  };
   const clamp = (p: Pos): Pos => {
     const w = box.current?.offsetWidth ?? width;
     const h = box.current?.offsetHeight ?? 60;
-    return { x: Math.max(8, Math.min(window.innerWidth - w - 8, p.x)), y: Math.max(8, Math.min(window.innerHeight - Math.min(h, 120) - 8, p.y)) };
+    return { x: Math.max(8, Math.min(window.innerWidth - w - 8, p.x)), y: Math.max(8, Math.min(window.innerHeight - navGap() - Math.min(h, 120) - 8, p.y)) };
   };
   useEffect(() => {
     let p: Pos | null = null;
@@ -38,9 +44,12 @@ export function FloatingWindow({ storageKey, width, minimized, onRestore, chip, 
         /* storage unavailable */
       }
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the saved spot is only readable in the browser
     setPos(clamp(p && Number.isFinite(p.x) && Number.isFinite(p.y) ? p : at ? at() : { x: window.innerWidth - width - 24, y: 150 }));
-    const resized = () => setPos((q) => (q ? clamp(q) : q));
+    setFloor(navGap());
+    const resized = () => {
+      setFloor(navGap());
+      setPos((q) => (q ? clamp(q) : q));
+    };
     window.addEventListener("resize", resized);
     return () => window.removeEventListener("resize", resized);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -84,7 +93,7 @@ export function FloatingWindow({ storageKey, width, minimized, onRestore, chip, 
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.key !== "Escape" && e.stopPropagation()}
       className={`fixed ${minimized ? "card-pop-in" : "reveal"}`}
-      style={fit && !minimized ? { zIndex: z, left: 8, top: fit.top + 8, width: "calc(100vw - 16px)", height: fit.height - 16, display: "flex" } : { zIndex: z, left: pos.x, top: pos.y, width: minimized ? undefined : `min(${size?.w ?? width}px, calc(100vw - 16px))`, ...(size && !minimized ? { height: `min(${size.h}px, calc(100dvh - ${pos.y}px - 16px))` } : {}), maxHeight: `calc(100dvh - ${pos.y}px - 16px)`, display: "flex", touchAction: minimized ? "none" : undefined }}
+      style={fit && !minimized ? { zIndex: z, left: 8, top: fit.top + 8, width: "calc(100vw - 16px)", height: fit.height - 16, display: "flex" } : { zIndex: z, left: pos.x, top: pos.y, width: minimized ? undefined : `min(${size?.w ?? width}px, calc(100vw - 16px))`, ...(size && !minimized ? { height: `min(${size.h}px, calc(100dvh - ${pos.y}px - ${16 + floor}px))` } : {}), maxHeight: `calc(100dvh - ${pos.y}px - ${16 + floor}px)`, display: "flex", touchAction: minimized ? "none" : undefined }}
     >
       {minimized ? (
         <button type="button" data-drag-handle className="hover-glow flex h-10 cursor-grab touch-none select-none items-center gap-1.5 whitespace-nowrap rounded-full pl-3 pr-4 text-[14px] font-bold shadow-lg" style={{ background: "radial-gradient(circle at 35% 25%, #f6e3a8, #d9b45f 60%, #a88a3f)", border: "2px solid #4a3913", color: "#2a1c10" }} aria-label={label}>
