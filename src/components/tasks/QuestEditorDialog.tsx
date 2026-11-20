@@ -1347,11 +1347,18 @@ export function QuestEditorDialog({
     </div>
   );
   /** The sub-quests drawer: out of the "+ Sub-quests" pill, with a caret pointing up at it. */
+  const subPillRef = useRef<HTMLButtonElement>(null);
   const stepsHas = (steps ?? []).length > 0 || (steps === null && (task?.steps_total ?? 0) > 0);
   const stepsOpen = !stepsFolded && (addingStep || stepsHas);
   const stepsDrawer = (
     <div className="relative mt-1.5 flex flex-col gap-1 rounded-xl px-3 pb-2.5 pt-2" style={{ background: "#f7eed6", border: "1px solid rgba(139,112,64,.4)" }} data-steps-drawer>
-      <span aria-hidden className="absolute -top-[6px] left-6 h-[11px] w-[11px] rotate-45" style={{ background: "#f7eed6", borderLeft: "1px solid rgba(139,112,64,.4)", borderTop: "1px solid rgba(139,112,64,.4)" }} />
+      <span aria-hidden className="absolute -top-[6px] h-[11px] w-[11px] rotate-45" ref={(el) => {
+        // Points at the "+ Sub-quests" pill, wherever it sits in the row above.
+        const pill = subPillRef.current;
+        const box = el?.parentElement;
+        if (!el || !pill || !box) return;
+        el.style.left = `${Math.max(10, pill.getBoundingClientRect().left - box.getBoundingClientRect().left + pill.offsetWidth / 2 - 6)}px`;
+      }} style={{ background: "#f7eed6", borderLeft: "1px solid rgba(139,112,64,.4)", borderTop: "1px solid rgba(139,112,64,.4)" }} />
       {((steps && steps.length > 0) || stepXpPop !== null) && (
         <span className="flex min-w-0 items-center gap-2 whitespace-nowrap text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
           {steps && steps.length > 0 && (
@@ -1647,6 +1654,57 @@ export function QuestEditorDialog({
                   )}
     </div>
   );
+  /** "+ Sub-quests" and "+ Sequence": in the quick-details row, before Due (owner, Nov 20); their place among the
+      other quick details follows the editor's layout (gear). */
+  const seqPills = (
+    <>
+                    {/* "+ Sub-quests" and "+ Sequence", no icons, like the other + pills (owner, Nov 20). */}
+                    {!stepsUnavailable && !isCompleted && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (stepsOpen) {
+                            setStepsFolded(true);
+                            setAddingStep(false);
+                            return;
+                          }
+                          setStepsFolded(false);
+                          if (!stepsHas) {
+                            setAddingStep(true);
+                            requestAnimationFrame(() => newStepRef.current?.focus());
+                          }
+                        }}
+                        ref={subPillRef}
+                        aria-expanded={stepsOpen}
+                        data-open={stepsOpen ? "true" : undefined}
+                        className="qe-fact flex h-8 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold"
+                        title="A checklist inside this quest"
+                      >
+                        {stepsOpen ? <FactCaret open /> : <PlusMark />}
+                        Sub-quests
+                        {(() => {
+                          const n = (steps ?? []).length || (steps === null ? (task?.steps_total ?? 0) : 0);
+                          return n ? <span style={{ color: "var(--t-ink-soft)" }}>· {n}</span> : null;
+                        })()}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => (task ? setSeqDialog(true) : setSeqOpen((o) => !o))}
+                      aria-expanded={task ? undefined : seqOpen}
+                      data-open={!task && seqOpen ? "true" : undefined}
+                      className="qe-fact flex h-8 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold"
+                      title="Quests before or after this one"
+                    >
+                      <PlusMark />
+                      Sequence
+                      {(() => {
+                        const n = task ? (task.behind?.length ?? 0) : seqLinks.length;
+                        return n ? <span style={{ color: "var(--t-ink-soft)" }}>· {n}</span> : null;
+                      })()}
+                    </button>
+    </>
+  );
   const partNodes: Record<EditorPart, React.ReactNode> = {
     showsIn: (
       <>
@@ -1766,52 +1824,7 @@ export function QuestEditorDialog({
                 <div className="flex flex-col gap-1.5" data-subseq>
                   {/* Two pills, side by side (owner, Nov 20: "the two pills for each, sub-quests and sequence"): one tap
                       each, no menu of choices. Sequence opens the sequence window (or, on a new quest, its panel here). */}
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {/* "+ Sub-quests" and "+ Sequence", no icons, like the other + pills (owner, Nov 20). */}
-                    {!stepsUnavailable && !isCompleted && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (stepsOpen) {
-                            setStepsFolded(true);
-                            setAddingStep(false);
-                            return;
-                          }
-                          setStepsFolded(false);
-                          if (!stepsHas) {
-                            setAddingStep(true);
-                            requestAnimationFrame(() => newStepRef.current?.focus());
-                          }
-                        }}
-                        aria-expanded={stepsOpen}
-                        data-open={stepsOpen ? "true" : undefined}
-                        className="qe-fact flex h-8 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold"
-                        title="A checklist inside this quest"
-                      >
-                        <span aria-hidden className="text-[13px] leading-none opacity-70">{stepsOpen ? "−" : "+"}</span>
-                        Sub-quests
-                        {(() => {
-                          const n = (steps ?? []).length || (steps === null ? (task?.steps_total ?? 0) : 0);
-                          return n ? <span style={{ color: "var(--t-ink-soft)" }}>· {n}</span> : null;
-                        })()}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => (task ? setSeqDialog(true) : setSeqOpen((o) => !o))}
-                      aria-expanded={task ? undefined : seqOpen}
-                      data-open={!task && seqOpen ? "true" : undefined}
-                      className="qe-fact flex h-8 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold"
-                      title="Quests before or after this one"
-                    >
-                      <span aria-hidden className="text-[13px] leading-none opacity-70">+</span>
-                      Sequence
-                      {(() => {
-                        const n = task ? (task.behind?.length ?? 0) : seqLinks.length;
-                        return n ? <span style={{ color: "var(--t-ink-soft)" }}>· {n}</span> : null;
-                      })()}
-                    </button>
-                  </div>
+                  {layout.folded.includes("sequence") && seqPills}
                   {!stepsUnavailable && <Fold open={stepsOpen}>{stepsDrawer}</Fold>}
                   {!task && seqOpen && (
                     <div className="reveal flex flex-col gap-2 rounded-xl px-3 py-2.5" style={{ border: "1px dashed rgba(139,112,64,.5)" }}>
@@ -2272,7 +2285,7 @@ export function QuestEditorDialog({
     </>
   );
   // The board is picked from its tag on the portrait (owner, Nov 12), not from a pill in this row.
-  const FACT_KEYS: EditorPart[] = ["showsIn", "time", "xp"];
+  const FACT_KEYS: EditorPart[] = ["showsIn", "time", "xp", "sequence"];
   const factLabel = (f: EditorPart) =>
     f === "showsIn"
       ? `${placement === "today" ? "Primary" : placement === "additional" ? "Secondary" : "Backlog"}`
@@ -2338,7 +2351,7 @@ export function QuestEditorDialog({
       <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="More details">
         {pillKeys.map((k) => (
           <button key={k} type="button" onClick={() => setMorePick((o) => (o === k ? null : k))} aria-expanded={morePick === k} className="qe-fact flex h-8 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold" data-open={morePick === k ? "true" : undefined}>
-            <span aria-hidden className="text-[13px] leading-none opacity-70">{morePick === k ? "−" : "+"}</span>
+            {morePick === k ? <FactCaret open /> : <PlusMark />}
             {pillName(k)}
           </button>
         ))}
@@ -2719,7 +2732,7 @@ export function QuestEditorDialog({
               return (
                 <Fragment key="facts">
                   <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Quick details">
-                    {facts.map((f) => (
+                    {facts.map((f) => f === "sequence" ? <Fragment key={f}>{seqPills}</Fragment> : (
                       <button
                         key={f}
                         type="button"
@@ -2747,9 +2760,10 @@ export function QuestEditorDialog({
                     )}
                     {/* Where it happens: an icon-only pill, last (owner, Nov 3); shown on the card too. */}
                     {task && !doingNow && (
-                      <button type="button" onClick={() => setFactOpen((o) => (o === "place" ? null : "place"))} aria-expanded={factOpen === "place"} aria-label={place ? `Place: ${place}` : "Add a place"} title={place ? `📍 ${place}` : "Where it happens"} className="qe-fact flex h-9 items-center gap-1 rounded-full px-2.5 text-[13.5px] font-semibold" data-open={factOpen === "place" ? "true" : undefined}>
+                      <button type="button" onClick={() => setFactOpen((o) => (o === "place" ? null : "place"))} aria-expanded={factOpen === "place"} aria-label={place ? `Location: ${place}` : "Add a location"} title={place ? `📍 ${place}` : "Where it happens"} className="qe-fact flex h-9 items-center gap-1 rounded-full px-2.5 text-[13.5px] font-semibold" data-open={factOpen === "place" ? "true" : undefined}>
                         <PinGlyph />
-                        {place && <span className="max-w-[110px] truncate">{place}</span>}
+                        {/* Says what it is when empty (owner, Nov 20: "have this say location"). */}
+                        <span className="max-w-[110px] truncate">{place || "Location"}</span>
                         {drive && <span className="shrink-0 whitespace-nowrap" style={{ opacity: 0.8 }}>· 🚗 {driveWords(drive)}</span>}
                       </button>
                     )}
@@ -2779,6 +2793,8 @@ export function QuestEditorDialog({
                     <DrivePicks taskId={task.id} />
                     </div>
                   )}
+                  {/* Under the row: the sub-quests drawer (pointing up at its pill) and the sequence's panel. */}
+                  {facts.includes("sequence") && partNodes.sequence}
                   {factOpen === "due" && (
                     <div key="due" className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3" data-tour="panel-due">
                       <div className="flex flex-wrap items-center gap-1">
@@ -3158,6 +3174,15 @@ function PinGlyph() {
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path d="M12 21s-6.5-6.2-6.5-11.2a6.5 6.5 0 0 1 13 0C18.5 14.8 12 21 12 21z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" fill="rgba(217,180,95,.35)" />
       <circle cx="12" cy="9.8" r="2.3" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+/** The + (or −) on the editor's add-on pills: drawn, so it sits exactly on the text's middle (owner, Nov 20). */
+function PlusMark({ minus = false }: { minus?: boolean }) {
+  return (
+    <svg aria-hidden width="9" height="9" viewBox="0 0 10 10" className="shrink-0 opacity-70" style={{ marginRight: 1 }}>
+      <path d={minus ? "M1.5 5h7" : "M1.5 5h7M5 1.5v7"} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }

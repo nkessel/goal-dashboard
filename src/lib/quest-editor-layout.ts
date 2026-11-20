@@ -30,9 +30,9 @@ export type EditorPart =
 export const EDITOR_PARTS: { key: EditorPart; label: string }[] = [
   { key: "showsIn", label: "Priority (primary, secondary, backlog)" },
   { key: "time", label: "Time to complete and scheduling" },
-  { key: "sequence", label: "Sequence" },
-  { key: "steps", label: "Steps" },
   { key: "xp", label: "XP and coins" },
+  { key: "sequence", label: "Sub-quests and sequence" },
+  { key: "steps", label: "Steps" },
   { key: "board", label: "Board" },
   { key: "stats", label: "Character stats" },
   { key: "progress", label: "Progress" },
@@ -52,7 +52,7 @@ export type EditorLayout = { order: EditorPart[]; folded: EditorPart[]; v?: numb
 export const DEFAULT_EDITOR_LAYOUT: EditorLayout = {
   order: EDITOR_PARTS.map((p) => p.key),
   folded: ["stats", "progress", "importance", "urgency", "difficulty", "energy", "matrix", "template", "tags"],
-  v: 3,
+  v: 4,
 };
 
 const KEY = "quest-editor-layout";
@@ -73,7 +73,14 @@ function clean(raw: unknown): EditorLayout {
     if (at >= 0) order.push(...order.splice(at, 1));
     folded = [...folded.filter((k) => k !== "tags"), "tags"];
   }
-  return { order: [...new Set(order)], folded: [...new Set(folded)], v: 3 };
+  // Before v4: Sub-quests and Sequence sit in the quick-details row just before Due (owner, Nov 20), so after XP.
+  if ((r.v ?? 1) < 4) {
+    const at = order.indexOf("sequence");
+    const xpAt = order.indexOf("xp");
+    if (at >= 0 && xpAt >= 0 && at < xpAt) order.splice(order.indexOf("xp") + 1, 0, ...order.splice(at, 1));
+    folded = folded.filter((k) => k !== "sequence");
+  }
+  return { order: [...new Set(order)], folded: [...new Set(folded)], v: 4 };
 }
 
 let cache: { raw: string | null; value: EditorLayout } | null = null;

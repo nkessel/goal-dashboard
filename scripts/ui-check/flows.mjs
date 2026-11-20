@@ -529,11 +529,11 @@ export const FLOWS = [
       if (await h.tap("text=Pick up medication", "open quest editor", { optional: true, expectMove: true })) {
         await h.settle(900);
         await h.check("sub-quests and sequence pills");
-        if (await h.tap((p) => p.locator("[data-subseq] button", { hasText: "Sub-quests" }).first(), "sub-quests pill", { optional: true, expectMove: true })) {
+        if (await h.tap((p) => p.getByRole("group", { name: "Quick details" }).locator("button", { hasText: "Sub-quests" }).first(), "sub-quests pill", { optional: true, expectMove: true })) {
           await h.settle(500);
           await h.check("sub-quests: adding one");
         }
-        if (await h.tap((p) => p.locator("[data-subseq] button", { hasText: "Sequence" }).first(), "sequence pill", { optional: true, expectMove: true })) {
+        if (await h.tap((p) => p.getByRole("group", { name: "Quick details" }).locator("button", { hasText: "Sequence" }).first(), "sequence pill", { optional: true, expectMove: true })) {
           await h.settle(700);
           await h.check("sequence: its window");
           await esc(h);
