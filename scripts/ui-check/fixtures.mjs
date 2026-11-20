@@ -61,7 +61,7 @@ export function makeFixtures() {
     // Failed yesterday, and how it felt (owner, Nov 19): a fail on the Insights chart.
     // Quests done earlier in the month (owner, Nov 19: XP under each day on the Insights chart, and the squished month view).
     ...[1, 2, 3, 4, 6, 8, 9, 11, 13, 15, 16, 19, 22, 24, 27].map((d, k) =>
-      task(`Done ${d} days ago`, { status: "completed", completed_at: inHours(-24 * d - 2), xp_value: [15, 20, 30, 25, 40][k % 5], felt: [1, 2, 0, -1, 2][k % 5] }),
+      task(`Done ${d} days ago`, { status: "completed", completed_at: inHours(-24 * d + [1.5, 4, 6.5, 9, 12][k % 5]), xp_value: [15, 20, 30, 25, 40][k % 5], felt: [1, 2, 0, -1, 2][k % 5] }),
     ),
     task("Morning run", { status: "completed", completed_at: inHours(-20), failed_at: inHours(-20), felt: -1 }),
   ];
