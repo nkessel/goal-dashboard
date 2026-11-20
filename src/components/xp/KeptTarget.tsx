@@ -35,7 +35,7 @@ export function KeptTarget() {
         aria-expanded={open}
         title="Most important today (drag to move)"
         className="kept-target fixed z-[38] touch-none rounded-full p-0"
-        style={{ left: pos.x, top: pos.y, width: size, height: size, filter: "drop-shadow(0 5px 8px rgba(0,0,0,.35))", cursor: drag ? "grabbing" : "grab" }}
+        style={{ left: pos.x, top: pos.y, width: size, height: size, filter: "drop-shadow(0 5px 8px rgba(0,0,0,.35))", cursor: drag ? "grabbing" : "grab", visibility: open && !drag ? "hidden" : undefined }}
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           start.current = { px: e.clientX, py: e.clientY, x: pos.x, y: pos.y, moved: false };
@@ -65,18 +65,22 @@ export function KeptTarget() {
       </button>
       {open && !drag && (
         <div
-          className="card-pop-in fixed z-[38] rounded-2xl px-4 pb-3 pt-2.5"
+          className="card-pop-in parchment fixed z-[38] rounded-2xl px-3.5 pb-3 pt-2"
           role="dialog"
           aria-label="Most important today"
           data-kept-card
-          style={{ top: pos.y + size + 8, ...(left ? { left: Math.max(8, pos.x) } : { right: Math.max(8, vw - pos.x - size) }), width: "min(300px, calc(100vw - 16px))", background: "linear-gradient(160deg, rgba(18,51,47,.96), rgba(10,32,29,.98))", border: "1.2px solid rgba(217,180,95,.75)", boxShadow: "0 12px 28px rgba(0,0,0,.4)", color: "#f3e7c6" }}
+          // Parchment (owner, Nov 19), opening where the target sits, with the target in its top corner.
+          style={{ top: pos.y, ...(left ? { left: Math.max(8, pos.x) } : { right: Math.max(8, vw - pos.x - size) }), width: "min(300px, calc(100vw - 16px))", border: "1.2px solid #b39a6a", boxShadow: "0 12px 28px rgba(40,25,5,.35)", color: "var(--t-ink, #2a1c10)" }}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-[.16em]" style={{ color: "#d9b45f" }}>
-              Most important today
+          <div className="relative z-[1] flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2">
+              <TargetArrow size={30} />
+              <span className="text-[11px] font-semibold uppercase tracking-[.16em]" style={{ color: "#8a6116" }}>
+                Most important today
+              </span>
             </span>
             <span className="flex items-center">
-              <button type="button" aria-label="Shrink" title="Shrink to the target" onClick={() => setOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-full text-[18px]" style={{ color: "#d9b45f" }}>
+              <button type="button" aria-label="Shrink" title="Shrink to the target" onClick={() => setOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-full text-[18px]" style={{ color: "#8a6116" }}>
                 –
               </button>
               <button
@@ -88,19 +92,19 @@ export function KeptTarget() {
                   putAwayKept();
                 }}
                 className="flex h-8 w-8 items-center justify-center rounded-full text-[18px]"
-                style={{ color: "#d9b45f" }}
+                style={{ color: "#8a6116" }}
               >
                 ×
               </button>
             </span>
           </div>
-          <div className="font-display mt-0.5 text-[19px] leading-snug">{kept.text}</div>
+          <div className="font-display relative z-[1] mt-1 text-[19px] leading-snug">{kept.text}</div>
           {quoteOn && (
-              <div className="mt-2.5 flex items-start gap-2 pt-2" style={{ borderTop: "1px solid rgba(217,180,95,.3)" }}>
-                <span className="font-display flex-1 text-[14.5px] italic" style={{ color: "rgba(243,231,198,.82)" }}>
+              <div className="relative z-[1] mt-2.5 flex items-start gap-2 pt-2" style={{ borderTop: "1px solid rgba(139,112,64,.35)" }}>
+                <span className="font-display flex-1 text-[14.5px] italic" style={{ color: "var(--t-ink-soft, #6b5631)" }}>
                   &ldquo;{line}&rdquo;
                 </span>
-                <button type="button" onClick={() => patchFx({ toucanKeptQuote: false })} className="text-[12px] underline underline-offset-2" style={{ color: "rgba(217,180,95,.85)" }}>
+                <button type="button" onClick={() => patchFx({ toucanKeptQuote: false })} className="text-[12px] underline underline-offset-2" style={{ color: "#8a6116" }}>
                   hide
                 </button>
               </div>
@@ -113,16 +117,17 @@ export function KeptTarget() {
 
 /** A gilded bullseye with an arrow struck in its heart (owner, Nov 19: "a much better target and arrow icon"). */
 function TargetArrow({ size }: { size: number }) {
+  // Quieter colours (owner, Nov 19: "slightly less colorful"): parchment and gold rings, a deep-gold heart, an ink arrow.
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden>
       <circle cx="22" cy="26" r="19" fill="#fbf3dc" stroke="#6b4a14" strokeWidth="1.6" />
-      <circle cx="22" cy="26" r="14.5" fill="#d9b45f" stroke="#8a6116" strokeWidth="1" />
+      <circle cx="22" cy="26" r="14.5" fill="#e6cf95" stroke="#8a6116" strokeWidth="1" />
       <circle cx="22" cy="26" r="10" fill="#fbf3dc" stroke="#8a6116" strokeWidth="1" />
-      <circle cx="22" cy="26" r="5.5" fill="#b5452e" stroke="#6b2a1a" strokeWidth="1" />
+      <circle cx="22" cy="26" r="5.5" fill="#a88a3f" stroke="#6b4a14" strokeWidth="1" />
       <circle cx="22" cy="26" r="1.6" fill="#fbf3dc" />
-      {/* The arrow, struck in the centre from the upper right: its shaft, and two pairs of red feathers at the tail. */}
+      {/* The arrow, struck in the centre from the upper right, its feathers at the tail. */}
       <path d="M22 26L41 7" stroke="#3b2a14" strokeWidth="2.2" strokeLinecap="round" />
-      <path d="M34 14L39.5 8.5L44 10.5L38.5 16Z M34 14L39.5 8.5L37.5 4L32 9.5Z" fill="#b5452e" stroke="#6b2a1a" strokeWidth=".8" strokeLinejoin="round" />
+      <path d="M34 14L39.5 8.5L44 10.5L38.5 16Z M34 14L39.5 8.5L37.5 4L32 9.5Z" fill="#7a5a2a" stroke="#3b2a14" strokeWidth=".8" strokeLinejoin="round" />
     </svg>
   );
 }
