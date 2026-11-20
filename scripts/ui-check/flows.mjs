@@ -599,6 +599,50 @@ export const FLOWS = [
         }
         await esc(h);
       }
+      // Sub-quests and Sequence: two pills side by side, one tap each (owner, Nov 20).
+      await h.goto("/", { name: "sequence" });
+      if (await h.tap("text=Pick up medication", "open quest editor", { optional: true, expectMove: true })) {
+        await h.settle(900);
+        await h.check("sub-quests and sequence pills");
+        if (await h.tap((p) => p.getByRole("group", { name: "Quick details" }).locator("button", { hasText: "Sub-quests" }).first(), "sub-quests pill", { optional: true, expectMove: true })) {
+          await h.settle(500);
+          await h.check("sub-quests: adding one");
+          // Sub-quests as little cards (owner's pick C, Nov 20): type two, then open one's ⋯ and its time and details.
+          await h.page.keyboard.type("Call the pharmacy");
+          await h.page.keyboard.press("Enter");
+          await h.page.keyboard.type("Bring the insurance card");
+          await h.page.keyboard.press("Enter");
+          await h.settle(400);
+          await h.check("sub-quests: two cards");
+          if (await h.tap((p) => p.getByRole("button", { name: /^More for Bring the insurance card$/ }).first(), "a sub-quest's ⋯", { optional: true, expectMove: true })) {
+            await h.settle(300);
+            await h.check("sub-quests: its ⋯ menu");
+            if (await h.tap((p) => p.getByRole("menuitem", { name: /Time, progress/ }).first(), "time, progress & XP share", { optional: true, expectMove: true })) {
+              await h.settle(400);
+              await h.check("sub-quests: its time and details");
+            }
+          }
+        }
+        if (await h.tap((p) => p.getByRole("group", { name: "Quick details" }).locator("button", { hasText: "Sequence" }).first(), "sequence pill", { optional: true, expectMove: true })) {
+          await h.settle(700);
+          await h.check("sequence: its window");
+          await esc(h);
+          await h.settle(400);
+        }
+        // The card's picture background sits at the foot of the portrait picker (owner, Nov 20).
+        if (await h.tap((p) => p.locator("button[title='Change the portrait']").first(), "portrait picker", { optional: true, expectMove: true })) {
+          await h.settle(600);
+          await h.check("portrait picker: its foot");
+          await esc(h);
+          await h.settle(300);
+        }
+        // "+ Color" is last in the + row (owner, Nov 20).
+        if (await h.tap((p) => p.getByRole("group", { name: "More details" }).getByRole("button", { name: /color/i }).first(), "+ color", { optional: true, expectMove: true })) {
+          await h.settle(500);
+          await h.check("+ color: its panel");
+        }
+        await esc(h);
+      }
     },
   },
   {

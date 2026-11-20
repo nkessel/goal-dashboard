@@ -8,7 +8,6 @@ import { InlineNumber } from "@/components/ui/InlineNumber";
 import { saveQuestPlace, useQuestPlace } from "@/lib/use-quest-places";
 import { DrivePicks } from "./DrivePicks";
 import { CardLookPicker } from "@/components/calendar/CardLookPicker";
-import { useCalCardLook } from "@/lib/use-quest-cal";
 import { driveWords, useQuestDrive } from "@/lib/use-quest-cal";
 import { useProgressUnit, saveProgressUnit } from "@/lib/use-progress-units";
 import { pctOf, type ProgressUnit } from "@/lib/progress-units";
@@ -61,6 +60,7 @@ import { IconPicker } from "./IconPicker";
 import { CheckMark } from "./TaskRow";
 import { WhenPicker } from "@/components/calendar/WhenPicker";
 import { Fold } from "@/components/ui/Fold";
+import { useCalCardLook } from "@/lib/use-quest-cal";
 import { ScheduleWithin, withinLabel } from "./ScheduleWithin";
 import { BoardPicker } from "./BoardPicker";
 import { useEscape } from "@/lib/use-escape";
@@ -321,6 +321,8 @@ export function QuestEditorDialog({
   const [seqOpen, setSeqOpen] = useState(() => mode.kind === "create" && !!mode.after);
   const [seqAdding, setSeqAdding] = useState<"after" | "before" | null>(null);
   const [seqDialog, setSeqDialog] = useState(false);
+  /** The sequence window opens by adding "Follow-up work" after this quest (and opening it to edit). */
+  const [seqFollow, setSeqFollow] = useState(false);
   const initialSlot =
     task?.is_on_calendar && task.scheduled_start && task.scheduled_end
       ? { start: task.scheduled_start, end: task.scheduled_end }
@@ -402,6 +404,12 @@ export function QuestEditorDialog({
   const boardLabel = boardId ? (boardOptions?.find((o) => o.id === boardId)?.label.split(" › ").pop() ?? null) : null;
   const [alsoOn, setAlsoOn] = useState<string[]>(task?.also_on ?? []);
   const [stepMenu, setStepMenu] = useState<string | null>(null);
+  /** The sub-quest whose time, progress and XP share are open under its card (from its ⋯). */
+  const [stepDetail, setStepDetail] = useState<string | null>(null);
+  const [stepMenuUp, setStepMenuUp] = useState(false);
+  /** The new sub-quest's details before Enter (its ⋯): a time estimate for now. */
+  const [newStepMinutes, setNewStepMinutes] = useState<number | null>(null);
+  const [newStepMore, setNewStepMore] = useState(false);
   // A sub-quest's ⋯ menu closes on a click outside it or Escape (it stayed open; owner, Nov 5).
   useEffect(() => {
     if (!stepMenu) return;
@@ -619,7 +627,7 @@ export function QuestEditorDialog({
     listQuestStepsAction(taskId)
       .then((rows) => {
         if (rows === null) setStepsUnavailable(true);
-        setSteps(treeOrder((rows ?? []).map((r) => ({ key: r.id, id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, coins: r.coins ?? 0, weight: r.weight ?? null, progress: r.progress ?? (r.done ? 100 : 0), state: r.state ?? null, parentKey: r.parent_id ?? null }))));
+        setSteps(treeOrder((rows ?? []).map((r) => ({ key: r.id, id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, coins: r.coins ?? 0, minutes: r.minutes ?? null, weight: r.weight ?? null, progress: r.progress ?? (r.done ? 100 : 0), state: r.state ?? null, parentKey: r.parent_id ?? null }))));
       })
       .catch(() => {
         setStepsUnavailable(true);
@@ -669,9 +677,11 @@ export function QuestEditorDialog({
   function addStep() {
     const t = newStep.trim();
     if (!t) return;
-    setSteps((list) => [...(list ?? []), { key: `new-${Date.now()}`, title: t, done: false }]);
+    setSteps((list) => [...(list ?? []), { key: `new-${Date.now()}`, title: t, done: false, ...(newStepMinutes ? { minutes: newStepMinutes } : {}) }]);
     setStepsDirty(true);
     setNewStep("");
+    setNewStepMinutes(null);
+    setNewStepMore(false);
   }
   function renameStep(key: string, title: string) {
     setSteps((list) => (list ?? []).map((st) => (st.key === key ? { ...st, title } : st)));
@@ -704,7 +714,6 @@ export function QuestEditorDialog({
   const dueAt = dueIso(dueDate, dueTime);
   const place = useQuestPlace(task?.id);
   const drive = useQuestDrive(task?.id);
-  const cardLook = useCalCardLook(task?.id);
 
   // ---- Saving as you go (existing quests) ----------------------------------
   const autosave = Boolean(task) && !review;
@@ -1348,6 +1357,402 @@ export function QuestEditorDialog({
       )}
     </div>
   );
+  /** The sub-quests drawer: out of the "+ Sub-quests" pill, with a caret pointing up at it. */
+  const subPillRef = useRef<HTMLButtonElement>(null);
+  const cardLook = useCalCardLook(task?.id);
+  const stepsHas = (steps ?? []).length > 0 || (steps === null && (task?.steps_total ?? 0) > 0);
+  const stepsOpen = !stepsFolded && (addingStep || stepsHas);
+  const stepsDrawer = (
+    <div className="relative mt-1.5 flex flex-col gap-1 rounded-xl px-3 pb-2.5 pt-2" style={{ background: "#f7eed6", border: "1px solid rgba(139,112,64,.4)" }} data-steps-drawer>
+      <span aria-hidden className="absolute -top-[6px] h-[11px] w-[11px] rotate-45" ref={(el) => {
+        // Points at the "+ Sub-quests" pill, wherever it sits in the row above.
+        const pill = subPillRef.current;
+        const box = el?.parentElement;
+        if (!el || !pill || !box) return;
+        el.style.left = `${Math.max(10, pill.getBoundingClientRect().left - box.getBoundingClientRect().left + pill.offsetWidth / 2 - 6)}px`;
+      }} style={{ background: "#f7eed6", borderLeft: "1px solid rgba(139,112,64,.4)", borderTop: "1px solid rgba(139,112,64,.4)" }} />
+      {((steps && steps.length > 0) || stepXpPop !== null) && (
+        <span className="flex min-w-0 items-center gap-2 whitespace-nowrap text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
+          {steps && steps.length > 0 && (
+            <>
+              {/* How far the sub-quests carry the quest, labelled (owner, Nov 4). */}
+              <span className="h-2.5 min-w-[40px] max-w-[160px] flex-1 overflow-hidden rounded-full" style={{ background: "#141a13", border: "1px solid #8a6c2c", boxShadow: "inset 0 1px 3px rgba(0,0,0,.6)" }} aria-label={`Sub-quests ${stepsShare(steps)}% done`}>
+                <span className="block h-full rounded-full transition-[width] duration-300" style={{ width: `${stepsShare(steps)}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)", boxShadow: "0 0 6px rgba(242,210,126,.5)" }} />
+              </span>
+              <span>{stepsShare(steps)}% done</span>
+            </>
+          )}
+          {stepXpPop !== null && (
+            <span aria-live="polite" className="power-spark text-[13px] font-bold" style={{ color: "var(--t-xp)" }}>
+              +{stepXpPop} XP
+            </span>
+          )}
+        </span>
+      )}
+                  {steps === null && (task?.steps_total ?? 0) > 0 ? (
+                    // Loading: hold the steps' place so the editor doesn't jump when they arrive.
+                    <ul className="m-0 flex list-none flex-col p-0" aria-busy="true" aria-label="Loading sub-quests">
+                      {Array.from({ length: task?.steps_total ?? 0 }).map((_, i) => (
+                        <li key={i} className="flex items-center gap-2 py-[5px] pl-1">
+                          <span className="h-[18px] w-[18px] shrink-0 rounded-[5px]" style={{ border: `1.5px solid ${isAdventure ? "#8a6c2c" : "var(--t-card-border)"}`, opacity: 0.5 }} />
+                          <span className="step-skeleton h-[14px] rounded" style={{ width: `${55 + ((i * 17) % 35)}%` }} />
+                        </li>
+                      ))}
+                    </ul>
+                  ) : steps === null || (steps.length === 0 && !addingStep) ? null : (
+                    <ul className="m-0 flex list-none flex-col p-0">
+                      {(() => {
+                        const ordered = treeOrder(steps);
+                        const wl = stepWeights(steps);
+                        const wOf = new Map(steps.map((x, i) => [x.key, wl[i]]));
+                        const depthOf = (x: StepDraft) => {
+                          let d = 0;
+                          let p = x.parentKey;
+                          while (p && d < 6) {
+                            d += 1;
+                            p = steps.find((y) => y.key === p)?.parentKey ?? null;
+                          }
+                          return d;
+                        };
+                        const shownSteps = ordered.filter((x) => {
+                          let p = x.parentKey;
+                          while (p) {
+                            if (!openSteps.has(p)) return false;
+                            p = steps.find((y) => y.key === p)?.parentKey ?? null;
+                          }
+                          return true;
+                        });
+                        return shownSteps.map((st) => {
+                        const isHolder = holders.has(st.key);
+                        const inside = isHolder ? [...descendants(steps, st.key)].filter((k) => k !== st.key && !holders.has(k)).map((k) => steps.find((y) => y.key === k)!) : [];
+                        const insideDone = inside.filter((x) => x.done).length;
+                        const checked = isHolder ? inside.length > 0 && inside.every((x) => x.done || x.state === "skipped") : st.done;
+                        const depth = depthOf(st);
+                        return (
+                        <li key={st.key} data-step-key={st.key} className="quest-step mb-1.5 flex flex-col rounded-[10px] py-0.5 pl-2 pr-0.5" style={{ background: "rgba(255,250,236,.85)", border: "1px solid rgba(139,112,64,.32)", ...(depth ? { marginLeft: depth * 22 } : {}) }}>
+                        <div className="flex items-start gap-1.5">
+                          {isHolder ? (
+                            <button
+                              type="button"
+                              onClick={() => setOpenSteps((o) => { const n = new Set(o); if (n.has(st.key)) n.delete(st.key); else n.add(st.key); return n; })}
+                              aria-expanded={openSteps.has(st.key)}
+                              aria-label={openSteps.has(st.key) ? `Hide the sub-tasks of ${st.title}` : `Show the sub-tasks of ${st.title}`}
+                              className="-ml-[20px] mt-[4px] flex h-5 w-4 shrink-0 items-center justify-center"
+                            >
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: openSteps.has(st.key) ? "rotate(90deg)" : undefined, color: "var(--t-ink-soft)" }}>
+                                <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            role="checkbox"
+                            aria-checked={checked}
+                            aria-label={st.state ? `Reopen ${st.title}` : st.done ? `Untick ${st.title}` : `Tick ${st.title}`}
+                            disabled={isCompleted}
+                            onClick={() => (st.state ? updateStep(st.key, { state: null }) : setStepDone(st.key, !checked))}
+                            className="mt-[5px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full"
+                            style={{
+                              // Round gold, like the quest's own check (owner's pick C, Nov 20).
+                              border: `1.5px solid ${checked ? "#8a6116" : st.state === "failed" ? "#b5321f" : st.state === "skipped" ? "#9a9286" : "#a4884f"}`,
+                              background: checked ? "radial-gradient(circle at 35% 30%, #f8e3a0, #c9a24a)" : st.state === "failed" ? "#b5321f" : st.state === "skipped" ? "#b7b0a4" : "transparent",
+                            }}
+                            title={st.state === "skipped" ? "Skipped — tap to reopen" : st.state === "failed" ? "Failed — tap to reopen" : undefined}
+                          >
+                            {checked && (
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+                                <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#3b2a14" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                            {st.state === "skipped" && (
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+                                <path d="M5 6l7 6-7 6M13 6l7 6-7 6" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                            {st.state === "failed" && (
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden>
+                                <path d="M6 6l12 12M18 6L6 18" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" />
+                              </svg>
+                            )}
+                          </button>
+                          <AutoGrowText
+                            value={st.title}
+                            onChange={(v) => renameStep(st.key, v.replace(/\n/g, " "))}
+                            onKeyDown={(e) => {
+                              // Enter: on to writing the next step.
+                              if (e.key === "Enter" && !isCompleted) {
+                                e.preventDefault();
+                                // Inside a step: the next sub-task beside this one. At the top: the next step.
+                                if (st.parentKey) addSubStep(st.parentKey, st.key);
+                                else {
+                                  setAddingStep(true);
+                                  requestAnimationFrame(() => newStepRef.current?.focus());
+                                }
+                              }
+                            }}
+                            ariaLabel="Step"
+                            className={`bare-input min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-[3px] text-[16px] leading-snug focus:outline-none ${st.state ? "line-through" : ""}`}
+                            style={st.state === "failed" ? { color: "#b5321f", textDecorationColor: "#b5321f" } : st.state === "skipped" ? { color: "#9a9286", textDecorationColor: "#9a9286" } : { color: "var(--t-ink)" }}
+                          />
+                          <span className="mt-[3px] shrink-0">
+                            <LinkOuts text={st.title} iconOnly />
+                          </span>
+                          {isHolder && (
+                            <button type="button" onClick={() => setOpenSteps((o) => new Set(o).add(st.key))} className="mt-[3px] flex h-7 shrink-0 items-center rounded-full px-2 text-[12px] font-semibold tabular-nums" style={{ color: "var(--t-ink-soft)", border: "1px solid rgba(139,112,64,.35)" }} title="Sub-tasks done">
+                              {progressWords(insideDone, inside.length)}
+                            </button>
+                          )}
+                          {/* Its time estimate, once set (⋯ › Time estimate), like the time on a quest card. */}
+                          {!isHolder && st.minutes ? (
+                            <span className="mt-[3px] flex h-7 shrink-0 items-center gap-0.5 text-[12.5px] font-semibold tabular-nums" style={{ color: "var(--t-ink-soft)" }} title="Time estimate">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden><circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="2" /><path d="M12 7.5V12l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                              {st.minutes >= 60 ? `${Math.floor(st.minutes / 60)}h${st.minutes % 60 ? ` ${st.minutes % 60}m` : ""}` : `${st.minutes}m`}
+                            </span>
+                          ) : null}
+                          {/* The XP it brings, on its row; its share and how far along sit behind ⋯ › Time, progress & XP share. */}
+                          {!isHolder && (
+                            <span className="mt-[3px] flex h-7 shrink-0 items-center text-[12.5px] font-semibold tabular-nums" style={{ color: "var(--t-xp)" }} title="XP this sub-quest brings">
+                              {Math.round((wOf.get(st.key) ?? 0) * xp) + (st.xp ?? 0)} XP
+                            </span>
+                          )}
+                          {/* Its own coins, once given (⋯ › Give coins; owner, Nov 14): tap the number to change it. */}
+                          {!isHolder && (st.coins ?? 0) > 0 && (
+                            <span className="mt-[3px] flex h-7 shrink-0 items-center gap-0.5 text-[12.5px] font-semibold" style={{ color: "#8a6116" }} title="Coins this sub-quest brings (tap to change; 0 takes them off)">
+                              <InlineNumber value={st.coins ?? 0} min={0} max={100} suffix="" label={`Coins for ${st.title}`} onChange={(v) => updateStep(st.key, { coins: v })} />
+                              <CoinIcon size={13} />
+                            </span>
+                          )}
+                          <span className="relative shrink-0" data-step-menu>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                // Opens upward when it would run past the bottom of the editor (it floats; nothing below moves).
+                                {
+                                  const box = e.currentTarget.closest("[role=dialog]")?.getBoundingClientRect();
+                                  setStepMenuUp(e.currentTarget.getBoundingClientRect().bottom > Math.min(window.innerHeight, box?.bottom ?? window.innerHeight) - 290);
+                                }
+                                setStepMenu(stepMenu === st.key ? null : st.key);
+                              }}
+                              aria-haspopup="menu"
+                              aria-expanded={stepMenu === st.key}
+                              aria-label={`More for ${st.title}`}
+                              className="flex h-7 w-7 items-center justify-center rounded-full text-[17px] leading-none hover:bg-black/[.06]"
+                              style={{ color: "var(--t-ink-soft)" }}
+                            >
+                              ⋯
+                            </button>
+                            {stepMenu === st.key && (
+                              <span role="menu" className={`card-pop-in parchment absolute right-0 ${stepMenuUp ? "bottom-8" : "top-8"} z-30 flex w-[220px] flex-col overflow-hidden py-1`} style={{ borderRadius: 12, boxShadow: "0 10px 24px rgba(0,0,0,.3)" }}>
+                                {(
+                                  [
+                                    // Order and words from the owner (Nov 4): Skip, then Remove, Failed last, all in black ink.
+                                    ...(!isHolder ? [["detail", "◷", "Time, progress & XP share", "var(--t-ink)"]] : []),
+                                    ["sub", "＋", "Add a sub-task", "var(--t-ink)"],
+                                    ...(!isHolder && !(st.coins ?? 0) ? [["coins", "◎", "Give coins", "var(--t-ink)"]] : []),
+                                    ...(st.state || st.done ? [["open", "↺", "Back to open", "var(--t-ink)"]] : []),
+                                    ...(st.state !== "skipped" ? [["skip", "»", "Skip", "var(--t-ink)"]] : []),
+                                    ["remove", "−", "Remove", "var(--t-ink)"],
+                                    ...(st.state !== "failed" ? [["fail", "✕", "Failed", "var(--t-ink)"]] : []),
+                                  ] as [string, string, string, string][]
+                                ).map(([k, icon, label, color]) => (
+                                  <button
+                                    key={k}
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => {
+                                      setStepMenu(null);
+                                      if (k === "sub") addSubStep(st.key);
+                                      if (k === "detail") setStepDetail((d) => (d === st.key ? null : st.key));
+                                      if (k === "coins") updateStep(st.key, { coins: 1 });
+                                      if (k === "skip") updateStep(st.key, { state: "skipped", done: false, progress: 0 });
+                                      if (k === "fail") updateStep(st.key, { state: "failed", done: false, progress: 0 });
+                                      if (k === "open") updateStep(st.key, { state: null, done: false, progress: 0 });
+                                      if (k === "remove") removeStep(st.key);
+                                    }}
+                                    className="relative z-[1] flex min-h-10 items-center gap-2.5 px-3.5 text-left text-[14.5px] hover:bg-black/5"
+                                    style={{ color }}
+                                  >
+                                    <span aria-hidden className="w-4 text-center">{icon}</span>
+                                    {label}
+                                  </button>
+                                ))}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        {/* Labelled, and each number is typed over in place (owner, Nov 4): how far along it is, and its share of the quest's XP. */}
+                        {!isHolder && !isCompleted && stepDetail === st.key && (
+                          <div className="reveal ml-[26px] mr-9 flex flex-col gap-0.5 pb-1 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                            <span className="flex items-center gap-2">
+                              <span className="w-[74px] shrink-0">Time</span>
+                              <InlineNumber value={st.minutes ?? 0} min={0} max={1440} suffix=" min" label={`Time estimate for ${st.title}, in minutes`} onChange={(v) => updateStep(st.key, { minutes: v > 0 ? v : null })} className="justify-end font-semibold" style={{ color: "var(--t-ink)" }} />
+                            </span>
+                            {!st.done && !st.state && (
+                              <span className="flex items-center gap-2">
+                                <span className="w-[74px] shrink-0">Done</span>
+                                <InlineNumber value={st.progress ?? 0} label={`How far along ${st.title} is, in percent`} onChange={(v) => updateStep(st.key, { progress: v, done: v >= 100 })} className="w-[38px] justify-end font-semibold" style={{ color: "var(--t-ink)" }} />
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={100}
+                                  step={5}
+                                  value={st.progress ?? 0}
+                                  onChange={(e) => {
+                                    const v = Number(e.target.value);
+                                    updateStep(st.key, { progress: v, done: v >= 100 });
+                                  }}
+                                  aria-label={`How far along ${st.title} is`}
+                                  className="step-progress min-w-0 flex-1"
+                                  style={{ ["--p" as string]: `${st.progress ?? 0}%` }}
+                                />
+                              </span>
+                            )}
+                            <span className="flex items-center gap-2">
+                              <span className="w-[74px] shrink-0">Share of XP</span>
+                              <InlineNumber value={st.weight ?? Math.round((wOf.get(st.key) ?? 0) * 100)} min={1} label={`Share of the quest's XP for ${st.title}, in percent`} onChange={(v) => updateStep(st.key, { weight: v })} className="w-[38px] justify-end font-semibold" style={{ color: "var(--t-ink)" }} />
+                              <input
+                                type="range"
+                                min={1}
+                                max={100}
+                                value={st.weight ?? Math.round((wOf.get(st.key) ?? 0) * 100)}
+                                onChange={(e) => updateStep(st.key, { weight: Number(e.target.value) })}
+                                aria-label={`Share of the quest's XP for ${st.title}, in percent`}
+                                className="step-progress min-w-0 flex-1"
+                                style={{ ["--p" as string]: `${st.weight ?? Math.round((wOf.get(st.key) ?? 0) * 100)}%` }}
+                              />
+                              {st.weight != null && (
+                                <button type="button" onClick={() => updateStep(st.key, { weight: null })} className="shrink-0 underline underline-offset-2" title="Back to an equal share">
+                                  equal
+                                </button>
+                              )}
+                            </span>
+                          </div>
+                        )}
+                        </li>
+                        );
+                        });
+                      })()}
+                      {!isCompleted && addingStep && (
+                        <li className="reveal quest-step flex flex-col rounded-[10px] py-0.5 pl-2 pr-0.5" style={{ border: "1.3px dashed rgba(169,132,58,.75)" }}>
+                          <div className="flex items-start gap-2">
+                          {/* Same box and type as a saved step, so a step looks the same before and after Enter. */}
+                          <span aria-hidden className="mt-[5px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-dashed text-[13px] leading-none" style={{ borderColor: isAdventure ? "#8a6c2c" : "var(--t-card-border)", color: "var(--t-ink-soft)" }}>
+                            +
+                          </span>
+                          <input
+                            ref={newStepRef}
+                            value={newStep}
+                            onChange={(e) => setNewStep(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                addStep();
+                                // Stay on the add row for the next step, whatever re-rendered.
+                                requestAnimationFrame(() => newStepRef.current?.focus());
+                              } else if (e.key === "Escape") {
+                                // Leaves just this row (a second Escape closes the editor).
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setNewStep("");
+                                setAddingStep(false);
+                              }
+                            }}
+                            onBlur={() => {
+                              addStep();
+                              // Only fold the add row away when it was left empty on purpose.
+                              setTimeout(() => {
+                                if (document.activeElement !== newStepRef.current && !newStepMore) setAddingStep(false);
+                              }, 0);
+                            }}
+                            autoFocus
+                            enterKeyHint="enter"
+                            placeholder="Add a sub-quest, then Enter"
+                            aria-label="Add a sub-quest"
+                            className="bare-input min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-[3px] text-[16px] leading-snug focus:outline-none"
+                            style={{ color: "var(--t-ink)" }}
+                          />
+                          {/* Its ⋯: the details for this one before you press Enter (owner, Nov 20). */}
+                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setNewStepMore((o) => !o)} aria-expanded={newStepMore} aria-label="Details for the new sub-quest" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[17px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
+                            ⋯
+                          </button>
+                          </div>
+                          {newStepMore && (
+                            <span className="reveal ml-[26px] flex items-center gap-2 pb-1 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                              <span className="w-[74px] shrink-0">Time</span>
+                              <InlineNumber value={newStepMinutes ?? 0} min={0} max={1440} suffix=" min" label="Time estimate for the new sub-quest, in minutes" onChange={(v) => setNewStepMinutes(v > 0 ? v : null)} className="justify-end font-semibold" style={{ color: "var(--t-ink)" }} />
+                            </span>
+                          )}
+                        </li>
+                      )}
+                    </ul>
+                  )}
+                  {!isCompleted && steps !== null && steps.length > 0 && !addingStep && (
+                    <button
+                      type="button"
+                      aria-label="Add a sub-quest"
+                      onClick={() => setAddingStep(true)}
+                      className="hover-glow mt-1 flex h-8 items-center gap-1 self-start rounded-full px-3 text-[13px] font-bold"
+                      style={{ background: isAdventure ? "linear-gradient(180deg,#f2d58a,#d9b45f)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff", border: isAdventure ? "1px solid #8a6116" : undefined, boxShadow: "0 1px 3px rgba(60,40,10,.3)" }}
+                    >
+                      <span aria-hidden className="text-[16px] leading-none">+</span> Add sub-quest
+                    </button>
+                  )}
+    </div>
+  );
+  /** "+ Sub-quests" and "+ Sequence": in the quick-details row, before Due (owner, Nov 20); their place among the
+      other quick details follows the editor's layout (gear). */
+  const seqPills = (
+    <>
+                    {/* "+ Sub-quests" and "+ Sequence", no icons, like the other + pills (owner, Nov 20). */}
+                    {!stepsUnavailable && !isCompleted && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (stepsOpen) {
+                            setStepsFolded(true);
+                            setAddingStep(false);
+                            return;
+                          }
+                          setStepsFolded(false);
+                          if (!stepsHas) {
+                            setAddingStep(true);
+                            requestAnimationFrame(() => newStepRef.current?.focus());
+                          }
+                        }}
+                        ref={subPillRef}
+                        aria-expanded={stepsOpen}
+                        data-open={stepsOpen ? "true" : undefined}
+                        className="qe-fact flex h-8 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold"
+                        title="A checklist inside this quest"
+                      >
+                        {/* Option 1 (owner, Nov 20): a + before the word while empty; once open or holding something, a
+                            caret after it (⌃ open, ⌄ closed), like the other quick details. */}
+                        {!stepsOpen && !stepsHas && <PlusMark />}
+                        Sub-quests
+                        {(() => {
+                          const n = (steps ?? []).length || (steps === null ? (task?.steps_total ?? 0) : 0);
+                          return n ? <span style={{ color: "var(--t-ink-soft)" }}>· {n}</span> : null;
+                        })()}
+                        {(stepsOpen || stepsHas) && <FactCaret open={stepsOpen} />}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => (task ? setSeqDialog(true) : setSeqOpen((o) => !o))}
+                      aria-expanded={task ? undefined : seqOpen}
+                      data-open={!task && seqOpen ? "true" : undefined}
+                      className="qe-fact flex h-8 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold"
+                      title="Quests before or after this one"
+                    >
+                      <PlusMark />
+                      Sequence
+                      {(() => {
+                        const n = task ? (task.behind?.length ?? 0) : seqLinks.length;
+                        return n ? <span style={{ color: "var(--t-ink-soft)" }}>· {n}</span> : null;
+                      })()}
+                    </button>
+    </>
+  );
   const partNodes: Record<EditorPart, React.ReactNode> = {
     showsIn: (
       <>
@@ -1461,35 +1866,14 @@ export function QuestEditorDialog({
     ),
     sequence: (
       <>
-              {/* Sequence: a fine setting, folded away until wanted. */}
+              {/* Sub-quests and the sequence from one place (owner, Nov 4 and 13: "sequence and steps should be
+                  accessible from the same pill"): a checklist inside this quest, or quests one after another. */}
               {!doingNow && !review && (
-                <div className="flex flex-col gap-1.5">
-                  <button type="button" onClick={() => (task ? setSeqDialog(true) : setSeqOpen((o) => !o))} aria-expanded={task ? undefined : seqOpen} className="flex min-h-8 items-center gap-1.5 self-start text-left" title="Quests before or after this one, or its sub-quests as quests of their own">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: seqOpen && !task ? "rotate(90deg)" : undefined, color: "var(--t-ink-soft)" }}>
-                      <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    <span className="text-[14px] font-semibold" style={{ color: "var(--t-ink)" }}>
-                      {task ? ((task.behind?.length ?? 0) > 0 ? "Sequence" : "Create a sequence") : seqLinks.length ? "Sequence" : "Create a sequence"}
-                    </span>
-                    <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-                      {task ? ((task.behind?.length ?? 0) > 0 ? `${task.behind!.length} waiting after this` : "") : seqLinks.length ? `${seqLinks.length} linked` : ""}
-                    </span>
-                  </button>
-                  {/* Steps live with the sequence (owner, Nov 3): a checklist inside this quest, or quests one after another. */}
-                  {!stepsUnavailable && !isCompleted && steps !== null && steps.length === 0 && !addingStep && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAddingStep(true);
-                        requestAnimationFrame(() => newStepRef.current?.focus());
-                      }}
-                      className="hover-glow flex h-8 items-center gap-1.5 self-start rounded-full px-3 text-[13px] font-semibold"
-                      style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: "rgba(255,250,235,.35)" }}
-                    >
-                      <StepsGlyph size={15} />
-                      Add sub-quests
-                    </button>
-                  )}
+                <div className="flex flex-col gap-1.5" data-subseq>
+                  {/* Two pills, side by side (owner, Nov 20: "the two pills for each, sub-quests and sequence"): one tap
+                      each, no menu of choices. Sequence opens the sequence window (or, on a new quest, its panel here). */}
+                  {layout.folded.includes("sequence") && seqPills}
+                  {!stepsUnavailable && <Fold open={stepsOpen}>{stepsDrawer}</Fold>}
                   {!task && seqOpen && (
                     <div className="reveal flex flex-col gap-2 rounded-xl px-3 py-2.5" style={{ border: "1px dashed rgba(139,112,64,.5)" }}>
                       <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
@@ -1545,7 +1929,8 @@ export function QuestEditorDialog({
                       taskId={task.id}
                       title={title}
                       isAdventure={isAdventure}
-                      onClose={() => setSeqDialog(false)}
+                      addFollowUp={seqFollow}
+                      onClose={() => (setSeqDialog(false), setSeqFollow(false))}
                       onEditSelf={() => setSeqDialog(false)}
                       onStepsMoved={() => {
                         setStepsDirty(false);
@@ -1587,320 +1972,9 @@ export function QuestEditorDialog({
     ),
     steps: (
       <>
-              {/* Steps: a checklist inside the quest */}
-              {!doingNow && !stepsUnavailable && (addingStep || (steps ?? []).length > 0 || (steps === null && (task?.steps_total ?? 0) > 0)) && (
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2.5">
-                    <StepsGlyph />
-                    <button type="button" onClick={() => setStepsFolded((f) => !f)} aria-expanded={!stepsFolded} className="flex items-center gap-1.5" title={stepsFolded ? "Show the sub-quests" : "Fold the sub-quests away"}>
-                      <span className={labelCls}>Sub-quests</span>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: stepsFolded ? undefined : "rotate(90deg)", color: "var(--t-ink-soft)" }}>
-                        <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                    {steps && steps.length > 0 && (
-                      <span className="flex min-w-0 flex-1 items-center gap-2 whitespace-nowrap text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
-                        {/* How far the sub-quests carry the quest, labelled (owner, Nov 4). */}
-                        <span className="h-2.5 min-w-[40px] max-w-[140px] flex-1 overflow-hidden rounded-full" style={{ background: "#141a13", border: "1px solid #8a6c2c", boxShadow: "inset 0 1px 3px rgba(0,0,0,.6)" }} aria-label={`Sub-quests ${stepsShare(steps)}% done`}>
-                          <span className="block h-full rounded-full transition-[width] duration-300" style={{ width: `${stepsShare(steps)}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)", boxShadow: "0 0 6px rgba(242,210,126,.5)" }} />
-                        </span>
-                        <span>{stepsShare(steps)}% done</span>
-                      </span>
-                    )}
-                    {stepXpPop !== null && (
-                      <span aria-live="polite" className="power-spark text-[13px] font-bold" style={{ color: "var(--t-xp)" }}>
-                        +{stepXpPop} XP
-                      </span>
-                    )}
-                    {/* With sub-quests on the list, Add sits under the last one (owner, Nov 13). */}
-                    {!isCompleted && steps !== null && !addingStep && steps.length === 0 && (
-                      <button aria-label="Add a sub-quest"
-                        type="button"
-                        onClick={() => (setAddingStep(true), setStepsFolded(false))}
-                        className="hover-glow ml-auto flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-bold"
-                        style={{ background: isAdventure ? "linear-gradient(180deg,#f2d58a,#d9b45f)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff", border: isAdventure ? "1px solid #8a6116" : undefined, boxShadow: "0 1px 3px rgba(60,40,10,.3)" }}
-                      >
-                        <span aria-hidden className="text-[16px] leading-none">+</span> {steps.length ? "Add" : "Add sub-quests"}
-                      </button>
-                    )}
-                  </div>
-                  {stepsFolded ? null : steps === null && (task?.steps_total ?? 0) > 0 ? (
-                    // Loading: hold the steps' place so the editor doesn't jump when they arrive.
-                    <ul className="m-0 flex list-none flex-col p-0 pl-[22px]" aria-busy="true" aria-label="Loading sub-quests">
-                      {Array.from({ length: task?.steps_total ?? 0 }).map((_, i) => (
-                        <li key={i} className="flex items-center gap-2 py-[5px] pl-1">
-                          <span className="h-[18px] w-[18px] shrink-0 rounded-[5px]" style={{ border: `1.5px solid ${isAdventure ? "#8a6c2c" : "var(--t-card-border)"}`, opacity: 0.5 }} />
-                          <span className="step-skeleton h-[14px] rounded" style={{ width: `${55 + ((i * 17) % 35)}%` }} />
-                        </li>
-                      ))}
-                    </ul>
-                  ) : steps === null || (steps.length === 0 && !addingStep) ? null : (
-                    <ul className="m-0 flex list-none flex-col p-0 pl-[22px]">
-                      {(() => {
-                        const ordered = treeOrder(steps);
-                        const wl = stepWeights(steps);
-                        const wOf = new Map(steps.map((x, i) => [x.key, wl[i]]));
-                        const depthOf = (x: StepDraft) => {
-                          let d = 0;
-                          let p = x.parentKey;
-                          while (p && d < 6) {
-                            d += 1;
-                            p = steps.find((y) => y.key === p)?.parentKey ?? null;
-                          }
-                          return d;
-                        };
-                        const shownSteps = ordered.filter((x) => {
-                          let p = x.parentKey;
-                          while (p) {
-                            if (!openSteps.has(p)) return false;
-                            p = steps.find((y) => y.key === p)?.parentKey ?? null;
-                          }
-                          return true;
-                        });
-                        return shownSteps.map((st) => {
-                        const isHolder = holders.has(st.key);
-                        const inside = isHolder ? [...descendants(steps, st.key)].filter((k) => k !== st.key && !holders.has(k)).map((k) => steps.find((y) => y.key === k)!) : [];
-                        const insideDone = inside.filter((x) => x.done).length;
-                        const checked = isHolder ? inside.length > 0 && inside.every((x) => x.done || x.state === "skipped") : st.done;
-                        const depth = depthOf(st);
-                        return (
-                        <li key={st.key} data-step-key={st.key} className="quest-step flex flex-col rounded-md py-0.5 pl-1" style={depth ? { marginLeft: depth * 22 } : undefined}>
-                        <div className="flex items-start gap-1.5">
-                          {isHolder ? (
-                            <button
-                              type="button"
-                              onClick={() => setOpenSteps((o) => { const n = new Set(o); if (n.has(st.key)) n.delete(st.key); else n.add(st.key); return n; })}
-                              aria-expanded={openSteps.has(st.key)}
-                              aria-label={openSteps.has(st.key) ? `Hide the sub-tasks of ${st.title}` : `Show the sub-tasks of ${st.title}`}
-                              className="-ml-[20px] mt-[4px] flex h-5 w-4 shrink-0 items-center justify-center"
-                            >
-                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: openSteps.has(st.key) ? "rotate(90deg)" : undefined, color: "var(--t-ink-soft)" }}>
-                                <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            role="checkbox"
-                            aria-checked={checked}
-                            aria-label={st.state ? `Reopen ${st.title}` : st.done ? `Untick ${st.title}` : `Tick ${st.title}`}
-                            disabled={isCompleted}
-                            onClick={() => (st.state ? updateStep(st.key, { state: null }) : setStepDone(st.key, !checked))}
-                            className="mt-[5px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px]"
-                            style={{
-                              border: `1.5px solid ${checked ? "var(--t-good)" : st.state === "failed" ? "#b5321f" : st.state === "skipped" ? "#9a9286" : isAdventure ? "#8a6c2c" : "var(--t-card-border)"}`,
-                              background: checked ? "var(--t-good)" : st.state === "failed" ? "#b5321f" : st.state === "skipped" ? "#b7b0a4" : "transparent",
-                            }}
-                            title={st.state === "skipped" ? "Skipped — tap to reopen" : st.state === "failed" ? "Failed — tap to reopen" : undefined}
-                          >
-                            {checked && (
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
-                                <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            )}
-                            {st.state === "skipped" && (
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
-                                <path d="M5 6l7 6-7 6M13 6l7 6-7 6" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            )}
-                            {st.state === "failed" && (
-                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden>
-                                <path d="M6 6l12 12M18 6L6 18" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" />
-                              </svg>
-                            )}
-                          </button>
-                          <AutoGrowText
-                            value={st.title}
-                            onChange={(v) => renameStep(st.key, v.replace(/\n/g, " "))}
-                            onKeyDown={(e) => {
-                              // Enter: on to writing the next step.
-                              if (e.key === "Enter" && !isCompleted) {
-                                e.preventDefault();
-                                // Inside a step: the next sub-task beside this one. At the top: the next step.
-                                if (st.parentKey) addSubStep(st.parentKey, st.key);
-                                else {
-                                  setAddingStep(true);
-                                  requestAnimationFrame(() => newStepRef.current?.focus());
-                                }
-                              }
-                            }}
-                            ariaLabel="Step"
-                            className={`bare-input min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-[3px] text-[16px] leading-snug focus:outline-none ${st.state ? "line-through" : ""}`}
-                            style={st.state === "failed" ? { color: "#b5321f", textDecorationColor: "#b5321f" } : st.state === "skipped" ? { color: "#9a9286", textDecorationColor: "#9a9286" } : { color: "var(--t-ink)" }}
-                          />
-                          <span className="mt-[3px] shrink-0">
-                            <LinkOuts text={st.title} iconOnly />
-                          </span>
-                          {isHolder && (
-                            <button type="button" onClick={() => setOpenSteps((o) => new Set(o).add(st.key))} className="mt-[3px] flex h-7 shrink-0 items-center rounded-full px-2 text-[12px] font-semibold tabular-nums" style={{ color: "var(--t-ink-soft)", border: "1px solid rgba(139,112,64,.35)" }} title="Sub-tasks done">
-                              {progressWords(insideDone, inside.length)}
-                            </button>
-                          )}
-                          {/* The XP it brings, on its row; its share and how far along sit labelled under it. */}
-                          {!isHolder && (
-                            <span className="mt-[3px] flex h-7 shrink-0 items-center text-[12.5px] font-semibold tabular-nums" style={{ color: "var(--t-xp)" }} title="XP this sub-quest brings">
-                              {Math.round((wOf.get(st.key) ?? 0) * xp) + (st.xp ?? 0)} XP
-                            </span>
-                          )}
-                          {/* Its own coins, once given (⋯ › Give coins; owner, Nov 14): tap the number to change it. */}
-                          {!isHolder && (st.coins ?? 0) > 0 && (
-                            <span className="mt-[3px] flex h-7 shrink-0 items-center gap-0.5 text-[12.5px] font-semibold" style={{ color: "#8a6116" }} title="Coins this sub-quest brings (tap to change; 0 takes them off)">
-                              <InlineNumber value={st.coins ?? 0} min={0} max={100} suffix="" label={`Coins for ${st.title}`} onChange={(v) => updateStep(st.key, { coins: v })} />
-                              <CoinIcon size={13} />
-                            </span>
-                          )}
-                          <span className="relative shrink-0" data-step-menu>
-                            <button
-                              type="button"
-                              onClick={() => setStepMenu(stepMenu === st.key ? null : st.key)}
-                              aria-haspopup="menu"
-                              aria-expanded={stepMenu === st.key}
-                              aria-label={`More for ${st.title}`}
-                              className="flex h-7 w-7 items-center justify-center rounded-full text-[17px] leading-none hover:bg-black/[.06]"
-                              style={{ color: "var(--t-ink-soft)" }}
-                            >
-                              ⋯
-                            </button>
-                            {stepMenu === st.key && (
-                              <span role="menu" className="card-pop-in parchment absolute right-0 top-8 z-30 flex w-[170px] flex-col overflow-hidden py-1" style={{ borderRadius: 12, boxShadow: "0 10px 24px rgba(0,0,0,.3)" }}>
-                                {(
-                                  [
-                                    // Order and words from the owner (Nov 4): Skip, then Remove, Failed last, all in black ink.
-                                    ["sub", "＋", "Add a sub-task", "var(--t-ink)"],
-                                    ...(!isHolder && !(st.coins ?? 0) ? [["coins", "🪙", "Give coins", "var(--t-ink)"]] : []),
-                                    ...(st.state || st.done ? [["open", "↺", "Back to open", "var(--t-ink)"]] : []),
-                                    ...(st.state !== "skipped" ? [["skip", "»", "Skip", "var(--t-ink)"]] : []),
-                                    ["remove", "−", "Remove", "var(--t-ink)"],
-                                    ...(st.state !== "failed" ? [["fail", "✕", "Failed", "var(--t-ink)"]] : []),
-                                  ] as [string, string, string, string][]
-                                ).map(([k, icon, label, color]) => (
-                                  <button
-                                    key={k}
-                                    type="button"
-                                    role="menuitem"
-                                    onClick={() => {
-                                      setStepMenu(null);
-                                      if (k === "sub") addSubStep(st.key);
-                                      if (k === "coins") updateStep(st.key, { coins: 1 });
-                                      if (k === "skip") updateStep(st.key, { state: "skipped", done: false, progress: 0 });
-                                      if (k === "fail") updateStep(st.key, { state: "failed", done: false, progress: 0 });
-                                      if (k === "open") updateStep(st.key, { state: null, done: false, progress: 0 });
-                                      if (k === "remove") removeStep(st.key);
-                                    }}
-                                    className="relative z-[1] flex min-h-10 items-center gap-2.5 px-3.5 text-left text-[14.5px] hover:bg-black/5"
-                                    style={{ color }}
-                                  >
-                                    <span aria-hidden className="w-4 text-center">{icon}</span>
-                                    {label}
-                                  </button>
-                                ))}
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                        {/* Labelled, and each number is typed over in place (owner, Nov 4): how far along it is, and its share of the quest's XP. */}
-                        {!isHolder && !isCompleted && (
-                          <div className="ml-[26px] mr-9 flex flex-col gap-0.5 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-                            {!st.done && !st.state && (
-                              <span className="flex items-center gap-2">
-                                <span className="w-[74px] shrink-0">Done</span>
-                                <InlineNumber value={st.progress ?? 0} label={`How far along ${st.title} is, in percent`} onChange={(v) => updateStep(st.key, { progress: v, done: v >= 100 })} className="w-[38px] justify-end font-semibold" style={{ color: "var(--t-ink)" }} />
-                                <input
-                                  type="range"
-                                  min={0}
-                                  max={100}
-                                  step={5}
-                                  value={st.progress ?? 0}
-                                  onChange={(e) => {
-                                    const v = Number(e.target.value);
-                                    updateStep(st.key, { progress: v, done: v >= 100 });
-                                  }}
-                                  aria-label={`How far along ${st.title} is`}
-                                  className="step-progress min-w-0 flex-1"
-                                  style={{ ["--p" as string]: `${st.progress ?? 0}%` }}
-                                />
-                              </span>
-                            )}
-                            <span className="flex items-center gap-2">
-                              <span className="w-[74px] shrink-0">Share of XP</span>
-                              <InlineNumber value={st.weight ?? Math.round((wOf.get(st.key) ?? 0) * 100)} min={1} label={`Share of the quest's XP for ${st.title}, in percent`} onChange={(v) => updateStep(st.key, { weight: v })} className="w-[38px] justify-end font-semibold" style={{ color: "var(--t-ink)" }} />
-                              <input
-                                type="range"
-                                min={1}
-                                max={100}
-                                value={st.weight ?? Math.round((wOf.get(st.key) ?? 0) * 100)}
-                                onChange={(e) => updateStep(st.key, { weight: Number(e.target.value) })}
-                                aria-label={`Share of the quest's XP for ${st.title}, in percent`}
-                                className="step-progress min-w-0 flex-1"
-                                style={{ ["--p" as string]: `${st.weight ?? Math.round((wOf.get(st.key) ?? 0) * 100)}%` }}
-                              />
-                              {st.weight != null && (
-                                <button type="button" onClick={() => updateStep(st.key, { weight: null })} className="shrink-0 underline underline-offset-2" title="Back to an equal share">
-                                  equal
-                                </button>
-                              )}
-                            </span>
-                          </div>
-                        )}
-                        </li>
-                        );
-                        });
-                      })()}
-                      {!isCompleted && addingStep && (
-                        <li className="reveal quest-step flex items-start gap-2 rounded-md py-0.5 pl-1">
-                          {/* Same box and type as a saved step, so a step looks the same before and after Enter. */}
-                          <span aria-hidden className="mt-[5px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border-[1.5px] border-dashed text-[13px] leading-none" style={{ borderColor: isAdventure ? "#8a6c2c" : "var(--t-card-border)", color: "var(--t-ink-soft)" }}>
-                            +
-                          </span>
-                          <input
-                            ref={newStepRef}
-                            value={newStep}
-                            onChange={(e) => setNewStep(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                addStep();
-                                // Stay on the add row for the next step, whatever re-rendered.
-                                requestAnimationFrame(() => newStepRef.current?.focus());
-                              } else if (e.key === "Escape") {
-                                // Leaves just this row (a second Escape closes the editor).
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setNewStep("");
-                                setAddingStep(false);
-                              }
-                            }}
-                            onBlur={() => {
-                              addStep();
-                              // Only fold the add row away when it was left empty on purpose.
-                              setTimeout(() => {
-                                if (document.activeElement !== newStepRef.current) setAddingStep(false);
-                              }, 0);
-                            }}
-                            autoFocus
-                            enterKeyHint="enter"
-                            placeholder="Add a sub-quest, then Enter"
-                            aria-label="Add a sub-quest"
-                            className="bare-input min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-[3px] text-[16px] leading-snug focus:outline-none"
-                            style={{ color: "var(--t-ink)" }}
-                          />
-                        </li>
-                      )}
-                    </ul>
-                  )}
-                  {!isCompleted && steps !== null && steps.length > 0 && !addingStep && !stepsFolded && (
-                    <button
-                      type="button"
-                      aria-label="Add a sub-quest"
-                      onClick={() => setAddingStep(true)}
-                      className="hover-glow ml-[22px] mt-1 flex h-8 items-center gap-1 self-start rounded-full px-3 text-[13px] font-bold"
-                      style={{ background: isAdventure ? "linear-gradient(180deg,#f2d58a,#d9b45f)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff", border: isAdventure ? "1px solid #8a6116" : undefined, boxShadow: "0 1px 3px rgba(60,40,10,.3)" }}
-                    >
-                      <span aria-hidden className="text-[16px] leading-none">+</span> Add sub-quest
-                    </button>
-                  )}
-                </div>
-              )}
+              {/* The sub-quests open from their "+ Sub-quests" pill (owner, Nov 20: the pill is the header; the drawer
+                  comes out of it and returns to it). Only when the pills aren't shown (a review) do they sit here. */}
+              {review && !doingNow && !stepsUnavailable && stepsDrawer}
       </>
     ),
     xp: (
@@ -2257,7 +2331,7 @@ export function QuestEditorDialog({
     </>
   );
   // The board is picked from its tag on the portrait (owner, Nov 12), not from a pill in this row.
-  const FACT_KEYS: EditorPart[] = ["showsIn", "time", "xp"];
+  const FACT_KEYS: EditorPart[] = ["showsIn", "time", "xp", "sequence"];
   const factLabel = (f: EditorPart) =>
     f === "showsIn"
       ? `${placement === "today" ? "Primary" : placement === "additional" ? "Secondary" : "Backlog"}`
@@ -2316,15 +2390,17 @@ export function QuestEditorDialog({
   const foldedParts = layout.order.filter((k) => layout.folded.includes(k) && partShown[k]);
   // No "More" fold (owner, Nov 3): the extra parts are small pills in a row, each opening its own panel in place.
   const SCALE_PARTS: EditorPart[] = ["importance", "urgency", "difficulty", "energy"];
-  const pillKeys: string[] = [...new Set<string>(foldedParts.filter((k) => k !== "stats" && k !== "template").map((k) => (SCALE_PARTS.includes(k) ? "scales" : k)))].concat(task ? ["file"] : []);
-  const pillName = (k: string) => (k === "scales" ? "Importance & effort" : k === "file" ? "Add a file" : k === "matrix" ? "Matrix" : (MORE_NAMES[k as EditorPart] ?? k).replace(/^./, (c) => c.toUpperCase()));
+  const pillKeys: string[] = [...new Set<string>(foldedParts.filter((k) => k !== "stats" && k !== "template").map((k) => (SCALE_PARTS.includes(k) ? "scales" : k)))].concat(task ? ["file", "color"] : []);
+  const pillName = (k: string) => (k === "scales" ? "Importance & effort" : k === "file" ? "Add a file" : k === "color" ? "Color" : k === "matrix" ? "Matrix" : (MORE_NAMES[k as EditorPart] ?? k).replace(/^./, (c) => c.toUpperCase()));
   const morePills = pillKeys.length > 0 && (
     <div className="flex flex-col gap-2 border-t pt-2" style={{ borderColor: "rgba(139,112,64,.25)" }}>
       <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="More details">
         {pillKeys.map((k) => (
           <button key={k} type="button" onClick={() => setMorePick((o) => (o === k ? null : k))} aria-expanded={morePick === k} className="qe-fact flex h-8 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold" data-open={morePick === k ? "true" : undefined}>
-            <span aria-hidden className="text-[13px] leading-none opacity-70">{morePick === k ? "−" : "+"}</span>
+            {/* Each + pill has its own line icon (owner's picks, Nov 20); a pill without one keeps the +. */}
+            {k in PILL_ICONS ? <PillIcon k={k} color={k === "color" ? cardLook?.color : undefined} /> : morePick !== k && !(k === "tags" && tags.length > 0) && <PlusMark />}
             {pillName(k)}
+            {(morePick === k || (k === "tags" && tags.length > 0)) && <FactCaret open={morePick === k} />}
           </button>
         ))}
       </div>
@@ -2332,6 +2408,9 @@ export function QuestEditorDialog({
         <div key={morePick} className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
           {morePick === "scales" ? (
             SCALE_PARTS.filter((k) => foldedParts.includes(k)).map((k) => <Fragment key={k}>{partNodes[k]}</Fragment>)
+          ) : morePick === "color" ? (
+            // The card's colour or picture, last in the row as "+ Color" (owner, Nov 20; it was a dot by the place pin).
+            task && <CardLookPicker task={task} part="colour" />
           ) : morePick === "file" ? (
             task && (
               <div className="flex items-center gap-2">
@@ -2488,6 +2567,7 @@ export function QuestEditorDialog({
                     size={72}
                     emptyContent={empty}
                     showEditHint
+                    footer={<CardLookPicker task={task} part="picture" />}
                   />
                   {/* Switch between a tiny task (half height on Today) and a standard quest. */}
                   {!isCompleted && (
@@ -2701,7 +2781,7 @@ export function QuestEditorDialog({
               return (
                 <PillTrays key="facts" open={!!factOpen}>
                   <div className="contents" role="group" aria-label="Quick details">
-                    {facts.map((f) => (
+                    {facts.map((f) => f === "sequence" ? <Fragment key={f}>{seqPills}</Fragment> : (
                       <button
                         key={f}
                         type="button"
@@ -2729,25 +2809,15 @@ export function QuestEditorDialog({
                     )}
                     {/* Where it happens: an icon-only pill, last (owner, Nov 3); shown on the card too. */}
                     {task && !doingNow && (
-                      <button type="button" onClick={() => setFactOpen((o) => (o === "place" ? null : "place"))} aria-expanded={factOpen === "place"} aria-label={place ? `Place: ${place}` : "Add a place"} title={place ? `📍 ${place}` : "Where it happens"} className="qe-fact flex h-9 items-center gap-1 rounded-full px-2.5 text-[13.5px] font-semibold" data-open={factOpen === "place" ? "true" : undefined}>
+                      <button type="button" onClick={() => setFactOpen((o) => (o === "place" ? null : "place"))} aria-expanded={factOpen === "place"} aria-label={place ? `Location: ${place}` : "Add a location"} title={place ? `📍 ${place}` : "Where it happens"} className="qe-fact flex h-9 items-center gap-1 rounded-full px-2.5 text-[13.5px] font-semibold" data-open={factOpen === "place" ? "true" : undefined}>
                         <PinGlyph />
-                        {place && <span className="max-w-[110px] truncate">{place}</span>}
+                        {/* Says what it is when empty (owner, Nov 20: "have this say location"). */}
+                        <span className="max-w-[110px] truncate">{place || "Location"}</span>
                         {drive && <span className="shrink-0 whitespace-nowrap" style={{ opacity: 0.8 }}>· 🚗 {driveWords(drive)}</span>}
-                      </button>
-                    )}
-                    {/* The card's background, a colour or a picture: on Today, boards and the calendar (owner, Nov 12). */}
-                    {task && !doingNow && (
-                      <button type="button" onClick={() => setFactOpen((o) => (o === "look" ? null : "look"))} aria-expanded={factOpen === "look"} aria-label="Card colour or picture" title="Card colour or picture" className="qe-fact flex h-9 items-center gap-1 rounded-full px-2.5 text-[13.5px] font-semibold" data-open={factOpen === "look" ? "true" : undefined}>
-                        <span aria-hidden className="h-4 w-4 rounded-full" style={{ border: "1.5px solid #8a6116", background: cardLook?.color ?? (cardLook?.image ? "conic-gradient(#d9b45f, #7c9a5a, #6fa8dc, #d9b45f)" : "linear-gradient(180deg, #fbf3dc, #eedcb3)") }} />
                       </button>
                     )}
 
                   </div>
-                  {factOpen === "look" && task && (
-                    <div key="look" data-pill-tray className="reveal qe-fact-panel pill-tray-box rounded-xl p-3">
-                      <CardLookPicker task={task} />
-                    </div>
-                  )}
                   {factOpen === "place" && task && (
                     <div key="place" data-pill-tray className="reveal qe-fact-panel pill-tray-box flex flex-col gap-2 rounded-xl p-3">
                     <div className="flex items-center gap-2">
@@ -2772,6 +2842,8 @@ export function QuestEditorDialog({
                     <DrivePicks taskId={task.id} />
                     </div>
                   )}
+                  {/* Under the row: the sub-quests drawer (pointing up at its pill) and the sequence's panel. */}
+                  {facts.includes("sequence") && partNodes.sequence}
                   {factOpen === "due" && (
                     <div key="due" data-pill-tray className="reveal qe-fact-panel pill-tray-box flex flex-col gap-2 rounded-xl p-3" data-tour="panel-due">
                       <div className="flex flex-wrap items-center gap-1">
@@ -3151,6 +3223,46 @@ function PinGlyph() {
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path d="M12 21s-6.5-6.2-6.5-11.2a6.5 6.5 0 0 1 13 0C18.5 14.8 12 21 12 21z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" fill="rgba(217,180,95,.35)" />
       <circle cx="12" cy="9.8" r="2.3" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+/** The + (or −) on the editor's add-on pills: drawn, so it sits exactly on the text's middle (owner, Nov 20). */
+function PlusMark({ minus = false }: { minus?: boolean }) {
+  return (
+    <svg aria-hidden width="9" height="9" viewBox="0 0 10 10" className="shrink-0 opacity-70" style={{ marginRight: 1 }}>
+      <path d={minus ? "M1.5 5h7" : "M1.5 5h7M5 1.5v7"} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** The + pills' icons, flat lines in the pill's ink (owner's picks, Nov 20). */
+const PILL_ICONS: Record<string, string> = {
+  // Importance & effort: a flame.
+  scales: "M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-3 2-4 2-7 1 1 2 2 3 2 0-2-1-3 0-5z",
+  // Progress: a rising line (c).
+  progress: "M4 20l5-6 4 3 7-9M15 8h5v5",
+  // Matrix: arrowed axes with faint quarters and a dot (b4.1); the quarters and dot are drawn below.
+  matrix: "M5 5v14h14M5 5l-1.5 2M5 5l1.5 2M19 19l-2-1.5M19 19l-2 1.5",
+  // Tags: a # (b).
+  tags: "M9 4 7 20M17 4l-2 16M4 9h16M3 15h16",
+  // Add a file: a paperclip (b).
+  file: "M20 11l-8 8a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-3-3l7-7",
+  // Color: the card's own colour, filled (drawn below).
+  color: "",
+};
+function PillIcon({ k, color }: { k: string; color?: string | null }) {
+  if (k === "color")
+    return <span aria-hidden className="h-3.5 w-3.5 shrink-0 rounded-full" style={{ border: "1.4px solid #8a6116", background: color ?? "linear-gradient(180deg, #fbf3dc, #e6cf98)" }} />;
+  return (
+    <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 opacity-80">
+      <path d={PILL_ICONS[k]} />
+      {k === "matrix" && (
+        <>
+          <path d="M12 5v14M5 12h14" strokeOpacity=".3" />
+          <circle cx="15.5" cy="8.5" r="2" fill="currentColor" stroke="none" />
+        </>
+      )}
     </svg>
   );
 }

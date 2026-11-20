@@ -36,7 +36,10 @@ export function IconPicker({
   artStyle = "monster",
   clearLabel = "Remove portrait",
   onPromptChange,
+  footer,
 }: {
+  /** Shown at the foot of the picker (the quest editor puts the card's picture background here). */
+  footer?: React.ReactNode;
   /** Omit together with `onDraftChange` when the quest doesn't exist yet. */
   taskId?: string;
   currentIcon: string | null;
@@ -558,6 +561,7 @@ export function IconPicker({
               )}
             </div>
           )}
+          {footer && <div className="mt-3 border-t pt-3" style={{ borderColor: "rgba(139,112,64,.25)" }}>{footer}</div>}
 
           </div>
         </div>

@@ -11,7 +11,8 @@ const COLORS = ["#fde8d0", "#dcefe0", "#e0e7fb", "#fbe0e6", "#fff4c2"];
 const WHEEL = "conic-gradient(#e06666, #f6b26b, #ffd966, #93c47d, #6fa8dc, #8e7cc3, #c27ba0, #e06666)";
 const GOLD = "#a88a3f";
 
-export function CardLookPicker({ task }: { task: Task }) {
+/** `part` shows only the colours (the quest editor's + Color) or only the pictures (its portrait editor; owner, Nov 20). */
+export function CardLookPicker({ task, part }: { task: Task; part?: "colour" | "picture" }) {
   const look = useCalCardLook(task.id);
   const art = questArt(task);
   const file = useRef<HTMLInputElement>(null);
@@ -23,6 +24,8 @@ export function CardLookPicker({ task }: { task: Task }) {
   const photo = !!look?.image && look.image !== "portrait";
   return (
     <div className="flex flex-col gap-2" data-card-look>
+      {part !== "picture" && (
+      <>
       <span className="text-[13px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
         Colour
       </span>
@@ -35,8 +38,12 @@ export function CardLookPicker({ task }: { task: Task }) {
           <input type="color" value={custom ? look!.color : "#c9a86a"} onChange={(e) => set({ color: e.target.value })} aria-label="Pick any colour" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
         </label>
       </div>
+      </>
+      )}
+      {part !== "colour" && (
+      <>
       <span className="text-[13px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
-        Picture
+        {part === "picture" ? "As the card's background" : "Picture"}
       </span>
       <div className="flex flex-wrap items-center gap-1.5">
         {art && (
@@ -51,7 +58,7 @@ export function CardLookPicker({ task }: { task: Task }) {
             // eslint-disable-next-line @next/next/no-img-element -- the chosen photo
             <img src={look!.image} alt="" className="-ml-1.5 h-6 w-6 rounded-full object-cover" />
           ) : (
-            <span aria-hidden>📷</span>
+            <svg aria-hidden width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z" /><circle cx="12" cy="13.5" r="3.5" /></svg>
           )}
           {busy ? "Adding…" : photo ? "Another photo" : "My photo"}
         </button>
@@ -80,6 +87,8 @@ export function CardLookPicker({ task }: { task: Task }) {
           }}
         />
       </div>
+      </>
+      )}
       {err && (
         <p className="m-0 text-[12.5px]" style={{ color: "var(--t-warn)" }}>
           {err}

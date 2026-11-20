@@ -93,8 +93,9 @@ export function DateField({
             <div className="fixed inset-0 z-[90]" onClick={() => setOpen(false)} aria-hidden />
             <div
               role="dialog"
+              // Above the feedback bubble (z-130), so it never sits on a date (UI check, Nov 20).
               aria-label={ariaLabel}
-              className="card-pop-in parchment parchment-framed fixed z-[91] w-[280px] rounded-2xl p-3"
+              className="card-pop-in parchment parchment-framed fixed z-[132] w-[280px] rounded-2xl p-3"
               // position inline: the adventure theme sets .parchment-framed { position: relative }, which put the calendar at the foot of the page (off screen; owner, Nov 7).
               style={{ position: "fixed", left: pos?.left ?? -9999, top: pos?.top ?? -9999, color: "var(--t-ink)", border: "1.5px solid #a88a3f", boxShadow: "0 14px 34px rgba(0,0,0,.4)" }}
             >
