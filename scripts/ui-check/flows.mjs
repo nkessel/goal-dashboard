@@ -71,11 +71,8 @@ export const FLOWS = [
       await h.goto("/settings?open=welcome-screen", { name: "toucanask-settings" });
       await h.page.locator("[data-welcome-mode]").scrollIntoViewIfNeeded().catch(() => {});
       await h.check("Settings › Welcome Screen: the toucan's question");
-      await h.goto("/settings?open=toucan-spirit", { name: "toucanask-look" });
-      if (await h.tap((p) => p.getByRole("button", { name: /^his look/i }).first(), "his look", { optional: true, expectMove: true })) {
-        await h.page.locator("[data-toucan-ask-bg]").scrollIntoViewIfNeeded().catch(() => {});
-        await h.check("Settings › His look: behind the toucan's question");
-      }
+      await h.page.locator("[data-toucan-ask-bg]").scrollIntoViewIfNeeded().catch(() => {});
+      await h.check("Settings › Welcome Screen: what's behind the toucan");
     },
   },
   {

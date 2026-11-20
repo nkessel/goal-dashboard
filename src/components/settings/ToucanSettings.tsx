@@ -204,7 +204,6 @@ export function ToucanLookSettings() {
   const pick = (on: boolean) => (on ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { border: "1.5px solid var(--t-card-border, rgba(139,112,64,.35))", color: "var(--t-ink)" });
   return (
     <div className="flex flex-col gap-2.5" style={{ color: "var(--t-ink)" }}>
-      <AskBackground />
       <ArrivalTalk />
       <BubbleStyleSettings />
       <ToucanPreview text="Rivers carve canyons not by force, but by returning." talk={talk} flourish={flourish} play={play} />
@@ -361,7 +360,7 @@ const ASK_BGS = [
  * What's behind him when he asks what's most important (the toucan's question, owner Nov 19: "let's have this
  * background be editable in some settings"), and how thick the mist is.
  */
-function AskBackground() {
+export function AskBackground() {
   const bg = useSyncExternalStore(subscribeFx, () => loadFx().toucanAskBg ?? "mist", () => "mist");
   const mist = useSyncExternalStore(subscribeFx, () => loadFx().toucanAskMist ?? 0.7, () => 0.7);
   const quote = useSyncExternalStore(subscribeFx, () => loadFx().toucanKeptQuote !== false, () => true);

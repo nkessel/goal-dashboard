@@ -1,6 +1,7 @@
 "use client";
 
 import { FoldGroup } from "./FoldGroup";
+import { AskBackground } from "./ToucanSettings";
 import { useEffect, useState, useRef } from "react";
 import { CastleArt } from "@/components/xp/CastleArt";
 import { CheckinIcon } from "@/components/xp/CheckinIcon";
@@ -92,6 +93,12 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
             );
           })}
         </div>
+        {/* The toucan's question's own look sits with it here (owner, Nov 19: "This should be in the Welcome settings"). */}
+        {fx.welcomeMode === "toucan" && (
+          <div className="reveal rounded-xl p-2.5" style={{ border: "1px solid rgba(139,112,64,.3)" }}>
+            <AskBackground />
+          </div>
+        )}
         <FoldGroup title="When it opens" value={backHours(fx) ? `Every ${backHours(fx)} ${backHours(fx) === 1 ? "hour" : "hours"}` : "Once a day"}>
           <div className="flex flex-col gap-2">
         <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>

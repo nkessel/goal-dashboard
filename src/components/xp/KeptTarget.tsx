@@ -65,7 +65,7 @@ export function KeptTarget() {
       </button>
       {open && !drag && (
         <div
-          className="card-pop-in parchment fixed z-[38] rounded-2xl px-3.5 pb-3 pt-2"
+          className="card-pop-in parchment fixed z-[45] rounded-2xl px-3.5 pb-3 pt-2"
           role="dialog"
           aria-label="Most important today"
           data-kept-card
