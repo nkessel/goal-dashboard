@@ -1680,12 +1680,15 @@ export function QuestEditorDialog({
                         className="qe-fact flex h-8 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold"
                         title="A checklist inside this quest"
                       >
-                        {stepsOpen ? <FactCaret open /> : <PlusMark />}
+                        {/* Option 1 (owner, Nov 20): a + before the word while empty; once open or holding something, a
+                            caret after it (⌃ open, ⌄ closed), like the other quick details. */}
+                        {!stepsOpen && !stepsHas && <PlusMark />}
                         Sub-quests
                         {(() => {
                           const n = (steps ?? []).length || (steps === null ? (task?.steps_total ?? 0) : 0);
                           return n ? <span style={{ color: "var(--t-ink-soft)" }}>· {n}</span> : null;
                         })()}
+                        {(stepsOpen || stepsHas) && <FactCaret open={stepsOpen} />}
                       </button>
                     )}
                     <button
@@ -2351,8 +2354,9 @@ export function QuestEditorDialog({
       <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="More details">
         {pillKeys.map((k) => (
           <button key={k} type="button" onClick={() => setMorePick((o) => (o === k ? null : k))} aria-expanded={morePick === k} className="qe-fact flex h-8 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold" data-open={morePick === k ? "true" : undefined}>
-            {morePick === k ? <FactCaret open /> : <PlusMark />}
+            {morePick !== k && !(k === "tags" && tags.length > 0) && <PlusMark />}
             {pillName(k)}
+            {(morePick === k || (k === "tags" && tags.length > 0)) && <FactCaret open={morePick === k} />}
           </button>
         ))}
       </div>
