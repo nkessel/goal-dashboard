@@ -357,12 +357,15 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
   const visDays = Math.max(1, Math.round(v1 - v0));
   // Zoomed in to a few days: the times show along the bottom and the days are divided by dotted lines.
   const close = visDays <= 3;
-  const headH = showWeather ? 40 : 24;
+  // Above the chart: each day's rating and rain. Its date and "+n XP" sit underneath it (owner, Nov 19).
+  const headH = 22;
   const T = headH + 4;
   const plotH = Math.max(90, Math.min(360, view.chartH ?? 190));
   const eventsH = activeEvents.length && marks === "lanes" ? 14 + activeEvents.length * 16 : 0;
   const timesH = close ? 16 : 0;
-  const plotEnd = T + plotH + timesH + eventsH;
+  const footY = T + plotH + timesH + eventsH;
+  const footH = 30;
+  const plotEnd = footY + footH;
   const tP = plotEnd + 12;
   const timeH = split ? Math.max(90, Math.min(400, view.timeH ?? 200)) : 0;
   const sleepY = (split ? tP + timeH : plotEnd) + 16;
@@ -486,7 +489,9 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
     });
   })();
 
-  const showXp = isOn("xp");
+  // XP always shows, as "+n XP" under each day (owner, Nov 19); no toggle.
+  const showXp = true;
+  const shownCount = series.filter((m) => isOn(m.metric)).length + (showWeather ? 1 : 0) + activeEvents.length;
   const xpByDay = days.map((d) => (eventsByDay.get(dayKey(d)) ?? []).reduce((a, w) => a + (w.xp || 0), 0));
   const xpTop = Math.ceil(Math.max(10, ...xpByDay) / 10) * 10;
   const xpTotal = xpByDay.reduce((a, b) => a + b, 0);
@@ -523,21 +528,8 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
     <div className="relative z-[1] flex flex-col gap-2">
       {/* Toggles, kept small so the chart leads: XP and each metric as a pill (its swatch is its mark), the rest under "Weather & events". */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <div className="contents" role="group" aria-label="Lines to show">
-          <button
-            type="button"
-            aria-pressed={showXp}
-            onClick={() => flip("xp")}
-            className="flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold"
-            style={showXp ? { background: "rgba(255,250,235,.85)", border: `1.5px solid ${XP_EDGE}`, color: INK } : { border: `1px dashed ${GRID}`, color: INK_SOFT, opacity: 0.75 }}
-          >
-            <svg aria-hidden width="12" height="12" viewBox="0 0 12 12">
-              <rect x="0.5" y="5" width="3" height="6.5" rx="0.8" fill={showXp ? XP_FILL : INK_SOFT} />
-              <rect x="4.5" y="2" width="3" height="9.5" rx="0.8" fill={showXp ? XP_FILL : INK_SOFT} />
-              <rect x="8.5" y="6.5" width="3" height="5" rx="0.8" fill={showXp ? XP_FILL : INK_SOFT} />
-            </svg>
-            XP per day
-          </button>
+        {/* One button for what's on the chart (owner, Nov 19); on a wider screen the lines also show as pills. */}
+        <div className="hidden flex-wrap items-center gap-1.5 sm:flex" role="group" aria-label="Lines to show">
           {series.map((s) => {
             const on = isOn(s.metric);
             return (
@@ -567,13 +559,21 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
               <circle cx="9" cy="9" r="4" fill="#e7b43c" />
               <path d="M8 19h9.5a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6 1.5A2.8 2.8 0 0 0 8 19z" fill="#f6f1e4" stroke="#7d8aa0" strokeWidth="1.4" />
             </svg>
-            Weather &amp; events{extrasOn ? ` (${extrasOn} on)` : ""}
+            Show{shownCount ? ` (${shownCount})` : ""}
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path d="M5 9l7 7 7-7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           {more && (
-            <div role="dialog" aria-label="Weather and events" className="pop parchment absolute right-0 top-full z-[6] mt-1.5 flex w-[220px] flex-col py-1.5" style={{ borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 28px rgba(0,0,0,.3)" }}>
+            <div role="dialog" aria-label="What the chart shows" className="pop parchment absolute right-0 top-full z-[6] mt-1.5 flex max-h-[70vh] w-[230px] flex-col overflow-y-auto py-1.5" style={{ borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 28px rgba(0,0,0,.3)" }}>
+              {series.map((m) => (
+                <label key={m.metric} className="relative z-[1] flex min-h-9 items-center gap-2 px-3 text-[14px]" style={{ color: INK }}>
+                  <input type="checkbox" checked={isOn(m.metric)} onChange={() => flip(m.metric)} />
+                  <span aria-hidden className="inline-block h-[3px] w-3.5 rounded-full" style={{ background: m.color }} />
+                  {m.metric}
+                </label>
+              ))}
+              {series.length > 0 && <span aria-hidden className="mx-3 my-1 block h-px" style={{ background: GRID }} />}
               <label className="relative z-[1] flex min-h-9 items-center gap-2 px-3 text-[14px]" style={{ color: INK }}>
                 <input type="checkbox" checked={showWeather} onChange={() => flip("weather")} />
                 <svg aria-hidden width="16" height="16" viewBox="0 0 24 24">
@@ -741,13 +741,12 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
               const rate = dayRate[i];
               const w = showWeather && weather ? weather[dayKey(d)] : null;
               const wide = dayW >= 58;
+              const rx = x0 + 8;
+              const cx = rate != null && wide ? x0 + 30 : dayW >= 26 ? xDay(i) : x0 + 8;
               return (
                 <g key={i}>
-                  <text x={wide ? x0 : xDay(i)} y={13} textAnchor={wide ? "start" : "middle"} fontSize="11.5" fill={INK_SOFT} fontFamily="var(--font-display, Georgia), serif">
-                    {i === n - 1 && !wide ? "today" : d.toLocaleDateString(undefined, wide ? { weekday: "short", day: "numeric" } : visDays <= 14 ? { weekday: "short" } : { month: "numeric", day: "numeric" })}
-                  </text>
                   {rate != null && wide && (
-                    <g transform={`translate(${(x0 + 50).toFixed(1)} 9)`}>
+                    <g transform={`translate(${rx.toFixed(1)} 11)`}>
                       <title>{`How the day was: ${rate} of 10`}</title>
                       <circle r="8" fill="#fffaf0" stroke="#a88a3f" strokeWidth="1" />
                       <text y="3.6" textAnchor="middle" fontSize="10" fontWeight="700" fill={INK}>
@@ -756,7 +755,7 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
                     </g>
                   )}
                   {w && (wide || dayW >= 26) && (
-                    <g transform={`translate(${(wide ? x0 + 7 : xDay(i)).toFixed(1)} 30)`}>
+                    <g transform={`translate(${cx.toFixed(1)} 14)`}>
                       <title>{`${w.hi}° / ${w.lo}°${w.rain > 0.02 ? `, rain ${w.rain.toFixed(2)}` : ""}`}</title>
                       <clipPath id={`cloud-${i}`}>
                         <path d={CLOUD} />
@@ -774,23 +773,6 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
               );
             })}
           </g>
-
-          {/* XP per day: gilded columns behind the lines, on their own scale (top label, right). */}
-          {showXp && (
-            <g clipPath="url(#plot-clip)">
-              {xpByDay.map((xp, i) => {
-                if (!xp || !inView(i)) return null;
-                const h = (xp / xpTop) * plotH;
-                const bw = Math.max(2, dayW * 0.62);
-                return (
-                  <rect key={i} x={xDay(i) - bw / 2} y={T + plotH - h} width={bw} height={h} rx={Math.min(3, bw / 3)} fill={XP_FILL} opacity={hover === null || hover === i ? 0.42 : 0.25} stroke={XP_EDGE} strokeWidth="0.8" />
-                );
-              })}
-              <text x={W - R - 2} y={T + 11} textAnchor="end" fontSize="10.5" fontWeight="700" fill={XP_EDGE}>
-                {xpTop} XP
-              </text>
-            </g>
-          )}
 
           {/* Grid */}
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
@@ -829,6 +811,27 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
                     })
                   : []
               )}
+          </g>
+          {/* Under each day: its date, and the XP earned that day (owner, Nov 19). */}
+          <g clipPath="url(#head-clip)">
+            {days.map((d, i) => {
+              if (!inView(i)) return null;
+              if (dayW < 30 && (n - 1 - i) % tickEvery !== 0) return null;
+              const wide = dayW >= 58;
+              const xp = xpByDay[i] ?? 0;
+              return (
+                <g key={i}>
+                  <text x={xDay(i)} y={footY + 12} textAnchor="middle" fontSize="11" fill={hover === i ? INK : INK_SOFT} fontWeight={i === n - 1 ? 700 : 400} fontFamily="var(--font-display, Georgia), serif">
+                    {i === n - 1 ? "today" : d.toLocaleDateString(undefined, wide ? { weekday: "short", day: "numeric" } : visDays <= 14 ? { weekday: "short" } : { month: "numeric", day: "numeric" })}
+                  </text>
+                  {xp > 0 && dayW >= 22 && (
+                    <text x={xDay(i)} y={footY + 25} textAnchor="middle" fontSize="10" fontWeight="700" fill={XP_EDGE}>
+                      {dayW >= 40 ? `+${xp} XP` : `+${xp}`}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
           </g>
           {hover !== null && <line x1={xDay(hover)} x2={xDay(hover)} y1={T} y2={sleepY - 10} stroke={INK_SOFT} strokeWidth="1" strokeDasharray="3 3" />}
 
