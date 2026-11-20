@@ -493,7 +493,6 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
   const showXp = true;
   const shownCount = series.filter((m) => isOn(m.metric)).length + (showWeather ? 1 : 0) + activeEvents.length;
   const xpByDay = days.map((d) => (eventsByDay.get(dayKey(d)) ?? []).reduce((a, w) => a + (w.xp || 0), 0));
-  const xpTop = Math.ceil(Math.max(10, ...xpByDay) / 10) * 10;
   const xpTotal = xpByDay.reduce((a, b) => a + b, 0);
   const dayW = (W - L - R) / (v1 - v0);
 
@@ -1038,7 +1037,7 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
       )}
       {visible.every((s) => s.pts.length < 3) && (
         <p className="m-0 text-[13px]" style={{ color: INK_SOFT }}>
-          A few more check-ins and the trends will show. Tap a name to show or hide its line, or + to add an entry.
+          A few more check-ins and the trends will show. Use Show to choose what the chart shows, or + to add an entry.
         </p>
       )}
     </div>
