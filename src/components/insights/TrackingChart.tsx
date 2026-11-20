@@ -999,13 +999,15 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
           })}
         </svg>
 
-        {/* Hover readout */}
+      </figure>
+        {/* The day you tapped, under the chart instead of over it (owner, Nov 19: "the selector should not cover the chart"). */}
         {hd && (
           <div
-            className="fade-in pointer-events-none absolute top-2 z-[3] flex max-w-[230px] flex-col gap-0.5 rounded-lg px-2.5 py-2 text-[13px] shadow-lg"
-            style={{ [hover! > n / 2 ? "left" : "right"]: 12, background: "#fbf3df", border: "1px solid #b39a6a", color: INK }}
+            className="reveal grid grid-cols-1 gap-x-5 gap-y-0.5 rounded-lg px-3 py-2 text-[13px] sm:grid-cols-2"
+            style={{ background: "rgba(251,243,223,.7)", border: `1px solid ${GRID}`, color: INK }}
+            data-day-readout
           >
-            <b className="text-[13.5px]">{hd.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</b>
+            <b className="text-[13.5px] sm:col-span-2">{hd.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</b>
             {hoverVals.map(({ s, v }) => (
               <span key={s.metric} className="flex items-center gap-1.5">
                 <span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: s.color }} />
@@ -1055,7 +1057,6 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
           </div>
         )}
 
-      </figure>
       {(zoom || showXp) && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]" style={{ color: INK_SOFT }}>
           {showXp && (
