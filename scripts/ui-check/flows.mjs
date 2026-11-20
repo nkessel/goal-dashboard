@@ -1079,6 +1079,15 @@ export const FLOWS = [
             await h.page.keyboard.press("Escape");
             await h.settle(500);
             await h.check(`chart: ${name}, squished`);
+            // Grid lines: Few · Some · Many (owner, Nov 19), on the month.
+            if (span !== "month") continue;
+            for (const g of ["Few", "Many", "Some"]) {
+              await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), `chart gear, grid ${g}`, { optional: true, expectMove: true });
+              await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: new RegExp(`^${g}$`, "i") }).first(), `grid: ${g}`, { optional: true });
+              await h.page.keyboard.press("Escape");
+              await h.settle(400);
+              if (g !== "Some") await h.check(`chart: a month, ${g.toLowerCase()} grid lines`);
+            }
           }
           await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), "chart gear, week again", { optional: true, expectMove: true });
           await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: /^week$/i }).first(), "chart: week again", { optional: true });

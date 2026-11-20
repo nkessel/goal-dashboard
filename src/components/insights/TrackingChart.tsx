@@ -51,7 +51,12 @@ type View = {
   /** Each panel's height, dragged at its bottom edge. */
   chartH?: number;
   timeH?: number;
+  /** How many level and hour lines (owner, Nov 19: "a setting to change the density of the lines and labels"). */
+  grid?: "few" | "some" | "many";
 };
+const GRID_LEVELS = { few: [1, 5, 10], some: [1, 4, 7, 10], many: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] } as const;
+const GRID_LABELS = { few: [1, 5, 10], some: [1, 4, 7, 10], many: [1, 4, 7, 10] } as const;
+const GRID_HOURS = { few: [12, 18], some: [9, 12, 15, 18, 21], many: [8, 10, 12, 14, 16, 18, 20, 22] } as const;
 const DEFAULT_VIEW: View = { range: 30, detail: "every", smooth: true, dots: true, marks: "onLine" };
 
 const EVENTS: { key: string; label: string; kinds: string[]; glyph: string; color: string }[] = [
@@ -277,6 +282,7 @@ function ResizeEdge({ y, x1, x2, label, svgRef, W, value, min, max, onChange }: 
  */
 export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metrics: string[]; readings: Reading[]; wins: WinLite[]; onAdd?: () => void; /** Sleep by the morning it ended (Wheel of Time), shown on the day's card (owner, Nov 9). */ nights?: Record<string, { bed: string | null; wake: string | null }> }) {
   const [view, setView] = useState<View>(DEFAULT_VIEW);
+  const gridD = view.grid ?? "some";
   const [more, setMore] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState<Record<string, boolean>>({});
@@ -628,6 +634,7 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
               <Seg label="Time span" value={String(view.range)} options={[["7", "Week"], ["30", "Month"], ["90", "3 months"]]} onPick={(v) => setV({ range: Number(v) as View["range"] })} />
               <Seg label="Points" value={view.detail} options={[["daily", "Daily average"], ["every", "Every check-in"]]} onPick={(v) => setV({ detail: v as View["detail"] })} />
               <Seg label="Lines" value={view.smooth ? "smooth" : "straight"} options={[["smooth", "Smooth"], ["straight", "Straight"]]} onPick={(v) => setV({ smooth: v === "smooth" })} />
+              <Seg label="Grid lines" value={gridD} options={[["few", "Few"], ["some", "Some"], ["many", "Many"]]} onPick={(v) => setV({ grid: v as View["grid"] })} />
               <Seg label="Layout" value={view.layout ?? "merged"} options={[["merged", "Merged"], ["split", "Split"]]} onPick={(v) => setV({ layout: v as View["layout"] })} />
               {!split && <Seg label="Things you did" value={view.marks ?? "onLine"} options={[["onLine", "On the chart"], ["lines", "Marker lines"], ["lanes", "Own rows"]]} onPick={(v) => setV({ marks: v as View["marks"] })} />}
               <label className="relative z-[1] flex min-h-8 items-center gap-2 text-[14px]" style={{ color: INK }}>
@@ -789,10 +796,10 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
           </g>
 
           {/* Grid */}
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
+          {GRID_LEVELS[gridD].map((v) => (
             <g key={v}>
-              <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke={GRID} strokeWidth="1" opacity={v % 3 === 1 ? 1 : 0.45} />
-              {v % 3 === 1 && (
+              <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke={GRID} strokeWidth="1" opacity={(GRID_LABELS[gridD] as readonly number[]).includes(v) ? 1 : 0.45} />
+              {(GRID_LABELS[gridD] as readonly number[]).includes(v) && (
                 <text x={L - 6} y={y(v) + 4} textAnchor="end" fontSize="12" fill={INK_SOFT}>
                   {v}
                 </text>
@@ -932,7 +939,7 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
           {split && (
             <g>
               <rect x={L} y={tP} width={W - L - R} height={timeH} rx="6" fill="rgba(255,250,235,.45)" />
-              {[9, 12, 15, 18, 21].map((h) => (
+              {GRID_HOURS[gridD].map((h) => (
                 <g key={h}>
                   <line x1={L} x2={W - R} y1={tY(h)} y2={tY(h)} stroke={GRID} strokeWidth="1" strokeDasharray="1 4" />
                   <text x={L - 4} y={tY(h) + 3} textAnchor="end" fontSize="9.5" fill={INK_SOFT}>
