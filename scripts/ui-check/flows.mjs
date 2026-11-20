@@ -309,6 +309,11 @@ export const FLOWS = [
         // The due pill reads "Due today", "Due Fri · Thu 3pm" or "Due date".
         if (await h.tap((p) => p.locator("[role=dialog] button.qe-fact", { hasText: /^(Due|Plan:)/ }).first(), "editor: due", { optional: true, expectMove: true })) {
           await h.check("quest editor: due panel");
+          // Time of day (owner, Nov 16): a range any quest can have, for the auto-scheduler.
+          if (await h.tap((p) => p.locator("[data-quest-window] button", { hasText: /^Before$/ }).first(), "editor: time of day, before", { optional: true, expectMove: true })) {
+            await h.check("quest editor: sometime before");
+            await h.tap((p) => p.locator("[data-quest-window] button", { hasText: /^Any time$/ }).first(), "editor: time of day, any", { optional: true, expectMove: true });
+          }
           // The month calendar (owner, Nov 7: "the due date picker isn't working"; it opened off screen in the adventure theme).
           if (await h.tap((p) => p.locator('[role=dialog] button[aria-label="Due date"]').first(), "editor: due date calendar", { optional: true, expectMove: true })) {
             await h.check("quest editor: due date calendar");
@@ -707,6 +712,36 @@ export const FLOWS = [
       }
       await h.page.getByText("Gym 🏋️").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
       await h.settle(300);
+      // Count every tick (owner, Nov 16): a habit set to it gives another completion, XP and celebration each tick,
+      // the card counts the day's times, the menu undoes the last one, and the XP changes on the celebration.
+      const walk = (p) => p.locator("li", { hasText: "Walk Chester" }).first();
+      await walk(h.page).evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+      await h.settle(300);
+      await h.check("habit cards: listen link inline");
+      if (await h.tap((p) => walk(p).getByRole("button", { name: /more for walk chester/i }), "habit menu", { optional: true, expectMove: true })) {
+        await h.check("habit menu: count every time");
+        await h.tap((p) => p.getByRole("menuitem", { name: /count every time/i }).first(), "count every time", { optional: true, expectMove: true });
+        await h.settle(300);
+        const closeParty = async () => {
+          await h.tap((p) => p.getByRole("button", { name: /^close$/i }).first(), "close celebration", { optional: true });
+          await h.settle(500);
+        };
+        if (await h.tap((p) => walk(p).getByRole("checkbox").first(), "tick: first", { optional: true })) {
+          await h.settle(1400);
+          await h.check("habit tick: celebration with XP to change");
+          await closeParty();
+          await h.tap((p) => walk(p).getByRole("checkbox").first(), "tick: again", { optional: true });
+          await h.settle(1600);
+          await h.check("habit tick: done again");
+          await closeParty();
+          await h.check("habit card: times today");
+          if (await h.tap((p) => walk(p).getByRole("button", { name: /more for walk chester/i }), "habit menu again", { optional: true, expectMove: true })) {
+            await h.check("habit menu: undo the last one");
+            await h.tap((p) => p.getByRole("menuitem", { name: /undo the last one/i }).first(), "undo the last one", { optional: true });
+            await h.settle(600);
+          }
+        }
+      }
       // The habit editor (repeat ask 15): sub-habits in view, dragged to reorder, a dot opens XP/coins/Remove.
       if (await h.tap("text=Gym 🏋️", "habit editor", { optional: true, expectMove: true })) {
         await h.settle(500);
@@ -725,6 +760,11 @@ export const FLOWS = [
           await h.page.keyboard.press("Escape").catch(() => {});
           await h.settle(200);
         }
+        // Escape above may have shut the editor: open it again for the pills.
+        if (!(await h.page.locator("[data-mi=pills]").first().isVisible().catch(() => false))) {
+          await h.tap("text=Gym 🏋️", "habit editor again", { optional: true, expectMove: true });
+          await h.settle(500);
+        }
         // Its details are pills now: open Repeats, then pick Certain days.
         await h.tap((p) => p.locator("[data-mi=pills] button").first(), "repeats pill", { optional: true, expectMove: true });
         await h.check("habit editor: repeats pill");
@@ -736,6 +776,9 @@ export const FLOWS = [
         await h.check("habit editor: xp pill");
         await h.tap((p) => p.locator("[data-mi=pills] button").nth(3), "when pill", { optional: true, expectMove: true });
         await h.check("habit editor: when pill");
+        // When (owner, Nov 16): Any time · At · Before · Between; "Before" needs only an end time.
+        if (await h.tap((p) => p.locator("[data-time-range] button", { hasText: /^Before$/ }).first(), "when: before", { optional: true, expectMove: true })) await h.check("habit editor: sometime before");
+        if (await h.tap((p) => p.locator("[data-time-range] button", { hasText: /^Between$/ }).first(), "when: between", { optional: true, expectMove: true })) await h.check("habit editor: between two times");
         if (await h.tap((p) => p.getByRole("button", { name: /^more$/i }).first(), "habit menu", { optional: true, expectMove: true })) {
           await h.check("habit editor: menu");
         }

@@ -8,7 +8,9 @@ import { InlineNumber } from "@/components/ui/InlineNumber";
 import { saveQuestPlace, useQuestPlace } from "@/lib/use-quest-places";
 import { DrivePicks } from "./DrivePicks";
 import { CardLookPicker } from "@/components/calendar/CardLookPicker";
-import { driveWords, useQuestDrive } from "@/lib/use-quest-cal";
+import { driveWords, saveQuestWindow, useQuestDrive, useQuestWindow } from "@/lib/use-quest-cal";
+import { minutesOf, rangeWords } from "@/lib/auto-schedule";
+import { TimeRangePick } from "@/components/ui/TimeRangePick";
 import { useProgressUnit, saveProgressUnit } from "@/lib/use-progress-units";
 import { pctOf, type ProgressUnit } from "@/lib/progress-units";
 import { progressWords } from "@/lib/progress-words";
@@ -714,6 +716,8 @@ export function QuestEditorDialog({
   const dueAt = dueIso(dueDate, dueTime);
   const place = useQuestPlace(task?.id);
   const drive = useQuestDrive(task?.id);
+  // Its own time range for the auto-scheduler ("sometime before 2 PM"; owner, Nov 16).
+  const timeWindow = useQuestWindow(task?.id);
 
   // ---- Saving as you go (existing quests) ----------------------------------
   const autosave = Boolean(task) && !review;
@@ -1284,6 +1288,7 @@ export function QuestEditorDialog({
       dueDate && `Due ${dueChipLabel(dueDate)}`,
       shownSlot && `${new Date(shownSlot.start).toLocaleDateString(undefined, { weekday: "short" })} ${shortTime(shownSlot.start).replace(":00", "")}`,
       !dueDate && !shownSlot && planDays !== null && `Plan: ${withinLabel(planDays)}`,
+      !shownSlot && timeWindow && rangeWords(minutesOf(timeWindow.from), minutesOf(timeWindow.to)),
     ]
       .filter(Boolean)
       .join(" · ") || "Due date";
@@ -1342,6 +1347,13 @@ export function QuestEditorDialog({
       </Fold>
       {/* How soon it needs a time: puts it on the auto-scheduler's list in that group. */}
       <ScheduleWithin days={planDays} onRate={rateWithin} />
+      {/* When in the day it may go: the auto-scheduler only looks inside this range. */}
+      {task && !fixedSchedule && (
+        <div data-quest-window className="flex flex-col gap-1.5">
+          <span className={labelCls}>Time of day</span>
+          <TimeRangePick small value={{ from: timeWindow?.from ?? "", to: timeWindow?.to ?? "" }} onChange={(v) => void saveQuestWindow(task.id, v.from || v.to ? { ...(v.from ? { from: v.from } : {}), ...(v.to ? { to: v.to } : {}) } : null)} startWord="After" />
+        </div>
+      )}
       {toSchedule && planDays == null && (
         <span className="flex items-center gap-2 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
           On the list to schedule

@@ -1,7 +1,7 @@
 "use client";
 
 import { PillTrays } from "@/components/ui/PillTrays";
-import { TimeToken } from "@/components/xp/NightFields";
+import { TimeRangePick } from "@/components/ui/TimeRangePick";
 import { useState, useTransition } from "react";
 import { nextOccurrence, repeatLabel, type Repeat } from "@/lib/habit-repeat";
 import { createPortal } from "react-dom";
@@ -67,7 +67,6 @@ export function RiteEditorDialog({
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
   const [customOpen, setCustomOpen] = useState(!!rite?.repeat && !(rite.repeat.every === 1 && (rite.repeat.unit === "week" || rite.repeat.unit === "month")));
-  const [dueOpen, setDueOpen] = useState(!!rite?.due_time);
   // A habit's details are pills like the quest editor's (owner, Nov 3); one opens at a time, in place.
   const [pill, setPill] = useState<"repeats" | "takes" | "reward" | "due" | null>(null);
   const subsChanged = JSON.stringify(subs) !== JSON.stringify(rite?.steps ?? []);
@@ -107,7 +106,7 @@ export function RiteEditorDialog({
         if (isHabit && !repeat && days.length === 0) throw new Error("Pick at least one day.");
         if (rite && !dirty) return close();
         const picture = { iconKey: icon?.url ?? null, iconSource: icon?.source ?? null };
-        const schedule = isHabit ? { days: repeat ? null : days.length === 7 ? null : days, repeat, dueTime: dueTime || null, windowTo: dueTime && windowTo ? windowTo : null, ...picture, coinValue, estimateMinutes: minutes } : picture;
+        const schedule = isHabit ? { days: repeat ? null : days.length === 7 ? null : days, repeat, dueTime: dueTime || null, windowTo: windowTo || null, ...picture, coinValue, estimateMinutes: minutes } : picture;
         const pending = subs;
         if (rite) {
           await updateRiteAction(rite.id, { title, description, isCore: isHabit ? true : isCore, xpValue: xp, ...schedule });
@@ -253,7 +252,7 @@ export function RiteEditorDialog({
                 ["takes", <img key="t" src="/design/ui-clock.png" alt="" width={14} height={14} className="h-3.5 w-3.5 shrink-0" />, minutes ? (minutes >= 60 && minutes % 60 === 0 ? `${minutes / 60}h` : `${minutes} min`) : "Time"],
                 ["reward", <span key="x" className="text-[13px] leading-none" style={{ color: "var(--t-xp, #6a4b0e)" }}>✦</span>, `${xp} XP${(coinValue ?? coinsForXp(xp)) ? ` · ${coinValue ?? coinsForXp(xp)} 🪙` : ""}`],
                 // eslint-disable-next-line @next/next/no-img-element -- card glyph
-                ["due", <img key="d" src="/design/ui-calendar.png" alt="" width={14} height={14} className="h-3.5 w-3.5 shrink-0" />, dueTime ? (windowTo ? spanWords(dueTime, windowTo) : `by ${shortClock(dueTime)}`) : "When"],
+                ["due", <img key="d" src="/design/ui-calendar.png" alt="" width={14} height={14} className="h-3.5 w-3.5 shrink-0" />, dueTime ? (windowTo ? spanWords(dueTime, windowTo) : `At ${shortClock(dueTime)}`) : windowTo ? `Before ${shortClock(windowTo)}` : "When"],
               ] as const
             ).map(([k, icon, label]) => (
               <button
@@ -519,35 +518,7 @@ export function RiteEditorDialog({
 
         {isHabit && (
           <div data-pill-tray data-mi="due" className={`relative z-[1] flex-col gap-2 ${pill === "due" ? "reveal qe-fact-panel pill-tray-box flex rounded-xl p-3" : "hidden"}`}>
-            <button type="button" onClick={() => setDueOpen((o) => !o)} aria-expanded={dueOpen} className="hidden items-center gap-1.5 self-start text-[14.5px] font-semibold">
-              <Caret open={dueOpen} />
-              {windowTo ? "Time" : "Due by"}
-              {!dueOpen && <span className="text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>{dueTime ? (windowTo ? `${dueTime}–${windowTo}` : dueTime) : "any time"}</span>}
-            </button>
-            {(dueOpen || isHabit) && (
-            <label className="reveal flex items-center gap-2 text-[14.5px] font-semibold">
-              <TimeToken value={dueTime} onChange={setDueTime} label={windowTo ? "From" : "Due by (optional)"} kind="any" compact />
-              {dueTime && (windowTo ? (
-                <>
-                  <span className="text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>to</span>
-                  <TimeToken value={windowTo} onChange={setWindowTo} label="Until" kind="any" compact />
-                </>
-              ) : (
-                <button type="button" onClick={() => setWindowTo(nextHour(dueTime, 3))} title="Any time in a window: the calendar finds it a free hour inside" className="text-[13px] font-normal underline" style={{ color: "var(--t-ink-soft)" }}>
-                  + window
-                </button>
-              ))}
-              {dueTime ? (
-                <button type="button" onClick={() => (setDueTime(""), setWindowTo(""))} className="text-[13px] font-normal underline" style={{ color: "var(--t-ink-soft)" }}>
-                  clear
-                </button>
-              ) : (
-                <span className="text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>
-                  optional
-                </span>
-              )}
-            </label>
-            )}
+            <TimeRangePick value={{ from: dueTime, to: windowTo }} onChange={(v) => (setDueTime(v.from), setWindowTo(v.to))} startWord="At" />
           </div>
         )}
         </PillTrays>
@@ -641,13 +612,6 @@ function HabitGlyph() {
 }
 
 /** "07:00" plus some hours ("10:00"), kept within the day. */
-function nextHour(t: string, hours: number) {
-  const m = /^(\d{1,2}):(\d{2})/.exec(t);
-  if (!m) return "";
-  const h = Math.min(23, Number(m[1]) + hours);
-  return `${String(h).padStart(2, "0")}:${m[2]}`;
-}
-
 /** "7 AM", "7:30 PM". */
 function shortClock(t: string) {
   const m = /^(\d{1,2}):(\d{2})/.exec(t);

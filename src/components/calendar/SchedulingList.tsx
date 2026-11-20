@@ -210,7 +210,7 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme, today 
     if (at != null) return clockOf(`${Math.floor(at / 60)}:${String(at % 60).padStart(2, "0")}`);
     return null;
   };
-  const habitPlaceable = (h: SchedHabit) => !h.due_time && habitAt(h) === null;
+  const habitPlaceable = (h: SchedHabit) => !h.due_time && !h.window_to && habitAt(h) === null;
   const ordered = (sec: Sec, ids: string[]) => {
     const saved = (ui.items[sec] ?? []).filter((id) => ids.includes(id));
     return [...saved, ...ids.filter((id) => !saved.includes(id))];
@@ -481,7 +481,7 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme, today 
                   const h = habitById.get(id);
                   if (!h) return null;
                   const at = habitAt(h);
-                  const when = at ? `Placed ${at}` : h.due_time ? (h.window_to ? `${clockOf(h.due_time)}–${clockOf(h.window_to)}` : clockOf(h.due_time)) : `${h.minutes}m · no time yet`;
+                  const when = at ? `Placed ${at}` : h.due_time ? (h.window_to ? `${clockOf(h.due_time)}–${clockOf(h.window_to)}` : clockOf(h.due_time)) : h.window_to ? `before ${clockOf(h.window_to)}` : `${h.minutes}m · no time yet`;
                   return <HabitRow key={id} id={id} habit={h} when={when} placing={carried?.id === id} onPlace={() => carry({ id, title: h.title, minutes: Math.max(15, h.minutes) })} />;
                 })}
               </ol>
@@ -815,6 +815,7 @@ function HabitRow({ id, habit, when, placing, onPlace }: { id: string; habit: Sc
       </span>
       <span className="min-w-0 flex-1">
         <span className="line-clamp-2 block text-[14.5px] font-semibold leading-snug" style={{ color: "var(--t-ink)" }}>
+          {habit.core && <span aria-hidden style={{ color: "#b8860b" }}>★ </span>}
           {habit.title}
         </span>
         <span className="block text-[12px]" style={{ color: when.startsWith("Placed") ? "#3f6a2c" : "var(--t-ink-soft)" }}>

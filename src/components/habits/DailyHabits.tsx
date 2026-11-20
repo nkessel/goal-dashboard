@@ -21,7 +21,10 @@ import { coinsForXp } from "@/lib/coins";
 import { fromFeedback } from "@/lib/from-feedback";
 import { defaultCleaning, normalizeCleaning, todaysPicks } from "@/lib/cleaning";
 import { CleaningCheckIn } from "@/components/habits/CleaningCheckIn";
-import { LanguagePractice, openLanguageWindow } from "@/components/xp/LearnLanguage";
+import { openLanguageWindow } from "@/components/xp/LearnLanguage";
+import { setHabitTicks, useHabitTicks } from "@/lib/use-habit-ticks";
+import type { HabitTicksSeed } from "@/lib/habit-ticks";
+import { setHabitManyAction, setHabitXpNowAction, tickHabitAgainAction, undoHabitTickAction } from "@/app/actions";
 import { SwipeReveal } from "@/components/ui/SwipeReveal";
 import { Fold } from "@/components/ui/Fold";
 
@@ -49,9 +52,12 @@ export function DailyHabits({
   core = [],
   bare = false,
   additional = false,
+  ticks: ticksSeed = null,
 }: {
   /** The habits not up today, as their own section under Daily Habits, like Additional Quests (owner, Nov 18). */
   additional?: boolean;
+  /** Habits that count every tick, and today's ticks after the first, so cards are right from the first paint. */
+  ticks?: HabitTicksSeed | null;
   /** Habits in today's plan (core ones and the ones picked for today): they sit in Today's Quests, not here. */
   planned?: string[];
   /** Core habits: a gold star, and they always come up in the day's plan. */
@@ -155,6 +161,15 @@ export function DailyHabits({
   const [error, setError] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [menuUp, setMenuUp] = useState(false);
+  const [menuMax, setMenuMax] = useState<number | undefined>(undefined);
+  /** The menu opens on the roomier side of its card and scrolls inside when even that is short (the bottom bar takes 100px). */
+  const placeMenu = (r: DOMRect) => {
+    const below = window.innerHeight - r.bottom - 100;
+    const above = r.top - 12;
+    const up = below < 500 && above > below;
+    setMenuUp(up);
+    setMenuMax(Math.max(180, up ? above : below));
+  };
   // A tap anywhere outside the open menu closes it.
   useEffect(() => {
     if (!menuFor) return;
@@ -333,12 +348,71 @@ export function DailyHabits({
     });
   }
 
-  function toggle(h: RiteView) {
+  // Habits that count every tick (owner, Nov 16): each tick is another completion with its XP.
+  const ticks = useHabitTicks(day, ticksSeed);
+  const isMany = (id: string) => ticks.many.includes(id);
+  const timesToday = (id: string, isDone: boolean) => (isDone ? 1 + (isMany(id) ? (ticks.today[id] ?? 0) : 0) : 0);
+  /** The small celebration for a tick, with the XP changeable right on it. */
+  function celebrateTick(h: RiteView, xp: number, coinsEarned: number, times: number) {
     if (!day) return;
+    celebrateProgress({
+      title: h.title,
+      heading: times > 1 ? "Done again!" : "Habit complete!",
+      xp,
+      coinsEarned,
+      fromPct: 0,
+      toPct: 100,
+      barCaption: times > 1 ? `${times} times today` : "First one today",
+      onXp: (n) => void setHabitXpNowAction(h.id, day, n).catch(() => setError("Couldn't change the XP.")),
+    });
+  }
+  function toggleMany(h: RiteView) {
+    const on = !isMany(h.id);
+    setHabitTicks({ many: on ? [...ticks.many, h.id] : ticks.many.filter((id) => id !== h.id) });
+    void setHabitManyAction(h.id, on).catch(() => setError("Couldn't save that."));
+  }
+  function tickAgain(h: RiteView) {
+    if (!day) return;
+    setError(null);
+    const before = ticks.today[h.id] ?? 0;
+    setHabitTicks({ today: { ...ticks.today, [h.id]: before + 1 } });
+    startTransition(async () => {
+      try {
+        const r = await tickHabitAgainAction(h.id, day);
+        setHabitTicks({ today: { ...ticks.today, [h.id]: r.extra } });
+        celebrateTick(h, r.xp, r.coinsEarned, r.extra + 1);
+      } catch (e) {
+        setHabitTicks({ today: { ...ticks.today, [h.id]: before } });
+        setError(e instanceof Error ? e.message : "Couldn't save that.");
+      }
+    });
+  }
+  /** From the menu: take back the latest tick (the habit itself when it was the only one). */
+  function undoTick(h: RiteView) {
+    if (!day) return;
+    const extra = ticks.today[h.id] ?? 0;
+    if (extra < 1) return toggle(h, true);
+    setHabitTicks({ today: { ...ticks.today, [h.id]: extra - 1 } });
+    startTransition(async () => {
+      try {
+        const r = await undoHabitTickAction(h.id, day);
+        setHabitTicks({ today: { ...ticks.today, [h.id]: r.extra } });
+      } catch {
+        setHabitTicks({ today: { ...ticks.today, [h.id]: extra } });
+        setError("Couldn't undo that.");
+      }
+    });
+  }
+
+  function toggle(h: RiteView, undo = false) {
+    if (!day) return;
+    // Already done and it counts every tick: this is one more.
+    if (!undo && done(h.id) && isMany(h.id)) return tickAgain(h);
     const next = !done(h.id);
+    if (next && isMany(h.id)) celebrateTick(h, h.xp_value, h.coin_value ?? coinsForXp(h.xp_value), 1);
     setError(null);
     setOptimistic((o) => ({ ...o, [h.id]: next }));
-    if (next && h.xp_value > 0) {
+    if (next && h.xp_value > 0 && !isMany(h.id)) {
       setPop({ id: h.id, xp: h.xp_value });
       setTimeout(() => setPop((p) => (p?.id === h.id ? null : p)), 1400);
     }
@@ -563,7 +637,7 @@ export function DailyHabits({
                     if ((e.target as Element).closest("input,textarea,a")) return;
                     e.preventDefault();
                     const r = e.currentTarget.getBoundingClientRect();
-                    setMenuUp(window.innerHeight - r.bottom < 200);
+                    placeMenu(r);
                     setMenuFor(h.id);
                   }}
                   className={`habit-row relative flex flex-wrap items-center gap-x-3 rounded-2xl px-3 py-2 ${isAdventure ? "parchment" : ""}`}
@@ -577,7 +651,8 @@ export function DailyHabits({
                       type="button"
                       role="checkbox"
                       aria-checked={d}
-                      aria-label={d ? `Undo ${h.title}` : `Done: ${h.title}`}
+                      aria-label={d ? (isMany(h.id) ? `Done again: ${h.title}` : `Undo ${h.title}`) : `Done: ${h.title}`}
+                      title={d && isMany(h.id) ? "Tick again each time you do it" : undefined}
                       onClick={() => toggle(h)}
                       className="relative z-[1] h-11 w-11 shrink-0 rounded-full transition-transform active:scale-90"
                       style={{ boxShadow: d ? "0 0 0 2.5px #58a04a" : "0 0 0 2px #a58c66" }}
@@ -597,7 +672,8 @@ export function DailyHabits({
                       type="button"
                       role="checkbox"
                       aria-checked={d}
-                      aria-label={d ? `Undo ${h.title}` : `Done: ${h.title}`}
+                      aria-label={d ? (isMany(h.id) ? `Done again: ${h.title}` : `Undo ${h.title}`) : `Done: ${h.title}`}
+                      title={d && isMany(h.id) ? "Tick again each time you do it" : undefined}
                       onClick={() => toggle(h)}
                       className="relative z-[1] flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90"
                       style={{
@@ -648,11 +724,33 @@ export function DailyHabits({
                         <>
                           {cleanTop ? ": " : ""}
                           {cleanTop && (
-                            <span style={{ color: "#7a5410" }}>
+                            <span className="md:ml-1.5" style={{ color: "#7a5410" }}>
                               {cleanTop.icon} {cleanTop.name}
                             </span>
                           )}
                         </>
+                      )}
+                      {/* Something to listen to, in the title's line like the cleaning area (owner, Nov 16). */}
+                      {listenHref && !d && LISTEN_HABIT.test(h.title) && " "}
+                      {listenHref && !d && LISTEN_HABIT.test(h.title) && (
+                        <span
+                          role="link"
+                          tabIndex={0}
+                          data-listen-link
+                          title="Something to listen to"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => (e.stopPropagation(), window.location.assign(listenHref))}
+                          onKeyDown={(e) => e.key === "Enter" && (e.stopPropagation(), window.location.assign(listenHref))}
+                          className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap align-baseline text-[14px] md:ml-2.5 font-semibold underline-offset-2 hover:underline"
+                          style={{ color: "#7a5410" }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <path d="M4 14v-2a8 8 0 0 1 16 0v2" />
+                            <rect x="3" y="14" width="4.5" height="6.5" rx="1.6" />
+                            <rect x="16.5" y="14" width="4.5" height="6.5" rx="1.6" />
+                          </svg>
+                          Listen
+                        </span>
                       )}
                     </span>
                     {/* How long it takes sits by the XP (owner, Nov 2); this line only when there's a time of day or a note. */}
@@ -663,7 +761,7 @@ export function DailyHabits({
                       const n = subs.filter((st) => ticked(h, st.id)).length;
                       const count = !subs.length ? "" : n >= subs.length ? "✓ all done" : n === 0 ? `${subs.length} habit${subs.length === 1 ? "" : "s"}` : `${subs.length - n} of ${subs.length} left`;
                       // Not up today: when it's next due, or that it was done today anyway.
-                      const rest = additional ? (d ? "Done today" : nextLabel(h, day)) : [scheduleLabel(h), h.description].filter(Boolean).join(" · ");
+                      const rest = additional ? (d ? "Done today" : nextLabel(h, day)) : [timesToday(h.id, d) > 1 ? `Done ${timesToday(h.id, d)} times today` : null, scheduleLabel(h), h.description].filter(Boolean).join(" · ");
                       if (!count && !rest) return null;
                       return (
                         <span className="flex flex-wrap items-center gap-x-1.5 text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
@@ -714,7 +812,7 @@ export function DailyHabits({
                       onClick={(e) => {
                         // Near the bottom of the screen the menu opens upward so it isn't cut off.
                         const r = e.currentTarget.getBoundingClientRect();
-                        setMenuUp(window.innerHeight - r.bottom < 200);
+                        placeMenu(r);
                         setMenuFor(menuFor === h.id ? null : h.id);
                       }}
                       data-habit-menu
@@ -727,7 +825,7 @@ export function DailyHabits({
                     </button>
                   )}
                   {menuFor === h.id && (
-                    <div data-habit-menu data-menu="habit" role="menu" className={`card-pop-in absolute right-2 z-30 flex flex-col overflow-hidden rounded-xl parchment ${menuUp ? "bottom-full mb-1" : "top-full mt-1"}`} style={{ borderRadius: 12, minWidth: 190 }}>
+                    <div data-habit-menu data-menu="habit" role="menu" className={`card-pop-in absolute right-2 z-30 flex flex-col overflow-y-auto overflow-x-hidden rounded-xl parchment ${menuUp ? "bottom-full mb-1" : "top-full mt-1"}`} style={{ maxHeight: menuMax, borderRadius: 12, minWidth: 190 }}>
                       <button
                         type="button"
                         role="menuitem"
@@ -788,6 +886,16 @@ export function DailyHabits({
                           {isCore(h.id) ? "☆" : "★"}
                         </span>
                         {isCore(h.id) ? "Not a core habit" : "Make it a core habit"}
+                      </button>
+                      {isMany(h.id) && d && (
+                        <button type="button" role="menuitem" data-mi="undo-tick" onClick={() => (setMenuFor(null), undoTick(h))} className="relative z-[1] flex min-h-11 items-center gap-2 px-4 text-left text-[15px] hover:bg-black/5" style={{ borderTop: "1px solid rgba(139,112,64,.2)" }}>
+                          <span aria-hidden className="w-[18px] text-center">↶</span>
+                          Undo the last one
+                        </button>
+                      )}
+                      <button type="button" role="menuitem" data-mi="many" onClick={() => (setMenuFor(null), toggleMany(h))} className="relative z-[1] flex min-h-11 items-center gap-2 px-4 text-left text-[15px] hover:bg-black/5" style={{ borderTop: "1px solid rgba(139,112,64,.2)" }}>
+                        <span aria-hidden className="w-[18px] text-center text-[13px] font-bold">×N</span>
+                        {isMany(h.id) ? "Once a day is enough" : "Count every time I do it"}
                       </button>
                       {/* No "Skip today": Snooze does the same (owner, Nov 2). */}
                       <button
@@ -888,12 +996,6 @@ export function DailyHabits({
                   )}
                 </div>
                 </SwipeReveal>
-                {/learn(ing)? (a )?language|language practice/i.test(h.title) && <LanguagePractice />}
-                {listenHref && !d && LISTEN_HABIT.test(h.title) && (
-                  <a href={listenHref} onPointerDown={(e) => e.stopPropagation()} className="due-in ml-11 mt-0.5 inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-0.5 text-[12.5px] font-semibold no-underline" style={{ background: "rgba(201,162,74,.14)", border: "1px solid rgba(160,120,40,.45)", color: "#6b4c12" }}>
-                    <span aria-hidden>🎧</span> Something to listen to
-                  </a>
-                )}
                 {cleaning && day && h.id === cleanId && <CleaningCheckIn key={day} initial={cleaning} day={day} habitDone={d} isAdventure={isAdventure} open={cleanOpen} />}
                 </SortableHabit>
               );
@@ -1021,7 +1123,8 @@ function scheduleLabel(h: RiteView): string | null {
     return `${((hh + 11) % 12) + 1}${mm ? `:${String(mm).padStart(2, "0")}` : ""} ${hh < 12 ? "AM" : "PM"}`;
   };
   if (h.due_time && h.window_to) parts.push(`${clock(h.due_time)}–${clock(h.window_to)}`);
-  else if (h.due_time) parts.push(`by ${clock(h.due_time)}`);
+  else if (h.due_time) parts.push(`at ${clock(h.due_time)}`);
+  else if (h.window_to) parts.push(`before ${clock(h.window_to)}`);
   return parts.length ? parts.join(" · ") : null;
 }
 

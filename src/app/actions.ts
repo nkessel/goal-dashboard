@@ -1,5 +1,6 @@
 "use server";
 
+import { cleanHabitTicks, habitTicksSeed, type HabitTicks, type HabitTicksSeed } from "@/lib/habit-ticks";
 import { isTentativeTitle } from "@/lib/tentative";
 import { revalidatePath } from "next/cache";
 import { auth, signIn, CALENDAR_AUTH_PARAMS } from "@/auth";
@@ -3305,8 +3306,22 @@ export async function schedulerContextAction(fromISO: string, toISO: string, hid
   const riteRows = (await ritesData.listRites(profileId).catch(() => null)) ?? [];
   const habits = timedHabitsFrom(riteRows, cleanRepeat);
   // Habits without a set time but with a length (20 mins of cleaning): the day planner keeps room for them.
-  const flex = riteRows.filter((r) => r.slot === "day" && !r.due_time && (r.estimate_minutes ?? 0) > 0 && r.kind !== "ritual");
-  const doneIds = dayKey && /^\d{4}-\d{2}-\d{2}$/.test(dayKey) && flex.length ? new Set((await ritesData.listCompletionsFor(profileId, flex.map((r) => r.id), dayKey).catch(() => [])).filter((c) => c.day === dayKey).map((c) => c.rite_id)) : new Set<string>();
+  const dayOk = !!dayKey && /^\d{4}-\d{2}-\d{2}$/.test(dayKey);
+  // With habits chosen for that day (or core ones), room is kept only for those (owner, Nov 14).
+  const habitPlan = dayOk ? cleanHabitPlan((await readExtras(profileId).catch(() => ({}) as Record<string, unknown>)).habitPlan) : null;
+  const chosen = new Set(habitPlan ? [...habitPlan.core, ...(habitPlan.days[dayKey!] ?? [])] : []);
+  const flex = riteRows.filter((r) => r.slot === "day" && !r.due_time && !r.window_to && (r.estimate_minutes ?? 0) > 0 && r.kind !== "ritual" && (!chosen.size || chosen.has(r.id)));
+  const doneIds = dayOk && flex.length
+    ? new Set(
+        [
+          ...(await ritesData.listCompletionsFor(profileId, flex.map((r) => r.id), dayKey!).catch(() => [])),
+          // Resting today counts as off the plan.
+          ...((await ritesData.listHabitSkips(profileId, dayKey!).catch(() => [])) ?? []),
+        ]
+          .filter((c) => c.day === dayKey)
+          .map((c) => c.rite_id)
+      )
+    : new Set<string>();
   const flexHabits = flex.filter((r) => !doneIds.has(r.id)).map((r) => ({ id: r.id, title: r.title, days: r.days ?? null, minutes: r.estimate_minutes ?? 15, repeat: cleanRepeat(r.repeat) }));
   // Events written in [brackets] on your calendar are optional: they don't hold time until you keep them.
   const optional: { id: string; calendarId: string; title: string; start: number; end: number }[] = [];
@@ -3375,7 +3390,7 @@ export async function planDayTasksAction(dayEndISO: string) {
 }
 
 /** A daily habit as the auto-scheduler lists it. */
-export type SchedHabit = { id: string; title: string; minutes: number; due_time: string | null; window_to: string | null; icon_key: string | null; days: number[] | null; repeat: unknown };
+export type SchedHabit = { id: string; title: string; minutes: number; due_time: string | null; window_to: string | null; icon_key: string | null; days: number[] | null; repeat: unknown; core?: boolean };
 
 /**
  * The auto-scheduler's sections on top (owner, Nov 6): Today's quests, Additional quests and today's
@@ -3399,10 +3414,15 @@ export async function autoSchedulerSectionsAction(dayKey: string) {
   const ids = dayHabits.map((r) => r.id);
   const [done, skips] = await Promise.all([ritesData.listCompletionsFor(ownerId, ids, day).catch(() => []), ritesData.listHabitSkips(ownerId, day).catch(() => [])]);
   const off = new Set([...done, ...(skips ?? [])].filter((c) => c.day === day).map((c) => c.rite_id));
+  // With habits chosen for the day (or core ones), only those are lined up, core first (owner, Nov 14).
+  const plan = cleanHabitPlan((await readExtras(ownerId).catch(() => ({}) as Record<string, unknown>)).habitPlan);
+  const chosen = new Set([...plan.core, ...(plan.days[day] ?? [])]);
+  const coreIds = new Set(plan.core);
   const habits: SchedHabit[] = dayHabits
-    .filter((r) => !off.has(r.id))
-    .map((r) => ({ id: r.id, title: r.title, minutes: r.estimate_minutes ?? (r.due_time ? 60 : 30), due_time: r.due_time ?? null, window_to: r.window_to ?? null, icon_key: r.icon_source ? (r.icon_key ?? null) : null, days: r.days ?? null, repeat: cleanRepeat(r.repeat) }));
-  return { today, additional, habits, settings: profileRes.error ? null : (profileRes.data?.scheduler ?? null) };
+    .filter((r) => !off.has(r.id) && (!chosen.size || chosen.has(r.id)))
+    .sort((a, b) => Number(coreIds.has(b.id)) - Number(coreIds.has(a.id)))
+    .map((r) => ({ id: r.id, title: r.title, minutes: r.estimate_minutes ?? (r.due_time || r.window_to ? 60 : 30), due_time: r.due_time ?? null, window_to: r.window_to ?? null, icon_key: r.icon_source ? (r.icon_key ?? null) : null, days: r.days ?? null, repeat: cleanRepeat(r.repeat), core: coreIds.has(r.id) }));
+  return { today, additional, habits, habitsChosen: chosen.size > 0, settings: profileRes.error ? null : (profileRes.data?.scheduler ?? null) };
 }
 
 /** Put a quest on the list to schedule in a group (owner, Nov 6): its plan-by (undefined keeps it) and the list's whole new order. */
@@ -3773,7 +3793,32 @@ function cleanLook(v: unknown): CalCardLook | null {
 }
 
 /** Driving time to each quest's place (minutes each way) and each quest's calendar card look, by quest id. */
-export async function questCalExtrasAction(): Promise<{ drives: Record<string, number>; looks: Record<string, CalCardLook> }> {
+/** A quest's own time range ("09:00"–"14:00"; either end alone works), for the auto-scheduler. */
+export type QuestWindow = { from?: string; to?: string };
+const HHMM = /^[0-2][0-9]:[0-5][0-9]$/;
+function cleanWindow(v: unknown): QuestWindow | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const from = typeof o.from === "string" && HHMM.test(o.from) ? o.from : undefined;
+  const to = typeof o.to === "string" && HHMM.test(o.to) ? o.to : undefined;
+  if (from && to && from >= to) return { from };
+  return from || to ? { ...(from ? { from } : {}), ...(to ? { to } : {}) } : null;
+}
+
+export async function setQuestWindowAction(taskId: string, win: QuestWindow | null) {
+  const ownerId = await requireProfileId();
+  if (!QUEST_ID.test(taskId)) throw new Error("Unknown quest.");
+  const extras = await readExtras(ownerId);
+  const all = { ...((extras.questWindows as Record<string, QuestWindow> | undefined) ?? {}) };
+  const w = cleanWindow(win);
+  if (w) all[taskId] = w;
+  else delete all[taskId];
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, questWindows: all } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  return w;
+}
+
+export async function questCalExtrasAction(): Promise<{ drives: Record<string, number>; looks: Record<string, CalCardLook>; windows: Record<string, QuestWindow> }> {
   const ownerId = await requireProfileId();
   const extras = await readExtras(ownerId);
   const drives: Record<string, number> = {};
@@ -3783,7 +3828,12 @@ export async function questCalExtrasAction(): Promise<{ drives: Record<string, n
     const l = QUEST_ID.test(k) ? cleanLook(v) : null;
     if (l) looks[k] = l;
   }
-  return { drives, looks };
+  const windows: Record<string, QuestWindow> = {};
+  for (const [k, v] of Object.entries((extras.questWindows as Record<string, unknown> | undefined) ?? {})) {
+    const w = QUEST_ID.test(k) ? cleanWindow(v) : null;
+    if (w) windows[k] = w;
+  }
+  return { drives, looks, windows };
 }
 
 export async function setQuestDriveAction(taskId: string, minutes: number | null) {
@@ -5336,4 +5386,105 @@ export async function tourCompletePracticeAction(taskId: string) {
   const res = await finishTask(ownerId, taskId);
   revalidatePath("/");
   return { title: t.title, xp: t.xp_value, totalXp: (res as { totalXp?: number | null } | null)?.totalXp ?? null, coins: t.coin_value ?? 1 };
+}
+
+// ---------------------------------------------------------------------------
+// Habits done more than once a day (owner, Nov 16: "every tick of the checkbox gives another
+// completion/victory/xp gain… the card keeps track of how many times per day it's been done")
+
+async function saveHabitTicks(ownerId: string, extras: Record<string, unknown>, ticks: HabitTicks) {
+  // The last 14 days are enough for an undo.
+  const days = Object.fromEntries(Object.entries(ticks.days).sort(([a], [b]) => b.localeCompare(a)).slice(0, 14));
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, habitTicks: { many: ticks.many, days } } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+}
+
+/** Which habits count every tick, and today's ticks after the first. */
+export async function habitTicksAction(day: string): Promise<HabitTicksSeed> {
+  const ownerId = await requireProfileId();
+  return habitTicksSeed((await readExtras(ownerId)).habitTicks, day);
+}
+
+/** A habit counts every tick (many times a day), or goes back to once a day. */
+export async function setHabitManyAction(riteId: string, on: boolean) {
+  const ownerId = await requireProfileId();
+  if (!QUEST_ID.test(riteId)) throw new Error("Unknown habit.");
+  const extras = await readExtras(ownerId);
+  const ticks = cleanHabitTicks(extras.habitTicks);
+  ticks.many = on ? [...new Set([...ticks.many, riteId])] : ticks.many.filter((id) => id !== riteId);
+  await saveHabitTicks(ownerId, extras, ticks);
+}
+
+/** Done again today: pays the habit's XP and coins once more and counts it. */
+export async function tickHabitAgainAction(riteId: string, day: string) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  const rite = await ritesData.getRite(riteId, ownerId);
+  if (!rite) throw new Error("That habit is gone.");
+  const extras = await readExtras(ownerId);
+  const ticks = cleanHabitTicks(extras.habitTicks);
+  const earned = Math.max(0, rite.xp_value);
+  const coinAdjust = rite.coin_value == null ? 0 : Math.max(0, rite.coin_value) - coinsForXp(rite.xp_value);
+  const list = [...(ticks.days[day]?.[riteId] ?? []), [earned, coinAdjust] as [number, number]];
+  ticks.days[day] = { ...(ticks.days[day] ?? {}), [riteId]: list };
+  await saveHabitTicks(ownerId, extras, ticks);
+  let coinsEarned = 0;
+  if (earned > 0) coinsEarned = (await xp.awardXp(ownerId, earned, "task_completed")).coinsEarned;
+  if (coinAdjust !== 0) {
+    await rewardsData.addCoins(ownerId, coinAdjust);
+    coinsEarned += coinAdjust;
+  }
+  revalidatePath("/");
+  return { xp: earned, coinsEarned, extra: list.length };
+}
+
+/** Take back the last extra tick of the day (what it paid). False when there was none: undo the habit itself. */
+export async function undoHabitTickAction(riteId: string, day: string) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  if (!QUEST_ID.test(riteId)) throw new Error("Unknown habit.");
+  const extras = await readExtras(ownerId);
+  const ticks = cleanHabitTicks(extras.habitTicks);
+  const list = [...(ticks.days[day]?.[riteId] ?? [])];
+  const last = list.pop();
+  if (!last) return { undone: false, extra: 0 };
+  ticks.days[day] = { ...(ticks.days[day] ?? {}), [riteId]: list };
+  await saveHabitTicks(ownerId, extras, cleanHabitTicks(ticks));
+  if (last[0] > 0) await xp.awardXp(ownerId, -last[0], "task_completed").catch(() => {});
+  if (last[1] !== 0) await rewardsData.addCoins(ownerId, -last[1]).catch(() => {});
+  revalidatePath("/");
+  return { undone: true, extra: list.length };
+}
+
+/** The XP changed on the celebration (owner, Nov 16): the habit pays that from now on, and the tick just made is paid the difference. */
+export async function setHabitXpNowAction(riteId: string, day: string, xpValue: number) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  const rite = await ritesData.getRite(riteId, ownerId);
+  if (!rite) throw new Error("That habit is gone.");
+  const next = Math.max(0, Math.min(500, Math.round(Number(xpValue) || 0)));
+  const db = supabaseAdmin();
+  const { error } = await db.from("rites").update({ xp_value: next }).eq("owner_id", ownerId).eq("id", riteId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  const extras = await readExtras(ownerId);
+  const ticks = cleanHabitTicks(extras.habitTicks);
+  const list = [...(ticks.days[day]?.[riteId] ?? [])];
+  let delta = 0;
+  if (list.length) {
+    // The latest tick was an extra one.
+    delta = next - list[list.length - 1][0];
+    list[list.length - 1] = [next, list[list.length - 1][1]];
+    ticks.days[day] = { ...(ticks.days[day] ?? {}), [riteId]: list };
+    await saveHabitTicks(ownerId, extras, ticks);
+  } else {
+    // It was the day's first: the completion itself.
+    const { data } = await db.from("rite_completions").select("xp_awarded").eq("owner_id", ownerId).eq("rite_id", riteId).eq("day", day).maybeSingle<{ xp_awarded: number }>();
+    if (data) {
+      delta = next - data.xp_awarded;
+      await db.from("rite_completions").update({ xp_awarded: next }).eq("owner_id", ownerId).eq("rite_id", riteId).eq("day", day);
+    }
+  }
+  if (delta !== 0) await xp.awardXp(ownerId, delta, "task_completed").catch(() => {});
+  revalidatePath("/");
+  return { xp: next };
 }

@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
+import { useAllQuestWindows } from "@/lib/use-quest-cal";
 import { applyAutoScheduleAction, listenBoardAction, resolveOptionalEventAction, saveSchedulerSettingsAction, schedulerContextAction } from "@/app/actions";
-import { MEAL_DEFAULTS, MEAL_NAMES, SCHEDULER_DEFAULTS, clockOf, freeStretch, holdAt, localDayKey, mealsOn, planSchedule, type Avoid, type Busy, type MealKey, type SchedulerSettings, type TimeOfDay } from "@/lib/auto-schedule";
+import { MEAL_DEFAULTS, MEAL_NAMES, SCHEDULER_DEFAULTS, clockOf, freeStretch, holdAt, localDayKey, mealsOn, minutesOf, planSchedule, type Avoid, type Busy, type MealKey, type SchedulerSettings, type TimeOfDay } from "@/lib/auto-schedule";
 import { useEscape } from "@/lib/use-escape";
 import { habitBlocksOn, habitOnDay } from "@/lib/timed-habits";
 import type { Repeat } from "@/lib/habit-repeat";
@@ -135,14 +136,15 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow, day, over = fal
   }
   const setPref = (id: string, v: TimeOfDay) => settings && change({ prefs: { ...settings.prefs, [id]: v } });
 
+  const windows = useAllQuestWindows();
   // Quests already on the calendar ahead keep their time.
   const items = useMemo(
     () =>
       tasks
         .filter((t) => !(t.is_on_calendar && t.scheduled_start && new Date(t.scheduled_start) > now))
         .filter((t) => !skipped.has(t.id))
-        .map((t) => ({ id: t.id, title: t.title, minutes: t.estimate_minutes, effort: t.effort ?? null, dueAt: t.due_at ?? null, planBy: t.plan_by ?? null })),
-    [tasks, skipped, now]
+        .map((t) => ({ id: t.id, title: t.title, minutes: t.estimate_minutes, effort: t.effort ?? null, dueAt: t.due_at ?? null, planBy: t.plan_by ?? null, from: minutesOf(windows[t.id]?.from), to: minutesOf(windows[t.id]?.to) })),
+    [tasks, skipped, now, windows]
   );
   // Calendars that only inform (subscriptions, other people's) don't block time unless you say so.
   const fyi = useMemo(() => new Set(settings?.fyi ?? calendars.filter((c) => !c.writable && !c.primary).map((c) => c.id)), [settings?.fyi, calendars]);
