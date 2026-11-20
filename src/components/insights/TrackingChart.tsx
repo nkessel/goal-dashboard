@@ -506,6 +506,7 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
   const shownCount = series.filter((m) => isOn(m.metric)).length + (showWeather ? 1 : 0) + activeEvents.length;
   const xpByDay = days.map((d) => (eventsByDay.get(dayKey(d)) ?? []).reduce((a, w) => a + (w.xp || 0), 0));
   const xpTotal = xpByDay.reduce((a, b) => a + b, 0);
+  const xpMaxShown = Math.max(1, ...xpByDay);
   const dayW = (W - L - R) / (v1 - v0);
   // A day's width on screen: 18px or more and every day gets its own date (owner, Nov 19).
   const everyDay = dayW >= 14 || dayW * scale >= 18;
@@ -850,7 +851,7 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
                     : `${d.getMonth() + 1}/${d.getDate()}`;
               return (
                 <g key={i}>
-                  <text x={xDay(i)} y={split ? 31 : footY + 12} textAnchor="middle" fontSize={dayW >= 30 ? 11 : 10} fill={hover === i ? INK : INK_SOFT} fontWeight={i === n - 1 ? 700 : 400} fontFamily="var(--font-display, Georgia), serif">
+                  <text x={xDay(i)} y={split ? 31 : footY + 12} textAnchor="middle" fontSize={dayW >= 30 ? 11 : 9} fill={hover === i ? INK : INK_SOFT} fontWeight={i === n - 1 ? 700 : 400} fontFamily="var(--font-display, Georgia), serif">
                     {/* The date at the bottom (owner, Nov 19), the weekday above the chart. */}
                     {label}
                   </text>
@@ -859,11 +860,24 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
                     const span = everyDay ? 1 : tickEvery;
                     const sum = xpByDay.slice(Math.max(0, i - span + 1), i + 1).reduce((a, b) => a + (b ?? 0), 0);
                     if (!sum) return null;
+                    const tip = span > 1 ? `${sum} XP over these ${span} days` : `${sum} XP that day`;
+                    const words = `+${sum} XP`;
+                    const fs = dayW >= 22 ? 10 : 9;
+                    const base = split ? xpY : footY + 25;
+                    // Always "+n XP" (owner, Nov 19); where it won't fit, a small gold bar as tall as the day's XP, its number on hover or tap.
+                    if (words.length * fs * 0.56 <= (span > 1 ? dayW * span : dayW) * 0.94)
+                      return (
+                        <text x={xDay(i)} y={base} textAnchor="middle" fontSize={fs} fontWeight="700" fill={XP_EDGE}>
+                          <title>{tip}</title>
+                          {words}
+                        </text>
+                      );
+                    const bh = Math.max(2, 13 * (sum / xpMaxShown));
+                    const bw = Math.min(6, dayW * 0.45);
                     return (
-                      <text x={xDay(i)} y={split ? xpY : footY + 25} textAnchor="middle" fontSize={dayW >= 22 ? 10 : 8.5} fontWeight="700" fill={XP_EDGE}>
-                        <title>{span > 1 ? `${sum} XP over these ${span} days` : `${sum} XP that day`}</title>
-                        {dayW >= 40 ? `+${sum} XP` : span === 1 && dayW < 22 ? sum : `+${sum}`}
-                      </text>
+                      <rect x={xDay(i) - bw / 2} y={base + 2 - bh} width={bw} height={bh} rx={Math.min(2, bw / 2)} fill={XP_FILL} stroke={XP_EDGE} strokeWidth=".8" data-xp-bar>
+                        <title>{tip}</title>
+                      </rect>
                     );
                   })()}
                 </g>
