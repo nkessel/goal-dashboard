@@ -355,7 +355,6 @@ const ASK_BGS = [
   { key: "mist", label: "Grey mist" },
   { key: "fog", label: "Fog for the time of day" },
   { key: "forest", label: "Dark forest" },
-  { key: "clear", label: "Clear" },
 ] as const;
 
 /**
@@ -380,7 +379,7 @@ function AskBackground() {
       </div>
       <label className="flex items-center gap-2 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
         <span>Light</span>
-        <input type="range" min={0} max={1} step={0.05} value={mist} onChange={(e) => set({ toucanAskMist: Number(e.target.value) })} aria-label="How thick the mist is" className="h-7 min-w-0 flex-1" style={{ accentColor: "#a88a3f" }} />
+        <input type="range" min={0} max={1} step={0.05} value={mist} onChange={(e) => set({ toucanAskMist: Number(e.target.value) })} aria-label="How much mist drifts" className="h-7 min-w-0 flex-1" style={{ accentColor: "#a88a3f" }} />
         <span>Thick</span>
       </label>
       <label className="flex items-center gap-2 text-[13px]">

@@ -37,9 +37,9 @@ export type FxSettings = {
    *  "full" opens it as before; unset or "off" keeps it away (your login still counts). */
   welcomeMode?: "full" | "toucan" | "off";
   /** The toucan's question (owner, Nov 19): what's behind him. "mist" (grey, like the old welcome fog), "fog" (that fog's
-   *  colour for the time of day), "forest" (dark), "clear" (Today as it is). */
+   *  colour for the time of day), "forest" (dark); it always hides the page behind ("clear" was retired, Nov 19). */
   toucanAskBg?: "mist" | "fog" | "forest" | "clear";
-  /** How thick the mist is, 0 (light) to 1 (thick). */
+  /** How much mist drifts across, 0 (little) to 1 (lots). */
   toucanAskMist?: number;
   /** The wise line under what you kept (off once you tap "hide"). */
   toucanKeptQuote?: boolean;

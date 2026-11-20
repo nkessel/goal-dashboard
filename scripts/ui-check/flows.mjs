@@ -66,8 +66,6 @@ export const FLOWS = [
       await h.check("kept: the floating target");
       if (await h.tap((p) => p.getByRole("button", { name: /^what's most important today$/i }).first(), "open the kept target", { optional: true, expectMove: true })) {
         await h.check("kept: open");
-        await h.tap((p) => p.locator("[data-kept-card]").getByRole("button", { name: /^close$/i }).first(), "kept: close asks", { optional: true, expectMove: true });
-        await h.check("kept: close asks first");
         await h.tap((p) => p.locator("[data-kept-card]").getByRole("button", { name: /^shrink$/i }).first(), "kept: shrink", { optional: true, expectMove: true });
       }
       await h.goto("/settings?open=welcome-screen", { name: "toucanask-settings" });
@@ -589,12 +587,9 @@ export const FLOWS = [
       if (await tick.count()) {
         await tick.evaluate((el) => { el.scrollIntoView({ block: "center" }); el.click(); }).catch(() => {});
         await h.settle(1800);
-        // (In the check the save reloads Today, which closes the tray: open it again to see the row.)
-        await h.page.evaluate(() => [...document.querySelectorAll("button[aria-expanded='false']")].find((b) => /Daily Habits/.test(b.textContent || ""))?.click());
-        await h.settle(700);
-        await h.page.locator("[data-felt-inline]").first().scrollIntoViewIfNeeded().catch(() => {});
-        await h.check("how do you feel, under the habit");
-        if (await h.tap((p) => p.locator("[data-felt-inline] [role=radio][aria-label=Good]").first(), "habit felt: good", { optional: true, expectMove: true })) await h.check("habit felt: kept");
+        await h.check("habit kept: its card asks how you feel");
+        if (await h.tap((p) => p.locator("[data-felt-ask] [role=radio][aria-label=Good]").first(), "habit felt: good", { optional: true, expectMove: true })) await h.check("habit felt: saved, with undo");
+        await h.tap((p) => p.getByRole("button", { name: /^close$/i }).last(), "close the habit card", { optional: true, expectMove: true });
         await h.settle(1400);
       }
       // A victory: the celebration asks too, above Claim your reward · Continue Your Journey.

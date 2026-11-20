@@ -1,7 +1,7 @@
 "use client";
 
 import { stepsComplete } from "@/lib/habit-steps";
-import { FeltInline, setFeltHabit, useFeltHabit } from "@/components/ui/FeltAsk";
+import { celebrateProgress } from "@/components/celebration/QuestCelebrationHost";
 import { GearIcon, SnoozeIcon } from "@/components/ui/Icons";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -70,9 +70,6 @@ export function DailyHabits({
 }) {
   const day = useLocalDay();
   // Closed until opened (the header still shows how the day is going).
-  // "How do you feel?" under the habit just ticked (owner, Nov 19).
-  const feltFor = useFeltHabit();
-  const closeFelt = useCallback(() => setFeltHabit(null), []);
   // Kept across a redraw (ticking a habit refreshes Today, which can draw the list anew), so the tray stays open.
   const [open, setOpen] = useState(() => trayOpen.get(bare ? "bare" : "main") ?? false);
   useEffect(() => {
@@ -350,11 +347,11 @@ export function DailyHabits({
         if (next) {
           const out = await saveOrQueue("completeRite", { id: h.id, day }, `rite:${h.id}:${day}`);
           // "How do you feel?" (owner, Nov 19), once it's saved.
-          if (!out.queued) setFeltHabit(h.id);
+          // Its completion screen, with "How do you feel?" like the other celebrations (owner, Nov 19).
+          if (!out.queued) celebrateProgress({ title: h.title, xp: h.xp_value ?? 0, fromPct: 0, toPct: 100, heading: "Habit kept!", barCaption: "Done for today", felt: { kind: "habit", riteId: h.id, day } });
         }
         else {
           await saveOrQueue("uncompleteRite", { id: h.id, day }, `rite:${h.id}:${day}`);
-          if (feltFor === h.id) setFeltHabit(null);
         }
       } catch (e) {
         setOptimistic((o) => ({ ...o, [h.id]: !next }));
@@ -872,7 +869,6 @@ export function DailyHabits({
                       })}
                     </ul>
                   )}
-                  {feltFor === h.id && day && <FeltInline target={{ kind: "habit", riteId: h.id, day }} onClose={closeFelt} />}
                 </div>
                 </SwipeReveal>
                 {/learn(ing)? (a )?language|language practice/i.test(h.title) && <LanguagePractice />}
