@@ -110,7 +110,7 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
     );
   }
   return createPortal(
-    <div ref={ref} role="menu" data-menu="calendar-item" className="parchment fixed z-[80] flex flex-col overflow-hidden py-1" style={{ left, top, width: W, borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 30px rgba(0,0,0,.35)" }}>
+    <div ref={ref} role="menu" data-menu="calendar-item" className="parchment fixed z-[131] flex flex-col overflow-hidden py-1" style={{ left, top, width: W, borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 30px rgba(0,0,0,.35)" }}>
       {mode === "menu" ? (
         <>
           {target.kind === "task" && (

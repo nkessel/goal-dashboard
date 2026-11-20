@@ -1363,6 +1363,40 @@ export const FLOWS = [
     },
   },
   {
+    // Failing a quest from its calendar menu (owner, Nov 20: "it took away a different item from the calendar
+    // completely", until a reload): every other card must still be there after the fail, and the failed one shows ✕.
+    name: "calfail",
+    async run(h) {
+      await h.goto("/calendar?view=day", { name: "calendar" });
+      await h.settle(1500);
+      const titles = () => h.page.evaluate(() => [...document.querySelectorAll("[data-cal-days] [title^='Edit \"']")].map((n) => n.getAttribute("title").split("\n")[0]).sort());
+      const before = await titles();
+      const chip = h.page.locator("[data-cal-days] [title^='Edit \"Goblin']").first();
+      if (!(await chip.count())) return h.record({ kind: "step-skipped", severity: "info", target: "calfail", detail: "no Goblin card on the day view" });
+      await chip.evaluate((el) => el.scrollIntoView({ block: "center" }));
+      await h.settle(300);
+      await chip.click({ button: "right" });
+      await h.settle(400);
+      await h.tap((p) => p.locator("[data-mi='fail']").first(), "Fail");
+      await h.settle(300);
+      await h.check("calendar fail: reason");
+      await h.tap((p) => p.getByRole("button", { name: /^mark failed$/i }).first(), "Mark failed");
+      await h.settle(2500);
+      await h.check("calendar fail: marked");
+      const after = await titles();
+      const gone = before.filter((t) => !after.includes(t));
+      if (gone.length) h.record({ kind: "card-vanished", severity: "error", target: "calendar fail", detail: `after failing Goblin, gone from the day: ${gone.join("; ")}` });
+      await h.tap((p) => p.getByRole("button", { name: /^(not now|continue)$/i }).first(), "Continue", { optional: true });
+      await h.settle(2500);
+      const after2 = await titles();
+      const gone2 = before.filter((t) => !after2.includes(t));
+      if (gone2.length) h.record({ kind: "card-vanished", severity: "error", target: "calendar fail (menu closed)", detail: `gone: ${gone2.join("; ")}` });
+      const failed = await h.page.locator("[data-cal-days] [title^='Edit \"Goblin'] [aria-label='Failed']").count();
+      if (!failed) h.record({ kind: "not-failed", severity: "error", target: "calendar fail", detail: "Goblin's card doesn't show the red ✕ after Mark failed" });
+      await h.check("calendar fail: closed");
+    },
+  },
+  {
     // The calendar (owner, Nov 3: "beautiful like the mockup"): week and day, quests and mini-quests for their duration.
     name: "calendar",
     async run(h) {

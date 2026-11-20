@@ -41,8 +41,7 @@ function groupCheckIns(readings: Reading[]): { at: string; items: Reading[] }[] 
  */
 const CHART_KEY = "insights-chart";
 
-export function CheckInHub({ readings, metrics, wins, starred = [], nights }: { readings: Reading[]; metrics: string[]; wins: WinLite[]; starred?: string[]; nights?: Record<string, { bed: string | null; wake: string | null }> }) {
-  const mounted = useSyncExternalStore(noop, () => true, () => false);
+export function CheckInHub({ zone, readings, metrics, wins, starred = [], nights }: { zone?: string; readings: Reading[]; metrics: string[]; wins: WinLite[]; starred?: string[]; nights?: Record<string, { bed: string | null; wake: string | null }> }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<{ at: string; items: Reading[] } | null>(null);
   const [chartPick, setChartPick] = useState<boolean | null>(null);
@@ -63,7 +62,8 @@ export function CheckInHub({ readings, metrics, wins, starred = [], nights }: { 
 
   return (
     <div className="flex flex-col gap-3">
-      {mounted && <CheckInLog readings={readings} metrics={metrics} starred={starred} onEdit={setEditing} />}
+      {/* Drawn by the server too, so the page doesn't jump when it arrives (UI check, Nov 20). */}
+      <CheckInLog zone={zone} readings={readings} metrics={metrics} starred={starred} onEdit={setEditing} />
       {/* The chart waits behind a plain button (owner, Nov 9): it slides open, and stays open on this device once you've chosen it. */}
       <button
         type="button"
@@ -219,16 +219,22 @@ const RANGE_KEY = "checkin-log-range";
  * The check-ins you've logged: today by default, or a longer range from the drop-down. Each one shows its time
  * and readings as small gauges, and its ⋯ has Star, Change and Remove (archive or delete) (owner, Nov 18).
  */
-function CheckInLog({ readings, metrics, starred, onEdit }: { readings: Reading[]; metrics: string[]; starred: string[]; onEdit: (c: { at: string; items: Reading[] }) => void }) {
+function CheckInLog({ zone, readings, metrics, starred, onEdit }: { zone?: string; readings: Reading[]; metrics: string[]; starred: string[]; onEdit: (c: { at: string; items: Reading[] }) => void }) {
   const router = useRouter();
-  const [days, setDays] = useState(() => {
+  // The range kept on this device; the server's picture (and the first one in the browser) is "Today".
+  const savedDays = useSyncExternalStore(noop, () => {
     try {
       const v = Number(localStorage.getItem(RANGE_KEY));
       return RANGES.some((r) => r.days === v) ? v : 1;
     } catch {
       return 1;
     }
-  });
+  }, () => 1);
+  const [pickedDays, setDays] = useState<number | null>(null);
+  const days = pickedDays ?? savedDays;
+  // Days and times in the app's time zone, the same on the server and in the browser, so the list doesn't
+  // change (and the page doesn't jump) once the browser takes over (UI check, Nov 20).
+  const keyIn = (d: Date) => (zone ? new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(d) : dayKey(d));
   const [picking, setPicking] = useState(false);
   const [menu, setMenu] = useState<string | null>(null);
   const [asking, setAsking] = useState<string | null>(null);
@@ -236,10 +242,8 @@ function CheckInLog({ readings, metrics, starred, onEdit }: { readings: Reading[
   const [gone, setGone] = useState<Set<string>>(new Set());
   const [, start] = useTransition();
   const [now] = useState(() => Date.now());
-  const from = new Date(now);
-  from.setHours(0, 0, 0, 0);
-  from.setDate(from.getDate() - (days - 1));
-  const groups = groupCheckIns(readings.filter((r) => new Date(r.at).getTime() >= from.getTime())).filter((g) => !gone.has(g.at));
+  const fromKey = keyIn(new Date(now - (days - 1) * DAY));
+  const groups = groupCheckIns(readings.filter((r) => keyIn(new Date(r.at)) >= fromKey)).filter((g) => !gone.has(g.at));
   const order = (m: string) => {
     const i = metrics.indexOf(m);
     return i < 0 ? 99 : i;
@@ -247,11 +251,11 @@ function CheckInLog({ readings, metrics, starred, onEdit }: { readings: Reading[
   const keysOf = (g: { items: Reading[] }) => g.items.map((r) => r.key).filter((k): k is string => !!k);
   const isStar = (g: { items: Reading[] }) => keysOf(g).some((k) => stars.has(k));
   const label = RANGES.find((r) => r.days === days)?.label ?? "Today";
-  const today = dayKey(new Date(now));
-  const yesterday = dayKey(new Date(now - DAY));
+  const today = keyIn(new Date(now));
+  const yesterday = keyIn(new Date(now - DAY));
   const dayWords = (iso: string) => {
-    const k = dayKey(new Date(iso));
-    return k === today ? "Today" : k === yesterday ? "Yesterday" : new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    const k = keyIn(new Date(iso));
+    return k === today ? "Today" : k === yesterday ? "Yesterday" : new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", timeZone: zone });
   };
   const pickRange = (d: number) => {
     setDays(d);
@@ -336,14 +340,14 @@ function CheckInLog({ readings, metrics, starred, onEdit }: { readings: Reading[
             return (
               <li key={g.at} className="due-in flex flex-col gap-1">
                 {head && (
-                  <span className="mt-1 text-[12px] font-semibold" style={{ color: "var(--ec-soft, rgba(239,230,204,.7))" }}>
+                  <span suppressHydrationWarning className="mt-1 text-[12px] font-semibold" style={{ color: "var(--ec-soft, rgba(239,230,204,.7))" }}>
                     {head}
                   </span>
                 )}
                 <div className="relative rounded-xl px-3 pb-2 pt-1.5" style={{ background: "var(--ec-chip, rgba(0,0,0,.25))", border: `1px solid ${starredNow ? "#d9b45f" : "var(--ec-line, rgba(217,180,95,.3))"}` }}>
                   <div className="flex items-center gap-2">
-                    <span className="text-[14px] font-semibold tabular-nums" style={{ color: "var(--ec-gold, #f2d27e)" }}>
-                      {new Date(g.at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+                    <span suppressHydrationWarning className="text-[14px] font-semibold tabular-nums" style={{ color: "var(--ec-gold, #f2d27e)" }}>
+                      {new Date(g.at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone: zone })}
                     </span>
                     {starredNow && (
                       <span aria-label="Starred" title="Starred" style={{ color: "#c99a2e" }}>

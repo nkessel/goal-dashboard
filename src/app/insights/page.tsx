@@ -9,7 +9,7 @@ import { ScreenArrange } from "@/components/ui/ScreenArrange";
 import { CheckInHub } from "@/components/insights/CheckInHub";
 import { getProfileById } from "@/lib/data/profiles";
 import { getCheckMetrics, listCheckInsSince, listCheckNotesSince, listEnergySince } from "@/lib/data/energy";
-import { appDayKey } from "@/lib/data/tomorrow";
+import { appDayKey, appTimeZone } from "@/lib/data/tomorrow";
 import { EnergyCheck } from "@/components/xp/EnergyCheck";
 import { EventLog } from "@/components/insights/EventLog";
 import { DEFAULT_WHEEL, LifeWheel } from "@/components/insights/LifeWheel";
@@ -125,7 +125,7 @@ export default async function InsightsPage() {
                 </h2>
                 {/* A fresh check-in each visit; today's earlier ones are listed under it, with the chart. */}
                 <EnergyCheck full sleepLink={false} today={null} metrics={metrics} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))} />
-                <CheckInHub readings={readings} metrics={["Energy", ...metrics]} wins={chartWins} starred={marks.star ?? []} nights={cleanWheel((profile?.life_wheel as Record<string, unknown> | null | undefined)?.wheelOfTime).log} />
+                <CheckInHub zone={appTimeZone()} readings={readings} metrics={["Energy", ...metrics]} wins={chartWins} starred={marks.star ?? []} nights={cleanWheel((profile?.life_wheel as Record<string, unknown> | null | undefined)?.wheelOfTime).log} />
                 </div>
               </section>
               ),
