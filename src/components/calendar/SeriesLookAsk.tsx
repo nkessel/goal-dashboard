@@ -14,7 +14,7 @@ export function askSeriesLook(taskId: string) {
 
 /**
  * After the portrait, XP, coins, board or card colour of one quest of a repeating event changes, a small card
- * at the foot of the screen asks "Same look for every …? Just this one · This and later · All" (owner, Nov 18).
+ * at the foot of the screen asks "Apply these settings to all future repeats of …? Just this one · This and later · All" (owner, Nov 18).
  * It asks only when the look really differs from the series', and not again for one kept to itself.
  */
 export function SeriesLookAsk() {
@@ -110,7 +110,7 @@ export function SeriesLookAsk() {
   return createPortal(
     <div
       role="dialog"
-      aria-label="Same look for every one?"
+      aria-label="Apply these settings to all future repeats?"
       data-series-ask
       className={`parchment fixed left-1/2 z-[95] w-[min(360px,calc(100vw-24px))] -translate-x-1/2 rounded-2xl px-4 pb-3 pt-3 ${leaving ? "pop-leave" : "card-pop-in"}`}
       style={{ bottom: "calc(96px + env(safe-area-inset-bottom, 0px))", border: "1px solid #b39a6a", boxShadow: "0 14px 34px rgba(0,0,0,.38)" }}
@@ -119,7 +119,7 @@ export function SeriesLookAsk() {
         <CloseIcon size={12} />
       </button>
       <p className="m-0 pr-6 font-display text-[16px] leading-snug" style={{ color: "var(--t-ink)" }}>
-        Same look for every “{ask.title}”?
+        Apply these settings to all future repeats of “{ask.title}”?
       </p>
       <p className="m-0 mt-0.5 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
         Its portrait, XP, coins, board and card colour.
