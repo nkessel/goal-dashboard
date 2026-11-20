@@ -1972,9 +1972,9 @@ export function QuestEditorDialog({
                 {/* Each stat's XP under the slider (owner, Nov 19). Review build: the three looks he's choosing between; hidden while the tray (which lists them) is open, so the editor doesn't jump as you tap. */}
                 {!doingNow && statTotal > 0 && !statsOpen && (
                   <>
-                    {(["board", "strip", "block", "boxes", "bands"] as const).map((look) => (
-                      <StatXpLine key={look} look={look} xp={xp} split={statSplit} isAdventure={isAdventure} onOpen={() => setStatsOpen(true)} />
-                    ))}
+                    {(["board", "strip", "block", "boxes"] as const).flatMap((look) =>
+                      [false, true].map((plus) => <StatXpLine key={`${look}${plus}`} look={look} plus={plus} xp={xp} split={statSplit} isAdventure={isAdventure} onOpen={() => setStatsOpen(true)} />)
+                    )}
                   </>
                 )}
                 <div className="flex flex-wrap items-center gap-2">

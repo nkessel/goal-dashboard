@@ -6,13 +6,13 @@ import { statAbbr } from "@/lib/stats";
  * then asked for ideas from tabletop sheets). Three looks for his pick, each
  * with your level's share under the XP total; tapping opens the stats tray.
  *   block — a stat block's ability row: the strip framed by tapered gold rules above and below, "+6" like a modifier
- *   boxes — a character sheet's ability boxes: the "+6" large in a small framed box, the stat's mark on a tab at its foot
- *   bands — one row of grouped cells told apart by soft parchment bands instead of rules
+ *   boxes — a character sheet's ability boxes: the "+6" large in a small framed box, the stat's mark on a tab at its top
+ * `plus` writes the amounts like modifiers ("+6") or plain ("6").
  *   board — (C1, kept to compare) up to five across, mark above amount
  *   strip — (C3, kept to compare) rows split by thin gold rules
  * Rows: 3 (boxes 4) on phones, 5 on wider screens.
  */
-export type StatXpLook = "board" | "strip" | "block" | "boxes" | "bands";
+export type StatXpLook = "board" | "strip" | "block" | "boxes";
 
 const MARK = "#8a6116";
 const RULE = "rgba(168,138,63,.45)";
@@ -24,12 +24,14 @@ function TaperedRule() {
 
 export function StatXpLine({
   look,
+  plus,
   xp,
   split,
   isAdventure,
   onOpen,
 }: {
   look: StatXpLook;
+  plus: boolean;
   xp: number;
   split: Record<string, number>;
   isAdventure: boolean;
@@ -41,7 +43,8 @@ export function StatXpLine({
   if (!parts.length) return null;
   const left = Math.max(0, xp - parts.reduce((a, s) => a + s.amount, 0));
   const xpInk = isAdventure ? "var(--t-xp)" : "var(--t-accent)";
-  const common = { type: "button" as const, onClick: onOpen, "aria-label": "Change the XP shared with stats", "data-stat-look": look };
+  const common = { type: "button" as const, onClick: onOpen, "aria-label": "Change the XP shared with stats", "data-stat-look": `${look}${plus ? "-plus" : ""}` };
+  const sign = plus ? "+" : "";
   const mark = "font-display text-[10px] font-bold uppercase tracking-[.12em]";
   // In a row, marks sit beside their number, so they're spaced less.
   const rowMark = "font-display text-[9.5px] font-bold uppercase tracking-[.05em]";
@@ -51,7 +54,7 @@ export function StatXpLine({
   const levelCell = (
     <span className="ml-[50px] flex w-[64px] shrink-0 flex-col items-center self-start leading-none">
       <span className={mark} style={{ color: xpInk }}>Level</span>
-      <span className="mt-1 text-[15px] font-semibold tabular-nums" style={{ color: xpInk }}>+{left}</span>
+      <span className="mt-1 text-[15px] font-semibold tabular-nums" style={{ color: xpInk }}>{sign}{left}</span>
     </span>
   );
 
@@ -62,13 +65,13 @@ export function StatXpLine({
           {parts.map((s) => (
             <span key={s.stat} className="flex flex-col items-center leading-none" title={s.stat}>
               <span className={mark} style={{ color: MARK }}>{statAbbr(s.stat)}</span>
-              <span className="mt-1 text-[15px] font-semibold" style={{ color: "var(--t-ink)" }}>{s.amount}</span>
+              <span className="mt-1 text-[15px] font-semibold" style={{ color: "var(--t-ink)" }}>{sign}{s.amount}</span>
             </span>
           ))}
         </span>
         <span className="ml-[50px] flex w-[64px] shrink-0 flex-col items-center leading-none">
           <span className={mark} style={{ color: xpInk }}>Level</span>
-          <span className="mt-1 text-[15px] font-semibold" style={{ color: xpInk }}>{left}</span>
+          <span className="mt-1 text-[15px] font-semibold" style={{ color: xpInk }}>{sign}{left}</span>
         </span>
       </button>
     );
@@ -82,14 +85,14 @@ export function StatXpLine({
             {parts.map((s) => (
               <span key={s.stat} className="flex items-baseline justify-center gap-1.5 whitespace-nowrap text-[13.5px] leading-6" style={{ borderLeft: `1px solid ${RULE}` }} title={s.stat}>
                 <span className={mark} style={{ color: MARK }}>{statAbbr(s.stat)}</span>
-                <span className="font-semibold" style={{ color: "var(--t-ink)" }}>{s.amount}</span>
+                <span className="font-semibold" style={{ color: "var(--t-ink)" }}>{sign}{s.amount}</span>
               </span>
             ))}
           </span>
         </span>
         <span className="ml-[50px] flex w-[64px] shrink-0 items-baseline justify-center gap-1 self-start whitespace-nowrap text-[13.5px] leading-6">
           <span className={mark} style={{ color: xpInk }}>Lvl</span>
-          <span className="font-semibold" style={{ color: xpInk }}>{left}</span>
+          <span className="font-semibold" style={{ color: xpInk }}>{sign}{left}</span>
         </span>
       </button>
     );
@@ -106,7 +109,7 @@ export function StatXpLine({
               {parts.map((s) => (
                 <span key={s.stat} className="flex min-w-0 items-baseline justify-center gap-1 whitespace-nowrap px-1 text-[13px] leading-6" style={{ borderLeft: `1px solid ${RULE}` }} title={s.stat}>
                   <span className={rowMark} style={{ color: MARK }}>{statAbbr(s.stat)}</span>
-                  <span className="font-semibold" style={{ color: "var(--t-ink)" }}>+{s.amount}</span>
+                  <span className="font-semibold" style={{ color: "var(--t-ink)" }}>{sign}{s.amount}</span>
                 </span>
               ))}
             </span>
@@ -120,14 +123,14 @@ export function StatXpLine({
 
   if (look === "boxes") {
     return (
-      <button {...common} className="due-in flex items-start text-center tabular-nums">
+      <button {...common} className="due-in mt-1.5 flex items-start text-center tabular-nums">
         <span className={`ml-[50px] min-w-0 flex-1 gap-x-1.5 gap-y-3 ${grid}`} style={cols(4)}>
           {parts.map((s) => (
-            <span key={s.stat} className="relative flex h-9 flex-col items-center justify-start rounded-md pt-1" style={{ border: `1px solid ${RULE}`, background: "rgba(255,250,238,.5)" }} title={s.stat}>
-              <span className="text-[15px] font-semibold leading-none" style={{ color: "var(--t-ink)" }}>+{s.amount}</span>
-              <span className={`${mark} absolute -bottom-[7px] rounded-full px-1.5 leading-[13px]`} style={{ color: MARK, background: "#f6ecd2", border: `1px solid ${RULE}` }}>
+            <span key={s.stat} className="relative flex h-9 flex-col items-center justify-end rounded-md pb-1.5" style={{ border: `1px solid ${RULE}`, background: "rgba(255,250,238,.5)" }} title={s.stat}>
+              <span className={`${mark} absolute -top-[7px] rounded-full px-1.5 leading-[13px]`} style={{ color: MARK, background: "#f6ecd2", border: `1px solid ${RULE}` }}>
                 {statAbbr(s.stat)}
               </span>
+              <span className="text-[15px] font-semibold leading-none" style={{ color: "var(--t-ink)" }}>{sign}{s.amount}</span>
             </span>
           ))}
         </span>
@@ -136,23 +139,5 @@ export function StatXpLine({
     );
   }
 
-  return (
-    <button {...common} className="due-in -mt-0.5 flex items-start text-center tabular-nums">
-      <span className={`ml-[50px] min-w-0 flex-1 gap-x-0.5 gap-y-1 ${grid}`} style={cols(3)}>
-        {parts.map((s, i) => (
-          <span
-            key={s.stat}
-            className="flex min-w-0 items-baseline justify-center gap-1 whitespace-nowrap rounded px-1 py-0.5 text-[13px] leading-6"
-            // Alternate soft bands, like the grouped rows of a newer stat block.
-            style={{ background: i % 2 ? "rgba(217,180,95,.10)" : "rgba(217,180,95,.24)" }}
-            title={s.stat}
-          >
-            <span className={rowMark} style={{ color: MARK }}>{statAbbr(s.stat)}</span>
-            <span className="font-semibold" style={{ color: "var(--t-ink)" }}>+{s.amount}</span>
-          </span>
-        ))}
-      </span>
-      {levelCell}
-    </button>
-  );
+  return null;
 }
