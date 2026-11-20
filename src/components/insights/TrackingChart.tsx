@@ -736,10 +736,14 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
               const rate = dayRate[i];
               const w = showWeather && weather ? weather[dayKey(d)] : null;
               const wide = dayW >= 58;
-              const rx = x0 + 8;
-              const cx = rate != null && wide ? x0 + 30 : dayW >= 26 ? xDay(i) : x0 + 8;
+              const wd = i === n - 1 ? "Today" : d.toLocaleDateString(undefined, { weekday: "short" });
+              const rx = x0 + 44;
+              const cx = rate != null && wide ? x0 + 64 : x0 + 44;
               return (
                 <g key={i}>
+                  <text x={wide ? x0 + 1 : xDay(i)} y={15} textAnchor={wide ? "start" : "middle"} fontSize="11.5" fontWeight={i === n - 1 ? 700 : 400} fill={hover === i || i === n - 1 ? INK : INK_SOFT} fontFamily="var(--font-display, Georgia), serif">
+                    {dayW >= 18 ? (wide ? wd : wd.slice(0, i === n - 1 ? 5 : 2)) : ""}
+                  </text>
                   {rate != null && wide && (
                     <g transform={`translate(${rx.toFixed(1)} 11)`}>
                       <title>{`How the day was: ${rate} of 10`}</title>
@@ -749,7 +753,7 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
                       </text>
                     </g>
                   )}
-                  {w && (wide || dayW >= 26) && (
+                  {w && wide && (
                     <g transform={`translate(${cx.toFixed(1)} 14)`}>
                       <title>{`${w.hi}° / ${w.lo}°${w.rain > 0.02 ? `, rain ${w.rain.toFixed(2)}` : ""}`}</title>
                       <clipPath id={`cloud-${i}`}>
@@ -817,7 +821,8 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
               return (
                 <g key={i}>
                   <text x={xDay(i)} y={footY + 12} textAnchor="middle" fontSize="11" fill={hover === i ? INK : INK_SOFT} fontWeight={i === n - 1 ? 700 : 400} fontFamily="var(--font-display, Georgia), serif">
-                    {i === n - 1 ? "today" : d.toLocaleDateString(undefined, wide ? { weekday: "short", day: "numeric" } : visDays <= 14 ? { weekday: "short" } : { month: "numeric", day: "numeric" })}
+                    {/* The date at the bottom (owner, Nov 19), the weekday above the chart. */}
+                    {d.toLocaleDateString(undefined, wide ? { month: "short", day: "numeric" } : { month: "numeric", day: "numeric" })}
                   </text>
                   {xp > 0 && dayW >= 22 && (
                     <text x={xDay(i)} y={footY + 25} textAnchor="middle" fontSize="10" fontWeight="700" fill={XP_EDGE}>
