@@ -14,6 +14,7 @@ Related: `docs/BUILD-PLAN.md` (tasks for lighter models), `docs/REPEAT-ASKS.md`,
 
 Take them in order. Each is the owner's own ask (note id prefix in brackets; read the full note with the section 3 query, `where id::text like 'xxxx%'`).
 
+0. **Bug, ship first (owner, Nov 20, calendar):** he failed a quest on the calendar and, when he tweaked the fail ("tweaked out"), the quest was NOT failed and a different item vanished from the calendar entirely. Repro: calendar chip or ⋯ menu > Fail, then change/undo it. Look at `lib/failed-now.ts`, the chip's `complete()` / fail path, the menu's Fail and the celebration's Undo (main's Nov 19 completion/undo fix is the likely neighbour; check the undo targets the right item id, and that fail on a calendar event-quest doesn't hide a sibling). A bug fix: ships straight to `main` after the UI check, with a test of fail > tweak > undo on two items on one day. Add it to `scripts/ui-check/flows.mjs` if not covered.
 1. **Bug: adding a quest in "Choose tomorrow's quests" clears the whole list** [2664d546], and the quest creator button there is faulty [234f0d70]. Loses work, so first. (`evening/TomorrowQuests.tsx`: local `ticked`/`rowsLocal` state is likely reset when `queued` changes after the add.)
 2. **Right-click menus open as popup menus, not inline trays** [841971c2] (app-wide; quest card ⋯ / right-click, habits, rites).
 3. **Today's "auto-scheduler"/calendar sheet** [a3fe0686]: movable, the calendars' colours as on the calendar screen, choose which calendars show.
