@@ -1,9 +1,10 @@
 "use client";
 
 import { FaceIcon, FaceRating, faceOf, isFace } from "@/components/ui/FaceRating";
+import { FeltInline } from "@/components/ui/FeltAsk";
 
 import { TimeToken } from "@/components/xp/NightFields";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteCheckNoteAction, updateCheckNoteAction } from "@/app/actions";
 import { saveOrQueue } from "@/lib/offline";
@@ -44,6 +45,9 @@ export function EventLog({ notes }: { notes: Note[] }) {
   // A short title (what shows on the chart), details for hovering, and how it felt.
   const [details, setDetails] = useState("");
   const [tone, setTone] = useState<number | null>(null);
+  // "How do you feel?" under the event just logged without a face (owner, Nov 19).
+  const [feltNote, setFeltNote] = useState<string | null>(null);
+  const closeFeltNote = useCallback(() => setFeltNote(null), []);
   const boxRef = useRef<HTMLDivElement>(null);
   // Tapping a day on the chart opens this, set to that day.
   useEffect(() => {
@@ -86,12 +90,11 @@ export function EventLog({ notes }: { notes: Note[] }) {
       return d.toISOString();
     }
     if (when === "now") return null;
-    if (when === "morning") {
-      d.setHours(9, 0, 0, 0);
-      return d.toISOString();
-    }
-    if (when === "yesterday") {
-      d.setDate(d.getDate() - 1);
+    // Earlier today or yesterday at the time you give (owner, Nov 18: "the event logged should be able to log the time").
+    if (when === "morning" || when === "yesterday") {
+      const [hh, mm] = (pickTime || "09:00").split(":").map(Number);
+      if (when === "yesterday") d.setDate(d.getDate() - 1);
+      d.setHours(Number.isFinite(hh) ? hh : 9, Number.isFinite(mm) ? mm : 0, 0, 0);
       return d.toISOString();
     }
     const t = new Date(`${pickDate}T${pickTime || "12:00"}`);
@@ -115,10 +118,14 @@ export function EventLog({ notes }: { notes: Note[] }) {
       try {
         // "a, b; c" is three events (unless you keep it as one).
         const parts = splitEvents(words, split);
+        const ids: string[] = [];
         for (const w of parts) {
           const out = await saveOrQueue("logEvent", { title: w, details: parts.length > 1 ? null : details, tone, at: at ?? new Date().toISOString(), allDay });
           if (!out.queued && !out.result.ok) throw new Error(out.result.error);
+          if (!out.queued && out.result.ok && out.result.note?.id) ids.push(out.result.note.id);
         }
+        // No face picked: ask once it's logged (owner, Nov 19: "How do you feel?" at the end of logging anything).
+        if (tone == null && ids.length === 1 && !all.length) setFeltNote(ids[0]);
         for (const t of all) {
           const out = await saveOrQueue("logEvent", { title: `#${t}`, details: words ? null : details, tone: words ? null : tone, at: at ?? new Date().toISOString(), allDay });
           if (!out.queued && !out.result.ok) throw new Error(out.result.error);
@@ -183,6 +190,7 @@ export function EventLog({ notes }: { notes: Note[] }) {
   return (
     <div className="relative z-[1] flex flex-col gap-2">
       <TrackedEvents onLogged={() => router.refresh()} />
+      {feltNote && <FeltInline key={feltNote} target={{ kind: "note", id: feltNote }} onClose={closeFeltNote} />}
       {!open ? (
         <button type="button" onClick={() => setOpen(true)} className="hover-glow flex h-10 items-center justify-center gap-1.5 self-start rounded-full px-4 text-[14px] font-bold" style={chip(true)}>
           <span aria-hidden>🏷</span> Log an event or #tag
@@ -241,7 +249,7 @@ export function EventLog({ notes }: { notes: Note[] }) {
             {(
               [
                 ["now", "Now"],
-                ["morning", "This morning"],
+                ["morning", "Earlier today"],
                 ["yesterday", "Yesterday"],
                 ["pick", "Pick a day…"],
               ] as const
@@ -260,7 +268,7 @@ export function EventLog({ notes }: { notes: Note[] }) {
                 style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.65)", color: INK }}
               />
             )}
-            {when === "pick" && !allDay && (
+            {when !== "now" && !allDay && (
               <TimeToken value={pickTime} onChange={setPickTime} label="What time" kind="any" compact />
             )}
             <label className="flex h-8 items-center gap-1.5 px-1 text-[13.5px] font-semibold" style={{ color: INK }}>

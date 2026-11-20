@@ -1,9 +1,10 @@
 "use client";
 
 import { stepsComplete } from "@/lib/habit-steps";
+import { celebrateProgress } from "@/components/celebration/QuestCelebrationHost";
 import { stopKeysButSave } from "@/lib/stop-keys";
 import { progressWords } from "@/lib/progress-words";
-import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { SettingsGear } from "@/components/ui/SettingsGear";
 import {
   DndContext,
@@ -259,8 +260,15 @@ export function EveningRites({
     }
     startTransition(async () => {
       try {
-        if (next) await saveOrQueue("completeRite", { id: r.id, day, pct }, `rite:${r.id}:${day}`);
-        else await saveOrQueue("uncompleteRite", { id: r.id, day }, `rite:${r.id}:${day}`);
+        if (next) {
+          const out = await saveOrQueue("completeRite", { id: r.id, day, pct }, `rite:${r.id}:${day}`);
+          // "How do you feel?" (owner, Nov 19), once it's saved.
+          // Its completion screen, with "How do you feel?" like the other celebrations (owner, Nov 19).
+          if (!out.queued) celebrateProgress({ title: r.title, xp: r.xp_value ?? 0, fromPct: 0, toPct: 100, heading: "Rite kept!", barCaption: "Done for tonight", felt: { kind: "habit", riteId: r.id, day } });
+        }
+        else {
+          await saveOrQueue("uncompleteRite", { id: r.id, day }, `rite:${r.id}:${day}`);
+        }
       } catch (e) {
         setOptimistic((o) => ({ ...o, [r.id]: !next }));
         setError(e instanceof Error ? e.message : "Couldn't save that.");

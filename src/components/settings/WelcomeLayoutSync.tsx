@@ -5,7 +5,7 @@ import { getWelcomeLayoutAction, saveWelcomeLayoutAction, type WelcomeLayout } f
 import { loadFx, patchFx, subscribeFx, type FxSettings } from "@/lib/celebration-fx";
 import { fromStartup } from "@/lib/startup";
 
-const KEYS = ["welcomeMode", "welcomeOrder", "welcomeHide", "welcomeArchived", "welcomeDawnOn", "welcomeHabitsOn", "welcomeButtons", "welcomeSleep", "welcomeMetrics", "welcomeLine", "welcomeStreak", "welcomeBar", "journalPrompts", "journalPromptsV", "journalAllPrompts", "journalPick"] as const;
+const KEYS = ["welcomeMode", "toucanAskBg", "toucanAskMist", "toucanKeptQuote", "welcomeOrder", "welcomeHide", "welcomeArchived", "welcomeDawnOn", "welcomeHabitsOn", "welcomeButtons", "welcomeSleep", "welcomeMetrics", "welcomeLine", "welcomeStreak", "welcomeBar", "journalPrompts", "journalPromptsV", "journalAllPrompts", "journalPick"] as const;
 const pick = (fx: FxSettings): WelcomeLayout => {
   const out: WelcomeLayout = {};
   for (const k of KEYS) if (fx[k] !== undefined) out[k] = fx[k];

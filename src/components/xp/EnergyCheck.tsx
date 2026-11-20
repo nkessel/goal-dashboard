@@ -5,7 +5,7 @@ import { FaceRating } from "@/components/ui/FaceRating";
 import { saveNightToo } from "./save-night";
 import { snapTo, useSliderStep } from "@/lib/use-slider-step";
 import Link from "next/link";
-import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
+import { useEffect, useState, useSyncExternalStore, useTransition, useRef } from "react";
 import { createPortal } from "react-dom";
 import { splitEvents, splitOn } from "@/lib/event-split";
 import { TrackedEvents } from "@/components/insights/TrackedEvents";
@@ -138,6 +138,8 @@ export function EnergyCheck({
   const [noting, setNoting] = useState(false);
   const [journaling, setJournaling] = useState(false);
   const [journalText, setJournalText] = useState("");
+  // How you feel, on the journal too (owner, Nov 18: "a smiley emotion picker for the journal here too").
+  const [journalFace, setJournalFace] = useState<number | null>(null);
   const [journalSaved, setJournalSaved] = useState(false);
   const [supping, setSupping] = useState(false);
   const [supp, setSupp] = useState({ name: "", dose: "", time: "" });
@@ -283,6 +285,50 @@ export function EnergyCheck({
     }
   }
 
+  // A check-in you started is kept on this device until you submit it, so leaving the screen loses nothing
+  // (owner, Nov 12 and 18: "partial check-ins should be saved when leaving a screen"; "save a check-in as a draft").
+  const DRAFT_KEY = "checkin-draft";
+  const [draftBack, setDraftBack] = useState(false);
+  const draftLoaded = useRef(false);
+  useEffect(() => {
+    if (draftLoaded.current) return;
+    draftLoaded.current = true;
+    try {
+      const d = JSON.parse(window.localStorage.getItem(DRAFT_KEY) ?? "null") as { day: string; energy: number | null; vals: Record<string, number>; journal: string; face: number | null } | null;
+      const day = new Date().toDateString();
+      if (!d || d.day !== day) return;
+      /* eslint-disable react-hooks/set-state-in-effect -- the draft is only readable in the browser */
+      if (d.energy !== null) {
+        setRawValue(d.energy);
+        setEnergySet(true);
+      }
+      if (d.vals && Object.keys(d.vals).length) setVals(d.vals);
+      if (d.journal) setJournalText(d.journal);
+      if (d.face !== null && d.face !== undefined) setJournalFace(d.face);
+      setDraftBack(true);
+      /* eslint-enable react-hooks/set-state-in-effect */
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  useEffect(() => {
+    if (!draftLoaded.current) return;
+    try {
+      const empty = !energySet && !Object.keys(vals).length && !journalText.trim() && journalFace === null;
+      if (empty) window.localStorage.removeItem(DRAFT_KEY);
+      else window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ day: new Date().toDateString(), energy: energySet ? value : null, vals, journal: journalText, face: journalFace }));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [energySet, value, vals, journalText, journalFace]);
+  const clearDraft = () => {
+    setEnergySet(false);
+    setVals({});
+    setJournalText("");
+    setJournalFace(null);
+    setDraftBack(false);
+  };
+
   const nightTouched = !!wheel && !noSleep && JSON.stringify(night) !== nightBase;
   function save(after?: () => void) {
     setError(null);
@@ -312,6 +358,7 @@ export function EnergyCheck({
           }
         }
         setEnergySet(false);
+        setDraftBack(false);
         setSavedVals(Object.fromEntries(all.map((r) => [r.metric, r.level])));
         setVals({});
         setEditing(false);
@@ -550,7 +597,8 @@ export function EnergyCheck({
         {editing ? (
           <>
             {/* Last night arrives a moment after the page: it slides in rather than shoving everything down. */}
-            {!noSleep && (
+            {/* Last night only on the day's first check-in (owner, Nov 18); the Sleep log below has it any time. */}
+            {!noSleep && !(savedAt && new Date(savedAt).toDateString() === new Date().toDateString()) && (
               <Fold open={!!wheel} eager>
                 <NightFields value={night} onChange={setNight} effort={wheel?.effort ?? []} hindrances={wheel?.hindrances ?? []} />
               </Fold>
@@ -630,15 +678,6 @@ export function EnergyCheck({
                         <span aria-hidden style={{ color: "var(--t-gold)" }}>+</span> metric
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => setNoting(true)}
-                      className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold"
-                      style={{ border: "1px solid rgba(217,180,95,.6)", color: "var(--t-cream)" }}
-                      title="Write in something that happened, or a #tag"
-                    >
-                      <span aria-hidden style={{ color: "var(--t-gold)" }}>+</span> Tag / event
-                    </button>
                     {/* Why the ratings are what they are, in your own words (owner, Nov 3): saved to the journal. */}
                     <button
                       type="button"
@@ -649,23 +688,15 @@ export function EnergyCheck({
                     >
                       <span aria-hidden style={{ color: "var(--t-gold)" }}>✎</span> Journal
                     </button>
-                    {/* A supplement taken: name, dose and time, logged as an event (owner, Nov 3). */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const d = new Date();
-                        setSupp((v) => ({ ...v, time: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` }));
-                        setSupping(true);
-                        setSuppSaved(null);
-                      }}
-                      className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold"
-                      style={{ border: "1px solid rgba(217,180,95,.6)", color: "var(--t-cream)" }}
-                      title="Log a supplement you took: name, dose and time"
-                      aria-label="Log a supplement"
-                    >
-                      <span aria-hidden>💊</span>
-                      <span className="hidden sm:inline">Supplement</span>
-                    </button>
+                    {/* A check-in started earlier and kept: said quietly on this line, so nothing below moves. */}
+                    {draftBack && (
+                      <span className="fade-in flex items-center gap-1.5 text-[12.5px]" style={{ color: "var(--ec-soft, rgba(239,230,204,.75))" }} data-checkin-draft>
+                        {journalText.trim() ? "Journal kept from earlier ·" : "Kept from earlier ·"}
+                        <button type="button" onClick={clearDraft} className="underline underline-offset-2">
+                          Start fresh
+                        </button>
+                      </span>
+                    )}
                     {suppSaved && <span className="confirm-pop text-[12.5px]" style={{ color: "var(--ec-gold, #f2d27e)" }}>✓ {suppSaved}</span>}
                     {journalSaved && <span className="confirm-pop text-[12.5px]" style={{ color: "var(--ec-gold, #f2d27e)" }}>✓ In your journal</span>}
                   </div>
@@ -718,38 +749,71 @@ export function EnergyCheck({
                   </div>
                 </Fold>
                 <Fold open={journaling}>
-                  <div className="flex flex-col gap-1.5 rounded-xl p-2" style={{ background: "rgba(0,0,0,.22)", border: "1px solid var(--ec-line, rgba(217,180,95,.3))" }}>
+                  {/* The journal: how you feel on five faces, your words written on the card (no white box), and the
+                      event / #tag and supplement buttons inside it (owner, Nov 18). */}
+                  <div className="flex flex-col gap-2 rounded-xl px-2.5 py-2" style={{ background: "rgba(217,180,95,.08)", border: "1px solid var(--ec-line, rgba(217,180,95,.3))" }} data-checkin-journal>
                     <textarea
                       value={journalText}
                       onChange={(e) => setJournalText(e.target.value.slice(0, 4000))}
                       rows={3}
-                      placeholder="Why these ratings? What's behind them today…"
+                      placeholder="What's alive in you right now?"
                       aria-label="Journal about this check-in"
-                      className="w-full resize-none rounded-lg border px-2.5 py-1.5 text-[16px] sm:text-[14px]"
-                      style={{ background: "rgba(255,250,238,.92)", borderColor: "#b39a6a", color: "#2a1c10" }}
+                      className="bare-input w-full resize-none px-1 py-1 text-[16px] leading-snug outline-none focus:outline-none focus-visible:outline-none sm:text-[15px]"
+                      style={{ background: "transparent", border: 0, borderBottom: "1.5px solid rgba(217,180,95,.55)", borderRadius: 0, boxShadow: "none", color: "var(--t-cream)" }}
                     />
-                    <span className="flex items-center justify-end gap-2">
-                      <button type="button" onClick={() => setJournaling(false)} className="h-8 rounded-full px-3 text-[13px]" style={{ color: "var(--ec-soft, rgba(239,230,204,.75))" }}>
-                        Close
-                      </button>
+                    <span className="flex flex-wrap items-center gap-1.5">
                       <button
                         type="button"
-                        disabled={!journalText.trim()}
-                        onClick={() => {
-                          const text = journalText.trim();
-                          addJournalEntryAction(`Check-in: ${text}`, null)
-                            .then(() => {
-                              setJournalText("");
-                              setJournaling(false);
-                              setJournalSaved(true);
-                            })
-                            .catch(() => setJournalSaved(false));
-                        }}
-                        className="h-8 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50"
-                        style={{ background: "var(--t-gold)", color: "#2a1c10" }}
+                        onClick={() => setNoting(true)}
+                        className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold"
+                        style={{ border: "1px solid rgba(217,180,95,.6)", color: "var(--t-cream)" }}
+                        title="Write in something that happened, or a #tag"
                       >
-                        Save to journal
+                        <span aria-hidden style={{ color: "var(--t-gold)" }}>+</span> Tag / event
                       </button>
+                    {/* A supplement taken: name, dose and time, logged as an event (owner, Nov 3). */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date();
+                        setSupp((v) => ({ ...v, time: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` }));
+                        setSupping(true);
+                        setSuppSaved(null);
+                      }}
+                      className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold"
+                      style={{ border: "1px solid rgba(217,180,95,.6)", color: "var(--t-cream)" }}
+                      title="Log a supplement you took: name, dose and time"
+                      aria-label="Log a supplement"
+                    >
+                      <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="3.5" y="8.5" width="17" height="7" rx="3.5" transform="rotate(-35 12 12)" stroke="currentColor" strokeWidth="1.8" /><path d="M10.2 9.6l4.2 4.8" stroke="currentColor" strokeWidth="1.8" /></svg>
+                      <span>Supplement</span>
+                    </button>
+                    </span>
+                    {/* The faces sit under the event buttons, above Save (owner, Nov 20). */}
+                    <FaceRating value={journalFace} onChange={(v) => setJournalFace(v)} label="How you feel" light />
+                    <span className="flex items-center justify-end gap-2">
+                        <button type="button" onClick={() => setJournaling(false)} className="h-8 rounded-full px-3 text-[13px]" style={{ color: "var(--ec-soft, rgba(239,230,204,.75))" }}>
+                          Close
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!journalText.trim() && journalFace === null}
+                          onClick={() => {
+                            const text = journalText.trim() || "(how I felt)";
+                            addJournalEntryAction(`Check-in: ${text}`, journalFace === null ? null : journalFace + 3)
+                              .then(() => {
+                                setJournalText("");
+                                setJournalFace(null);
+                                setJournaling(false);
+                                setJournalSaved(true);
+                              })
+                              .catch(() => setJournalSaved(false));
+                          }}
+                          className="h-8 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50"
+                          style={{ background: "var(--t-gold)", color: "#2a1c10" }}
+                        >
+                          Save to journal
+                        </button>
                     </span>
                   </div>
                 </Fold>
@@ -904,16 +968,25 @@ export function EnergyCheck({
             {/* Only what came with this check-in: written in the half hour before it, or since. */}
             {chipsFor(notes.filter((n) => sessionIds.has(n.id) || !("at" in n) || !n.at || !savedAt || new Date(n.at).getTime() >= new Date(savedAt).getTime() - 30 * 60_000))}
             {noteInput}
-            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px]" style={{ color: "var(--t-cream)" }}>
-              {mounted && savedAt && <span style={{ opacity: 0.75 }}>✓ Checked in at {clock(savedAt)}</span>}
-              <button type="button" onClick={() => setEditing(true)} className="underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
+            {/* After a check-in: Edit it, or a new one behind its own button (owner, Nov 18: "check in again" was too faint;
+                no "+ event/tag" by a finished check-in, an "Edit check-in" button instead). */}
+            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-[13px]" style={{ color: "var(--t-cream)" }}>
+              {/* Edit is a small word to the right of the confirmation (owner, Nov 20), not a button of its own. */}
+              <span className="flex w-full items-baseline justify-center gap-2.5">
+                {mounted && savedAt && <span className="font-semibold">✓ Checked in at {clock(savedAt)}</span>}
+                {full ? (
+                  <button type="button" aria-label="Edit check-in" onClick={() => window.dispatchEvent(new CustomEvent("checkin-edit-latest"))} className="min-h-8 px-1 text-[13px] underline decoration-[#c9a24a] underline-offset-[3px]" style={{ color: "var(--t-cream)", opacity: 0.85 }}>
+                    Edit
+                  </button>
+                ) : (
+                  <Link href="/insights#edit-checkin" aria-label="Edit check-in" className="flex min-h-8 items-center px-1 text-[13px] underline decoration-[#c9a24a] underline-offset-[3px]" style={{ color: "var(--t-cream)", opacity: 0.85 }}>
+                    Edit
+                  </Link>
+                )}
+              </span>
+              <button type="button" onClick={() => setEditing(true)} className="hover-glow h-8 rounded-full px-3.5 text-[13.5px] font-bold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
                 Check in again
               </button>
-              {full && !noting && (
-                <button type="button" onClick={() => setNoting(true)} className="underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
-                  + Event or #tag
-                </button>
-              )}
             </div>
           </div>
         )}

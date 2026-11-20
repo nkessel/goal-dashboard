@@ -12,3 +12,5 @@ export const FeedbackDock = dynamic(() => import("@/components/feedback/Feedback
 export const LanguageWindow = dynamic(() => import("@/components/xp/LearnLanguage").then((m) => m.LanguageWindow), { ssr: false });
 export const PackingWindow = dynamic(() => import("@/components/settings/PackingLists").then((m) => m.PackingWindow), { ssr: false });
 export const Walkthrough = dynamic(() => import("@/components/tour/Walkthrough").then((m) => m.Walkthrough), { ssr: false });
+export const KeptTarget = dynamic(() => import("@/components/xp/KeptTarget").then((m) => m.KeptTarget), { ssr: false });
+export const FailSceneHost = dynamic(() => import("@/components/tasks/FailQuest").then((m) => m.FailSceneHost), { ssr: false });

@@ -82,5 +82,13 @@
   {
     "match": "^calendar\\|covered-by-bar\\|<div \\.reveal> \"Auto-scheduler",
     "reason": "The auto-scheduler is a floating window over the calendar by design (owner, Nov 3: moves by its title, resizes from its corner, minimizes to a chip), so it covers the calendar under it until it's moved or minimized. It stops above the bottom bar (Nov 19)."
+  },
+  {
+    "match": "^faces\\|layout-shift\\|<div> \"Today's Quests",
+    "reason": "Completing a quest takes it off Today's Quests underneath the celebration, which covers the whole screen; the list closes up behind it, out of sight. The celebration itself doesn't move (see the screenshot)."
+  },
+  {
+    "match": "^faces\\|layout-shift\\|<div> \"Daily Habits",
+    "reason": "The faces flow opens Daily Habits by script (no tap) after a tick, because the check's save reloads Today; the tray sliding open is that, not a jump."
   }
 ]

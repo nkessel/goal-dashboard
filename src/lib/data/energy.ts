@@ -112,13 +112,13 @@ export async function latestCheckIns(ownerId: string, sinceISO: string): Promise
 export async function listCheckInsSince(ownerId: string, sinceISO: string): Promise<CheckReading[]> {
   const { data, error } = await supabaseAdmin()
     .from("check_ins")
-    .select("metric, level, created_at")
+    .select("id, metric, level, created_at")
     .eq("owner_id", ownerId)
     .gte("created_at", sinceISO)
     .order("created_at", { ascending: true })
     .limit(1000);
   if (error) return [];
-  return (data ?? []).map((r) => ({ metric: r.metric as string, level: Number(r.level), created_at: r.created_at as string }));
+  return (data ?? []).map((r) => ({ id: r.id as string, metric: r.metric as string, level: Number(r.level), created_at: r.created_at as string }));
 }
 
 // ---------------------------------------------------------------------------

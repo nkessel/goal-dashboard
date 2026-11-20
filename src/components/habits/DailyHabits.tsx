@@ -1,8 +1,9 @@
 "use client";
 
 import { stepsComplete } from "@/lib/habit-steps";
+import { celebrateProgress } from "@/components/celebration/QuestCelebrationHost";
 import { GearIcon, SnoozeIcon } from "@/components/ui/Icons";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -32,6 +33,9 @@ import { Fold } from "@/components/ui/Fold";
  */
 // Habits you can listen along to (walks, drives, the dog).
 const LISTEN_HABIT = /\b(walk|walking|drive|driving|dog|commute|car ride|errands?|hike)\b|🐶|🐕/iu;
+
+/** Whether each Daily Habits tray was open, kept outside the list so a redraw doesn't close it. */
+const trayOpen = new Map<string, boolean>();
 
 export function DailyHabits({
   habits,
@@ -66,7 +70,11 @@ export function DailyHabits({
 }) {
   const day = useLocalDay();
   // Closed until opened (the header still shows how the day is going).
-  const [open, setOpen] = useState(false);
+  // Kept across a redraw (ticking a habit refreshes Today, which can draw the list anew), so the tray stays open.
+  const [open, setOpen] = useState(() => trayOpen.get(bare ? "bare" : "main") ?? false);
+  useEffect(() => {
+    trayOpen.set(bare ? "bare" : "main", open);
+  }, [open, bare]);
   const [look, setLook] = useState<HeaderLook>("togo");
   const [mark, setMark] = useState<HabitMark>("seedling");
   const [lookMenu, setLookMenu] = useState(false);
@@ -336,8 +344,15 @@ export function DailyHabits({
     startTransition(async () => {
       try {
         // Done and undone share one key, so only the latest waits when offline.
-        if (next) await saveOrQueue("completeRite", { id: h.id, day }, `rite:${h.id}:${day}`);
-        else await saveOrQueue("uncompleteRite", { id: h.id, day }, `rite:${h.id}:${day}`);
+        if (next) {
+          const out = await saveOrQueue("completeRite", { id: h.id, day }, `rite:${h.id}:${day}`);
+          // "How do you feel?" (owner, Nov 19), once it's saved.
+          // Its completion screen, with "How do you feel?" like the other celebrations (owner, Nov 19).
+          if (!out.queued) celebrateProgress({ title: h.title, xp: h.xp_value ?? 0, fromPct: 0, toPct: 100, heading: "Habit kept!", barCaption: "Done for today", felt: { kind: "habit", riteId: h.id, day } });
+        }
+        else {
+          await saveOrQueue("uncompleteRite", { id: h.id, day }, `rite:${h.id}:${day}`);
+        }
       } catch (e) {
         setOptimistic((o) => ({ ...o, [h.id]: !next }));
         setError(e instanceof Error ? e.message : "Couldn't save that.");

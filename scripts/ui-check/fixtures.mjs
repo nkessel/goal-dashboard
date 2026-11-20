@@ -57,14 +57,20 @@ export function makeFixtures() {
     task("Book the dentist cleaning", { plan_by: inHours(48), schedule_rank: 1 }),
     task("See Grandma for tea", { plan_by: inHours(24 * 9), schedule_rank: 2, estimate_minutes: 90 }),
     task("Clear out the shed someday", { schedule_rank: 3 }),
-    task("Finished: return library books", { status: "completed", completed_at: inHours(-3), xp_awarded: 20 }),
+    task("Finished: return library books", { status: "completed", completed_at: inHours(-3), xp_awarded: 20, felt: 2 }),
+    // Failed yesterday, and how it felt (owner, Nov 19): a fail on the Insights chart.
+    // Quests done earlier in the month (owner, Nov 19: XP under each day on the Insights chart, and the squished month view).
+    ...[1, 2, 3, 4, 6, 8, 9, 11, 13, 15, 16, 19, 22, 24, 27].map((d, k) =>
+      task(`Done ${d} days ago`, { status: "completed", completed_at: inHours(-24 * d + [1.5, 4, 6.5, 9, 12][k % 5]), xp_value: [15, 20, 30, 25, 40][k % 5], felt: [1, 2, 0, -1, 2][k % 5] }),
+    ),
+    task("Morning run", { status: "completed", completed_at: inHours(-20), failed_at: inHours(-20), felt: -1 }),
   ];
   // The calendar: quests placed on it today and this week, one done, and a mini-quest with a time (Nov 3).
   const at = (h, mins = 60) => ({ is_on_calendar: true, scheduled_start: inHours(h), scheduled_end: inHours(h + mins / 60), estimate_minutes: mins });
   tasks.push(
     task("Goblin paperwork: renew the car registration", at(1.5)),
     task("Draft the facilitation workshop outline", { board_id: course.id, ...at(3.5, 90) }),
-    task("Herb gathering at the farmers market", { status: "completed", completed_at: inHours(-1), xp_awarded: 20, ...at(-1.5, 45) }),
+    task("Herb gathering at the farmers market", { status: "completed", completed_at: inHours(-1), xp_awarded: 20, felt: 1, ...at(-1.5, 45) }),
     task("Scout the old trail with Chester", at(25, 60)),
     // Written in [brackets]: a maybe, drawn as a dashed outline with no fill (owner, Nov 12).
     task("[Stretch and tea on the porch]", at(5.5, 45)),
@@ -114,6 +120,9 @@ export function makeFixtures() {
     { owner_id: OWNER_ID, metric: "Mood", level: 7, created_at: inHours(-26) },
     { owner_id: OWNER_ID, metric: "Sleep quality", level: 6, created_at: inHours(-30) },
     { owner_id: OWNER_ID, metric: "Energy", level: 5, created_at: inHours(-50) },
+    // Today's check-in, for the log under the check-in (owner, Nov 10 and 18).
+    { owner_id: OWNER_ID, metric: "Mood", level: 6.5, created_at: inHours(-1) },
+    { owner_id: OWNER_ID, metric: "Sleep quality", level: 7, created_at: inHours(-1) },
   ].map((r) => ({ id: randomUUID(), ...r }));
 
   const xp_events = [

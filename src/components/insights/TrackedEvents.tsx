@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { FeltInline } from "@/components/ui/FeltAsk";
 import { deleteCheckNoteAction, saveTrackedEventsAction, trackedEventsAction } from "@/app/actions";
 import { saveOrQueue } from "@/lib/offline";
 import { Fold } from "@/components/ui/Fold";
@@ -43,6 +44,9 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
   const [said, setSaid] = useState<{ text: string; undo?: () => void } | null>(null);
+  // "How do you feel?" under the event just logged (owner, Nov 19).
+  const [feltNote, setFeltNote] = useState<string | null>(null);
+  const closeFeltNote = useCallback(() => setFeltNote(null), []);
   const [removing, setRemoving] = useState<string | null>(null);
   const hold = useRef<number | null>(null);
   useEffect(() => {
@@ -69,8 +73,9 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
     }
     const at = stamp;
     const id = r.note?.id;
-    setSaid({ text: `✓ ${name} · ${at}`, undo: id ? () => void deleteCheckNoteAction(id).then(() => (setSaid({ text: "Taken back" }), onLogged?.())) : undefined });
+    setSaid({ text: `✓ ${name} · ${at}`, undo: id ? () => void deleteCheckNoteAction(id).then(() => (setSaid({ text: "Taken back" }), setFeltNote(null), onLogged?.())) : undefined });
     onLogged?.();
+    if (id) setFeltNote(id);
   };
   const add = () => {
     const t = draft.trim();
@@ -156,12 +161,12 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
                 setLeaf(null);
                 void log(LEAF_EVENT, m === now ? undefined : at);
               }}
-              className="h-9 rounded-full px-4 text-[13.5px] font-bold"
-              style={{ background: "linear-gradient(180deg,#8fd17a,#4f9a47)", border: "1px solid #2c5f28", color: "#10240e" }}
+              // The app's forest-green primary, like the quest editor's Save (owner, Nov 19: the bright green was off).
+              className="qe-save h-9 rounded-full px-4 text-[14px] font-semibold"
             >
               Log it
             </button>
-            <button type="button" onClick={() => setLeaf(null)} className="h-7 text-[12.5px] underline underline-offset-2" style={{ color: "inherit", opacity: 0.8 }}>
+            <button type="button" onClick={() => setLeaf(null)} className="h-7 text-[13px] underline underline-offset-2" style={{ color: "#6b5631" }}>
               Cancel
             </button>
           </div>
@@ -191,6 +196,7 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
           </button>
         </p>
       )}
+      {feltNote && <FeltInline key={feltNote} target={{ kind: "note", id: feltNote }} onClose={closeFeltNote} />}
     </div>
   );
 }

@@ -1,5 +1,8 @@
 "use client";
 
+import { DndContext, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { TimeToken } from "@/components/xp/NightFields";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { saveNightAction, setWheelOfTimeAction } from "@/app/actions";
@@ -122,6 +125,7 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
 
   // Today's doings belong to tonight, which is logged on tomorrow's morning;
   // yesterday's belong to last night (this morning's check-in).
+  const [pulled, setPulled] = useState<1 | -1 | null>(null);
   const pressKey = pressDay === "today" ? shiftDay(today, 1) : today;
   const pressNight = state.log[pressKey];
   const turned = wheelTurns(state);
@@ -263,7 +267,7 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
       {/* The stone wheel, and what turns it. */}
       <div className="flex flex-col gap-2.5">
         <div className="relative">
-          <StoneWheel angle={turned.net * WHEEL_STEP} sound={sound} />
+          <StoneWheel angle={turned.net * WHEEL_STEP} sound={sound} held={pulled !== null} onPull={(d) => setPulled(d)} />
           <button
             type="button"
             onClick={toggleSound}
@@ -276,10 +280,29 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
             {sound ? "🔊" : "🔇"}
           </button>
         </div>
-        <span className="text-center text-[12.5px]" style={{ color: SOFT }}>
-          <span aria-hidden className="mr-1 text-[14px]" style={{ color: GOLD }}>☸</span>
-          Turned forward <b style={{ color: GOLD }}>{turned.forward}</b> · back <b style={{ color: ROSE }}>{turned.back}</b>
-        </span>
+        {/* No count of turns (owner, Nov 9). Spun by hand past halfway, it waits for what turned it. */}
+        {pulled !== null ? (
+          <div className="reveal flex flex-col items-center gap-1.5 rounded-xl px-3 py-2" style={{ background: "rgba(0,0,0,.25)", border: `1px solid ${pulled > 0 ? "rgba(217,180,95,.55)" : "rgba(242,160,140,.5)"}` }} data-wheel-pulled>
+            <span className="text-center text-[13.5px]" style={{ color: CREAM }}>
+              {pulled > 0 ? "It's stuck halfway forward. What turned it?" : "It's stuck halfway back. What held it back?"}
+            </span>
+            <div className="flex flex-wrap justify-center gap-1.5">
+              {(pulled > 0 ? state.effort : state.hindrances).map((n) => (
+                <button key={n} type="button" onClick={() => (press(pulled > 0 ? "effort" : "hindrance", n), setPulled(null))} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ border: `1px solid ${pulled > 0 ? "rgba(217,180,95,.6)" : "rgba(242,160,140,.55)"}`, color: pulled > 0 ? GOLD : ROSE }}>
+                  {n}
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={() => setPulled(null)} className="text-[12.5px] underline" style={{ color: SOFT }}>
+              Let it roll back
+            </button>
+          </div>
+        ) : (
+          <span className="text-center text-[12px]" style={{ color: SOFT }}>
+            <span aria-hidden className="mr-1 text-[14px]" style={{ color: GOLD }}>☸</span>
+            Spin it by hand, or press what you did
+          </span>
+        )}
         <div className="mx-auto flex rounded-full p-0.5" role="group" aria-label="Which day" style={{ background: "rgba(0,0,0,.3)", border: "1px solid rgba(217,180,95,.35)" }}>
           {(["today", "yesterday"] as const).map((d) => (
             <button
@@ -434,6 +457,7 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
 
 function ListEditor({ title, color, items, weights, onChange, onWeight }: { title: string; color: string; items: string[]; weights: Record<string, number>; onChange: (next: string[]) => void; onWeight: (name: string, weight: number) => void }) {
   const [text, setText] = useState("");
+  const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 6 } }));
   const add = () => {
     const t = text.replace(/\s+/g, " ").trim().slice(0, 60);
     if (t && !items.some((i) => i.toLowerCase() === t.toLowerCase())) onChange([...items, t]);
@@ -444,8 +468,21 @@ function ListEditor({ title, color, items, weights, onChange, onWeight }: { titl
       <span className="text-[11.5px] font-bold uppercase tracking-[.12em]" style={{ color }}>
         {title}
       </span>
-      {items.map((i) => (
-        <span key={i} className="flex items-center gap-2 text-[13.5px] leading-snug">
+      {/* Hold and drag a factor to move it (owner, Nov 17: "I should be able to re-order wheel factors"). */}
+      <DndContext
+        id={`wheel-${title}`}
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={(e) => {
+          const from = items.indexOf(String(e.active.id));
+          const to = e.over ? items.indexOf(String(e.over.id)) : -1;
+          if (from >= 0 && to >= 0 && from !== to) onChange(arrayMove(items, from, to));
+        }}
+      >
+        <SortableContext items={items} strategy={verticalListSortingStrategy}>
+          {items.map((i) => (
+            <FactorRow key={i} id={i}>
+              <span className="flex items-center gap-2 text-[13.5px] leading-snug">
           <span className="flex-1">{i}</span>
           <span className="flex shrink-0 items-center rounded-full" role="group" aria-label={`How far ${i} turns the wheel`} style={{ border: "1px solid rgba(217,180,95,.4)" }}>
             <button type="button" onClick={() => onWeight(i, Math.max(1, weightOf(weights, i) - 1))} disabled={weightOf(weights, i) <= 1} aria-label={`Turn less for ${i}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] font-bold hover:bg-white/10 disabled:opacity-30" style={{ color }}>
@@ -461,8 +498,11 @@ function ListEditor({ title, color, items, weights, onChange, onWeight }: { titl
           <button type="button" onClick={() => onChange(items.filter((x) => x !== i))} aria-label={`Remove ${i}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[16px] hover:bg-white/10" style={{ color: SOFT }}>
             <CloseIcon size={10} />
           </button>
-        </span>
-      ))}
+              </span>
+            </FactorRow>
+          ))}
+        </SortableContext>
+      </DndContext>
       <div className="flex items-center gap-1.5 pt-1">
         <input
           value={text}
@@ -478,6 +518,22 @@ function ListEditor({ title, color, items, weights, onChange, onWeight }: { titl
           Add
         </button>
       </div>
+    </div>
+  );
+}
+
+/** One factor in the list, moved by holding and dragging the row itself. */
+function FactorRow({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      role="listitem"
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.85 : 1, zIndex: isDragging ? 2 : undefined, position: "relative", cursor: "grab", touchAction: "manipulation" }}
+    >
+      {children}
     </div>
   );
 }

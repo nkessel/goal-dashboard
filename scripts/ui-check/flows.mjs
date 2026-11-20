@@ -42,6 +42,43 @@ export const FLOWS = [
     },
   },
   {
+    // The toucan's question (owner, Nov 19): just the toucan, over a grey mist, asking what's most important.
+    name: "toucanask",
+    timeoutMs: 300_000,
+    async run(h) {
+      await h.goto("/", { name: "toucanask" });
+      await h.page.evaluate(() => {
+        for (const k of ["daily-login", "welcome-pending", "daily-login-open", "welcome-back-at", "toucan-kept"]) localStorage.removeItem(k);
+        localStorage.setItem("evening-prompt-at", "off");
+        const fx = JSON.parse(localStorage.getItem("goalFxSaved") || "{}");
+        localStorage.setItem("goalFxSaved", JSON.stringify({ ...fx, welcomeMode: "toucan" }));
+      });
+      await h.page.reload();
+      await h.page.waitForSelector("[data-toucan-question]", { timeout: 15000 }).catch(() => {});
+      await h.settle(900);
+      if (!(await h.page.locator("[data-toucan-question]").count())) throw new Error("toucanask: the toucan's question didn't open on the day's first visit");
+      await h.check("the toucan's question");
+      await h.typeIn((p) => p.locator("[data-toucan-question] textarea").first(), "toucan's question answer");
+      await h.page.locator("[data-toucan-question] textarea").first().fill("Call Dad about Sunday");
+      await h.check("the toucan's question, answered");
+      await h.tap((p) => p.locator("[data-toucan-question]").getByRole("button", { name: /^keep it$/i }).first(), "keep it", { expectMove: true });
+      await h.settle(1200);
+      await h.check("kept: the floating target");
+      if (await h.tap((p) => p.getByRole("button", { name: /^what's most important today$/i }).first(), "open the kept target", { optional: true, expectMove: true })) {
+        await h.check("kept: open");
+        await h.tap((p) => p.locator("[data-kept-card]").getByRole("button", { name: /^shrink$/i }).first(), "kept: shrink", { optional: true, expectMove: true });
+      }
+      await h.goto("/settings?open=welcome-screen", { name: "toucanask-settings" });
+      await h.page.locator("[data-welcome-mode]").scrollIntoViewIfNeeded().catch(() => {});
+      await h.check("Settings › Welcome Screen: the toucan's question");
+      await h.goto("/settings?open=toucan-spirit", { name: "toucanask-look" });
+      if (await h.tap((p) => p.getByRole("button", { name: /^his look/i }).first(), "his look", { optional: true, expectMove: true })) {
+        await h.page.locator("[data-toucan-ask-bg]").scrollIntoViewIfNeeded().catch(() => {});
+        await h.check("Settings › His look: behind the toucan's question");
+      }
+    },
+  },
+  {
     name: "welcome",
     async run(h) {
       await h.goto("/", { welcome: true, name: "welcome" });
@@ -200,6 +237,9 @@ export const FLOWS = [
       }
       await h.toggle(/additional quests/i, "additional quests");
       await h.toggle(/daily habits/i, "daily habits");
+      // (toggle shows it open, then closes it again): open it to tick one.
+      await h.page.evaluate(() => [...document.querySelectorAll("button[aria-expanded='false']")].find((b) => /Daily Habits/.test(b.textContent || ""))?.click());
+      await h.settle(700);
       // The Check in button folds away as the check-in opens, so it's closed with its ×.
       await h.tap(/^check in/i, "open check-in", { expectMove: true });
       await h.check("check-in open");
@@ -557,6 +597,50 @@ export const FLOWS = [
           }
           await esc(h);
         }
+        await esc(h);
+      }
+    },
+  },
+  {
+    // "How do you feel?" (owner, Nov 19): five one-ink faces after a habit tick, a victory and a fail.
+    name: "faces",
+    async run(h) {
+      await h.goto("/", { name: "faces" });
+      await h.toggle(/daily habits/i, "daily habits");
+      const tick = h.page.getByRole("checkbox", { name: /^Done: Walk Chester/ }).first();
+      if (await tick.count()) {
+        await tick.evaluate((el) => { el.scrollIntoView({ block: "center" }); el.click(); }).catch(() => {});
+        await h.settle(1800);
+        await h.check("habit kept: its card asks how you feel");
+        if (await h.tap((p) => p.locator("[data-felt-ask] [role=radio][aria-label=Good]").first(), "habit felt: good", { optional: true, expectMove: true })) await h.check("habit felt: saved, with undo");
+        await h.tap((p) => p.getByRole("button", { name: /^close$/i }).last(), "close the habit card", { optional: true, expectMove: true });
+        await h.settle(1400);
+      }
+      // A victory: the celebration asks too, above Claim your reward · Continue Your Journey.
+      if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu for complete", { optional: true })) {
+        if (await h.tap((p) => p.getByRole("menuitem", { name: /^✓?\s*complete this/i }).first(), "complete from the menu", { optional: true, expectMove: true })) {
+          await h.settle(3500);
+          await h.check("celebration: how do you feel");
+          if (await h.tap((p) => p.locator("[data-felt-ask] [role=radio][aria-label=Great]").first(), "celebration: great", { optional: true, expectMove: true })) await h.check("celebration: felt kept");
+          await h.tap(/continue your journey/i, "continue your journey", { optional: true, expectMove: true });
+          await h.settle(800);
+        }
+        await esc(h);
+      }
+      // A fail: a wise line, the faces, then Try again · Continue.
+      if (await h.tap((p) => p.locator("li", { hasText: "AR class homework" }).getByRole("button", { name: /^quest actions$/i }).last(), "quest menu for fail")) {
+        if (await h.tap((p) => p.getByRole("menuitem", { name: /^archive/i }).first(), "archive choices (fail)", { optional: true, expectMove: true })) {
+          if (await h.tap((p) => p.getByRole("button", { name: /mark as failed/i }).first(), "fail form", { optional: true, expectMove: true })) {
+            if (await h.tap((p) => p.getByRole("button", { name: /^mark failed$/i }).first(), "mark failed", { optional: true, expectMove: true })) {
+              await h.settle(1200);
+              await h.page.waitForSelector("[data-fail-scene]", { timeout: 6000 }).catch(() => {});
+              await h.settle(600);
+              await h.check("fail: wise line and faces");
+              if (await h.tap((p) => p.locator("[data-fail-scene]").getByRole("button", { name: /^try again$/i }).first(), "fail: try again", { optional: true, expectMove: true })) await h.check("fail: copy or new");
+            }
+          }
+        }
+        await esc(h);
         await esc(h);
       }
     },
@@ -986,10 +1070,130 @@ export const FLOWS = [
     async run(h) {
       await h.goto("/insights", { name: "insights" });
       await h.check("top");
+      // The check-in log (owner, Nov 10 and 18): today's by default, a longer range from its drop-down, and each one's
+      // ⋯ with Star, Change and Remove.
+      if (await h.tap((p) => p.locator("[data-checkin-log] button[aria-label='Check-in options']").first(), "check-in ⋯", { optional: true, expectMove: true })) {
+        await h.settle(400);
+        await h.check("check-in log: options");
+        await h.tap((p) => p.locator("[data-checkin-log] [role=menuitem]", { hasText: /^Star$/ }).first(), "star a check-in", { optional: true });
+        await h.settle(400);
+        await h.check("check-in log: starred");
+      } else h.record({ kind: "checkin-log", severity: "error", target: "check-in log", detail: "No check-in in today's log to open (the fixtures have one an hour ago)" });
+      if (await h.tap((p) => p.locator("[data-checkin-log] button[aria-expanded]").first(), "check-in log range", { optional: true, expectMove: true })) {
+        await h.tap((p) => p.locator("[data-checkin-log] [role=radio]", { hasText: "This week" }).first(), "this week", { optional: true, expectMove: true });
+        await h.settle(500);
+        await h.check("check-in log: this week");
+        await h.tap((p) => p.locator("[data-checkin-log] button[aria-expanded]").first(), "check-in log range again", { optional: true, expectMove: true });
+        await h.tap((p) => p.locator("[data-checkin-log] [role=radio]", { hasText: "Today" }).first(), "today", { optional: true, expectMove: true });
+      }
       // The chart waits behind a plain button (owner, Nov 9).
       if (await h.tap(/show insights chart/i, "show the chart", { optional: true })) {
         await h.settle(500);
         await h.check("chart open");
+        // Round 3 (owner, Nov 19): a week, things on the chart by how they felt; then split, with its panels resized.
+        if (await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), "chart gear", { optional: true, expectMove: true })) {
+          await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: /^week$/i }).first(), "chart: a week", { optional: true });
+          await h.page.keyboard.press("Escape");
+          await h.settle(500);
+          await h.check("chart: the week, merged");
+          // A month and three months: the dates squish together (owner, Nov 19).
+          for (const [span, name] of [["month", "a month"], ["3 months", "three months"]]) {
+            await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), `chart gear for ${name}`, { optional: true, expectMove: true });
+            await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: new RegExp(`^${span}$`, "i") }).first(), `chart: ${name}`, { optional: true });
+            await h.page.keyboard.press("Escape");
+            await h.settle(500);
+            await h.check(`chart: ${name}, squished`);
+            // Grid lines: Few · Some · Many (owner, Nov 19), on the month.
+            if (span !== "month") continue;
+            for (const g of ["Few", "Many", "Some"]) {
+              await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), `chart gear, grid ${g}`, { optional: true, expectMove: true });
+              await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: new RegExp(`^${g}$`, "i") }).first(), `grid: ${g}`, { optional: true });
+              await h.page.keyboard.press("Escape");
+              await h.settle(400);
+              if (g !== "Some") await h.check(`chart: a month, ${g.toLowerCase()} grid lines`);
+            }
+            // Lines between days (owner, Nov 19): each choice in the gear, then back to the default.
+            for (const ln of ["Dotted", "Solid", "Weeks only", "None", "Dotted, weeks solid"]) {
+              await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), `chart gear, day lines ${ln}`, { optional: true, expectMove: true });
+              await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: ln, exact: true }).first(), `day lines: ${ln}`, { optional: true });
+              await h.page.keyboard.press("Escape");
+              await h.settle(400);
+              if (ln !== "Dotted, weeks solid") await h.check(`chart: a month, day lines ${ln.toLowerCase()}`);
+            }
+            // XP as coins (owner, Nov 19: off by default, toggled on in the gear).
+            for (const on of [true, false]) {
+              await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), `chart gear, coins ${on}`, { optional: true, expectMove: true });
+              await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByText(/xp as coins/i).first(), `XP as coins ${on ? "on" : "off"}`, { optional: true });
+              await h.page.keyboard.press("Escape");
+              await h.settle(400);
+              if (on) await h.check("chart: a month, XP as coins");
+            }
+          }
+          await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), "chart gear, week again", { optional: true, expectMove: true });
+          await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: /^week$/i }).first(), "chart: week again", { optional: true });
+          await h.page.keyboard.press("Escape");
+          await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), "chart gear again", { optional: true, expectMove: true });
+          await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: /^split$/i }).first(), "chart: split", { optional: true });
+          await h.page.keyboard.press("Escape");
+          await h.settle(500);
+          await h.check("chart: split");
+          const edge = h.page.locator("[role=separator][aria-label='Resize the time-of-day panel']").first();
+          const box = await edge.boundingBox().catch(() => null);
+          if (box) {
+            await h.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+            await h.page.mouse.down();
+            await h.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 60, { steps: 6 });
+            await h.page.mouse.up();
+            await h.settle(400);
+            await h.check("chart: split, the time panel taller");
+          }
+          await h.tap((p) => p.getByRole("button", { name: /^show/i }).first(), "chart: what's shown", { optional: true, expectMove: true });
+          await h.check("chart: the Show list");
+          await h.page.keyboard.press("Escape");
+          await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), "chart gear, back", { optional: true, expectMove: true });
+          await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: /^merged$/i }).first(), "chart: merged", { optional: true });
+          await h.page.keyboard.press("Escape");
+        }
+      }
+      // The check-in's Journal: five faces, words on the card, and Tag / event and Supplement inside it; what you started
+      // is kept if you leave and come back (owner, Nov 18).
+      if (await h.tap((p) => p.locator("section[aria-label='Check in'] button", { hasText: /^✎ Journal$|^Journal$/ }).first(), "check-in journal", { optional: true, expectMove: true })) {
+        await h.settle(500);
+        await h.page.locator("[data-checkin-journal] textarea").first().fill("Slept well, slow start").catch(() => {});
+        await h.check("check-in journal: faces, words, tag and supplement inside");
+        if (!(await h.page.locator("[data-checkin-journal] button", { hasText: /tag \/ event/i }).count())) h.record({ kind: "checkin-journal", severity: "error", target: "check-in journal", detail: "Tag / event isn't inside the journal" });
+        await h.page.reload();
+        await h.settle(1500);
+        const kept = (await h.page.locator("[data-checkin-draft]").count()) > 0;
+        if (!kept) h.record({ kind: "checkin-draft", severity: "error", target: "check-in draft", detail: "A started check-in wasn't kept after leaving and coming back" });
+        await h.check("check-in: kept from earlier");
+        await h.tap((p) => p.locator("[data-checkin-draft] button").first(), "start fresh", { optional: true, expectMove: true });
+      }
+      // Spin the Wheel of Time by hand (owner, Nov 9): past halfway it sticks and asks what turned it.
+      {
+        const wheel = h.page.locator("[data-wheel-spin]").first();
+        if (await wheel.count()) {
+          await wheel.scrollIntoViewIfNeeded().catch(() => {});
+          const b = await wheel.boundingBox();
+          if (b) {
+            const cx = b.x + b.width / 2, cy = b.y + b.height * (207 / 440), r = b.width * 0.36;
+            await h.page.mouse.move(cx + r, cy);
+            await h.page.mouse.down();
+            for (const deg of [3, 6, 9, 12]) await h.page.mouse.move(cx + r * Math.cos((deg * Math.PI) / 180), cy + r * Math.sin((deg * Math.PI) / 180), { steps: 2 });
+            await h.page.mouse.up();
+            const stuck = await h.page.locator("[data-wheel-pulled]").first().waitFor({ timeout: 2500 }).then(() => true).catch(() => false);
+            await h.settle(600);
+            await h.check("wheel: spun by hand, stuck halfway");
+            if (!stuck) h.record({ kind: "wheel-spin", severity: "error", target: "wheel of time", detail: "Dragging the wheel past halfway didn't ask what turned it" });
+            else await h.tap((p) => p.locator("[data-wheel-pulled] button", { hasText: /roll back/i }).first(), "let it roll back", { optional: true, expectMove: true });
+          }
+        }
+      }
+      // Wheel factors move by dragging (owner, Nov 17).
+      if (await h.tap((p) => p.getByRole("button", { name: /edit what's on the wheel/i }).first(), "edit the wheel", { optional: true, expectMove: true })) {
+        await h.settle(500);
+        await h.check("wheel: its lists, dragged to reorder");
+        await h.tap((p) => p.getByRole("button", { name: /^done$/i }).first(), "wheel lists done", { optional: true, expectMove: true });
       }
       await h.toggle(/last night/i, "last night", {});
       await h.tap(/did it/i, "ritual did it", { optional: true });
@@ -998,9 +1202,44 @@ export const FLOWS = [
       if (await h.tap((p) => p.locator("[data-leaf-log]").first(), "leaf button", { optional: true, expectMove: true })) {
         await h.settle(500);
         await h.check("leaf: time wheels");
+        // Tap the chosen hour to type the time (owner, Nov 17).
+        {
+          const hour = await h.page.locator("[data-time-wheels] [role=spinbutton][aria-label=Hour]").first().boundingBox().catch(() => null);
+          if (hour) {
+            await h.page.mouse.click(hour.x + hour.width / 2, hour.y + 34 * 1.5);
+            const typed = await h.page.locator("[data-time-wheels] input[aria-label='Type a time']").first().waitFor({ timeout: 2000 }).then(() => true).catch(() => false);
+            if (!typed) h.record({ kind: "time-type", severity: "error", target: "time wheels", detail: "Tapping the chosen hour didn't open a field to type the time" });
+            else {
+              await h.page.keyboard.press("Control+A");
+              await h.page.keyboard.type("7:05 am");
+              await h.check("time wheels: typing a time");
+              await h.page.keyboard.press("Enter");
+              await h.settle(400);
+            }
+          }
+        }
         await h.tap((p) => p.getByRole("button", { name: /^log it$/i }).first(), "log it", { optional: true, expectMove: true });
         await h.settle(700);
         await h.check("leaf: logged");
+      }
+      // Check in, then: Edit check-in opens the latest to change, and Check in again is a gold button (owner, Nov 18).
+      await h.goto("/insights", { name: "insights" });
+      {
+        const slider = h.page.locator("section[aria-label='Check in'] input[type=range]").first();
+        if (await slider.count()) {
+          await slider.focus().catch(() => {});
+          for (let i = 0; i < 3; i++) await h.page.keyboard.press("ArrowRight");
+          await h.settle(300);
+          if (await h.tap((p) => p.getByRole("button", { name: /^submit check-in$/i }).first(), "submit check-in", { optional: true, expectMove: true })) {
+            await h.settle(1200);
+            await h.check("after checking in");
+            if (await h.tap((p) => p.getByRole("button", { name: /^edit check-in$/i }).first(), "edit check-in", { optional: true, expectMove: true })) {
+              await h.settle(700);
+              await h.check("edit check-in: the latest one to change");
+              await esc(h);
+            }
+          }
+        }
       }
     },
   },

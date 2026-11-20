@@ -3543,3 +3543,34 @@ html[data-tour-open] [data-perched-owl] { visibility: hidden; }
 /* Quest Drop: the falling card shakes when it can't go that way. */
 @keyframes quest-drop-shake { 0%, 100% { translate: 0 0; } 25% { translate: -4px 0; } 75% { translate: 4px 0; } }
 .quest-drop-shake { animation: quest-drop-shake 0.18s ease-in-out; }
+
+/* "How do you feel?" in place under a ticked habit or a logged event (owner, Nov 19): slides open and closed. */
+.felt-in { animation: felt-in 0.28s cubic-bezier(.2,.8,.2,1) both; overflow: hidden; }
+.felt-out { animation: felt-out 0.26s ease both; overflow: hidden; }
+@keyframes felt-in { from { max-height: 0; opacity: 0; } to { max-height: 120px; opacity: 1; } }
+@keyframes felt-out { from { max-height: 120px; opacity: 1; } to { max-height: 0; opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .felt-in, .felt-out { animation-duration: 0.01s; } }
+
+/* The toucan's question (owner, Nov 19): a grey mist like the old welcome fog, its look set in Settings. */
+.tq-in { animation: tq-in 0.45s ease both; }
+.tq-out { animation: tq-out 0.32s ease both; }
+@keyframes tq-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tq-out { from { opacity: 1; } to { opacity: 0; } }
+.tq-in .tq-card { animation: card-pop-in 0.42s cubic-bezier(.2,.8,.2,1) 0.12s both; }
+/* Opaque: nothing of the page shows through (owner, Nov 19). The slider sets how much mist drifts across. */
+.tq-mist { --mist: 0.7; }
+.tq-mist[data-bg="mist"] { background: radial-gradient(ellipse 80% 70% at 50% 45%, #d6dbde, #9aa2a8 70%, #868e94); }
+.tq-mist[data-bg="fog"][data-fog="dawn"] { background: radial-gradient(ellipse 80% 70% at 50% 45%, #fff3ec, #e2d4d6 70%, #cfc0c4); }
+.tq-mist[data-bg="fog"][data-fog="day"] { background: radial-gradient(ellipse 80% 70% at 50% 45%, #fafcff, #d6e0e8 70%, #c2ced8); }
+.tq-mist[data-bg="fog"][data-fog="dusk"] { background: radial-gradient(ellipse 80% 70% at 50% 45%, #ffe6dc, #d2bac4 70%, #bca4b0); }
+.tq-mist[data-bg="fog"][data-fog="night"] { background: radial-gradient(ellipse 80% 70% at 50% 45%, #c4cef0, #7884b0 70%, #5e6894); }
+.tq-mist[data-bg="forest"] { background: radial-gradient(ellipse at 50% 60%, #12241d, #050d0a); }
+.tq-mist[data-bg="mist"]::after, .tq-mist[data-bg="fog"]::after, .tq-mist[data-bg="forest"]::after {
+  content: ""; position: absolute; inset: 0; opacity: calc(.15 + var(--mist) * .85);
+  background:
+    radial-gradient(ellipse 40% 22% at 30% 40%, rgba(255, 255, 255, 0.5), transparent 70%),
+    radial-gradient(ellipse 36% 20% at 72% 62%, rgba(255, 255, 255, 0.4), transparent 70%),
+    radial-gradient(ellipse 50% 24% at 50% 88%, rgba(255, 255, 255, 0.35), transparent 70%);
+  animation: fog-breathe 6s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) { .tq-mist::after { animation: none; } }

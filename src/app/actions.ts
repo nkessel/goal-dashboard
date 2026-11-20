@@ -4239,6 +4239,52 @@ export async function saveFeedbackRunTokenAction(token: string) {
   revalidatePath("/feedback-review");
 }
 
+/** Star a check-in (owner, Nov 9: "I want to thumbs up the check in"; Nov 18: "star an entry"), by its readings' keys. */
+export async function starCheckInAction(keys: string[], on: boolean) {
+  const ownerId = await requireProfileId();
+  const extras = await readExtras(ownerId);
+  const marks = { ...((extras.checkInMarks as { star?: string[]; archived?: string[] } | undefined) ?? {}) };
+  const clean = keys.filter((k) => /^[ec]:[0-9a-f-]{36}$/i.test(k)).slice(0, 12);
+  const star = new Set(marks.star ?? []);
+  for (const k of clean) {
+    if (on) star.add(k);
+    else star.delete(k);
+  }
+  marks.star = [...star].slice(-500);
+  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, checkInMarks: marks } }).eq("id", ownerId);
+  revalidatePath("/insights");
+}
+
+/** Take a check-in out of the log and the chart: archived (kept, can come back) or deleted for good. */
+export async function removeCheckInAction(keys: string[], how: "archive" | "delete") {
+  const ownerId = await requireProfileId();
+  const clean = keys.filter((k) => /^[ec]:[0-9a-f-]{36}$/i.test(k)).slice(0, 12);
+  if (how === "delete") {
+    await energyData.deleteReadings(ownerId, clean.filter((k) => k.startsWith("e:")).map((k) => k.slice(2)), clean.filter((k) => k.startsWith("c:")).map((k) => k.slice(2)));
+  } else {
+    const extras = await readExtras(ownerId);
+    const marks = { ...((extras.checkInMarks as { star?: string[]; archived?: string[] } | undefined) ?? {}) };
+    marks.archived = [...new Set([...(marks.archived ?? []), ...clean])].slice(-2000);
+    await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, checkInMarks: marks } }).eq("id", ownerId);
+  }
+  revalidatePath("/insights");
+  revalidatePath("/");
+}
+
+/** Change a check-in: its readings are replaced by the new ones, at the time given. */
+export async function replaceCheckInAction(keys: string[], energy: number | null, metrics: { metric: string; level: number }[], atISO: string) {
+  const ownerId = await requireProfileId();
+  const at = new Date(atISO);
+  if (Number.isNaN(at.getTime()) || at.getTime() > Date.now() + 60_000) throw new Error("Pick a time that has already happened.");
+  if (energy === null && !metrics.length) throw new Error("Keep at least one reading, or delete the check-in.");
+  const clean = keys.filter((k) => /^[ec]:[0-9a-f-]{36}$/i.test(k)).slice(0, 12);
+  await energyData.deleteReadings(ownerId, clean.filter((k) => k.startsWith("e:")).map((k) => k.slice(2)), clean.filter((k) => k.startsWith("c:")).map((k) => k.slice(2)));
+  if (energy !== null) await energyData.logEnergy(ownerId, energy, at.toISOString());
+  if (metrics.length) await energyData.logCheckIns(ownerId, metrics, at.toISOString());
+  revalidatePath("/insights");
+  revalidatePath("/");
+}
+
 /** A check-in the toucan logged; returns what it saved so it can be undone. */
 export async function coachCheckInAction(energy: number | null, metrics: { metric: string; level: number }[]) {
   const ownerId = await requireProfileId();
@@ -4838,7 +4884,7 @@ export async function saveOwnWordsAction(words: OwnWords) {
 
 /** The welcome screen's layout (order, hidden parts, its buttons), kept on the account so every device shows the same screen. */
 export type WelcomeLayout = Record<string, unknown> & { at?: number };
-const WELCOME_LAYOUT_KEYS = ["welcomeOrder", "welcomeHide", "welcomeArchived", "welcomeDawnOn", "welcomeHabitsOn", "welcomeButtons", "welcomeSleep", "welcomeMetrics", "welcomeLine", "welcomeStreak", "welcomeBar", "journalPrompts", "journalPromptsV", "journalAllPrompts", "journalPick"] as const;
+const WELCOME_LAYOUT_KEYS = ["welcomeMode", "toucanAskBg", "toucanAskMist", "toucanKeptQuote", "welcomeOrder", "welcomeHide", "welcomeArchived", "welcomeDawnOn", "welcomeHabitsOn", "welcomeButtons", "welcomeSleep", "welcomeMetrics", "welcomeLine", "welcomeStreak", "welcomeBar", "journalPrompts", "journalPromptsV", "journalAllPrompts", "journalPick"] as const;
 /** The bottom bar's tab order (hold and drag a tab). */
 export async function saveNavOrderAction(order: string[]) {
   const ownerId = await requireProfileId();

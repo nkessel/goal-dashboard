@@ -82,8 +82,9 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
         {/* On or off (owner, Nov 17: paused for now; the login still counts either way). */}
         <div className="flex flex-wrap items-center gap-2" data-welcome-mode>
           <span className="text-sm font-bold">Welcome screen</span>
-          {([["full", "On"], ["off", "Off"]] as const).map(([k, label]) => {
-            const on = (k === "full") === welcomeOn(fx);
+          {/* Or just the toucan, asking what's most important right now (owner, Nov 19). */}
+          {([["full", "Full"], ["toucan", "The toucan's question"], ["off", "Off"]] as const).map(([k, label]) => {
+            const on = k === (fx.welcomeMode === "full" || fx.welcomeMode === "toucan" ? fx.welcomeMode : "off");
             return (
               <button key={k} type="button" aria-pressed={on} className="hover-glow h-8 rounded-full px-3.5 text-[13px] font-bold" style={pick(on)} onClick={() => update({ welcomeMode: k })}>
                 {label}

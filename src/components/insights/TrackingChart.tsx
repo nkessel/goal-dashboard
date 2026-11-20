@@ -1,5 +1,6 @@
 "use client";
 
+import { minutesLabel, prettyTime, sleptMinutes } from "@/lib/wheel-of-time";
 import { FaceIcon, faceOf } from "@/components/ui/FaceRating";
 
 import { useEffect, useRef, useState } from "react";
@@ -8,10 +9,8 @@ import { WeatherLocation } from "@/components/ui/WeatherLocation";
 import { fromFeedback } from "@/lib/from-feedback";
 
 type Reading = { metric: string; level: number; at: string };
+/** A thing you did or logged; `tone` is how it felt (-2 … 2), from an event's face or a quest's or habit's "How do you feel?". */
 type WinLite = { kind: string; at: string; xp: number; title?: string; icon?: string | null; details?: string | null; tone?: number | null };
-/** An event's colour by how it felt (minus, neutral, plus); others keep their kind's colour. */
-// A felt event shows its face on the chart (owner, Nov 13); its words on hover or a tap.
-const markColor = (w: WinLite, fallback: string) => (w.kind === "note" ? (faceOf(w.tone)?.color ?? fallback) : fallback);
 
 /** Series colors, checked for contrast and color-blind separation on parchment. */
 const SERIES = ["#c4620f", "#2a6fb5", "#24875a", "#8a3fa0", "#c23a48", "#a0880a"];
@@ -31,14 +30,42 @@ const TALLIES: { kind: string; one: string; many: string }[] = [
   { kind: "reward", one: "reward", many: "rewards" },
 ];
 const DAY = 86_400_000;
+/** Each day shows its waking hours, 7am to 11:30pm; the nights fold away between days (owner, Nov 19). */
+const H0 = 7;
+const H1 = 23.5;
+/** Where something you gave a face to sits on the 1–10 scale: Rough low … Wonderful high (owner, Nov 19). */
+const FACE_V: Record<number, number> = { [-2]: 1.6, [-1]: 3.5, 0: 5.5, 1: 7.5, 2: 9.4 };
+/** The check-in metric that rates the whole day. */
+const DAY_METRIC = "My day";
 const VIEW_KEY = "insights-view-2";
 const SHOWN_KEY = "insights-shown";
 
-type View = { range: 7 | 30 | 90; detail: "daily" | "every"; smooth: boolean; dots: boolean; marks?: "onLine" | "lines" | "lanes" };
+type View = {
+  range: 7 | 30 | 90;
+  detail: "daily" | "every";
+  smooth: boolean;
+  dots: boolean;
+  marks?: "onLine" | "lines" | "lanes";
+  /** Merged (things on the chart, by how they felt) or split (a time-of-day panel under it), owner Nov 19. */
+  layout?: "merged" | "split";
+  /** Each panel's height, dragged at its bottom edge. */
+  chartH?: number;
+  timeH?: number;
+  /** How many level and hour lines (owner, Nov 19: "a setting to change the density of the lines and labels"). */
+  grid?: "few" | "some" | "many";
+  /** XP drawn as stacked coins instead of bars, where "+n XP" won't fit under the days (owner, Nov 19: off by default). */
+  xpCoins?: boolean;
+  /** The lines between days (owner, Nov 19): dotted with solid weeks, all dotted, all solid, weeks only, or none. */
+  dayLines?: "dotWeek" | "dotted" | "solid" | "weeks" | "off";
+};
+const GRID_LEVELS = { few: [1, 5, 10], some: [1, 4, 7, 10], many: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] } as const;
+const GRID_LABELS = { few: [1, 5, 10], some: [1, 4, 7, 10], many: [1, 4, 7, 10] } as const;
+const GRID_HOURS = { few: [12, 18], some: [9, 12, 15, 18, 21], many: [8, 10, 12, 14, 16, 18, 20, 22] } as const;
 const DEFAULT_VIEW: View = { range: 30, detail: "every", smooth: true, dots: true, marks: "onLine" };
 
 const EVENTS: { key: string; label: string; kinds: string[]; glyph: string; color: string }[] = [
   { key: "quests", label: "Quests done", kinds: ["quest"], glyph: "◆", color: "#8a6116" },
+  { key: "fails", label: "Quests not done", kinds: ["fail"], glyph: "✕", color: "#8a2a1c" },
   { key: "habits", label: "Habits & rites", kinds: ["habit", "rite"], glyph: "●", color: "#5d7a3a" },
   { key: "journal", label: "Journal notes", kinds: ["journal"], glyph: "✎", color: "#6b4a8a" },
   { key: "notes", label: "Events & #tags", kinds: ["note"], glyph: "🏷", color: "#7a4a1a" },
@@ -157,13 +184,110 @@ function pathFor(pts: [number, number][], smooth: boolean) {
   return d;
 }
 
+/** A cloud that fills with the day's rain (owner, Nov 18: "the weather should show as a raincloud that is partially filled in"). */
+const CLOUD = "M-7 3a3.5 3.5 0 0 1 1-6.8a5 5 0 0 1 9.5-1a3.6 3.6 0 0 1 3.5 4.4a3 3 0 0 1-.5 3.4z";
+/** How full the cloud is: an inch (or 25 mm) fills it. */
+function rainShare(rain: number) {
+  const metric = !/^en-US/.test(typeof navigator === "undefined" ? "" : navigator.language);
+  return Math.max(0.15, Math.min(1, rain / (metric ? 25 : 1)));
+}
+
+type Placed = { key: string; x: number; y: number; u: number; hour: number; li: number; ev: (typeof EVENTS)[number]; w: WinLite; felt: number | null; label: string };
+
+/** One thing on the chart: a quest's portrait (or a gold check), a fail's ✕, or its kind's mark; in the split panel, with its face. */
+function ItemMark({ p, r, badge = false }: { p: Placed; r: number; badge?: boolean }) {
+  const { w, ev } = p;
+  const id = `im-${p.key}`;
+  return (
+    <g transform={`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`}>
+      <title>{p.label}</title>
+      {w.kind === "quest" ? (
+        w.icon ? (
+          <>
+            <clipPath id={id}>
+              <circle r={r - 1} />
+            </clipPath>
+            <circle r={r} fill="#efe2c2" stroke="#8a6c2c" strokeWidth="1.2" />
+            <image href={w.icon} x={-(r - 1)} y={-(r - 1)} width={(r - 1) * 2} height={(r - 1) * 2} clipPath={`url(#${id})`} preserveAspectRatio="xMidYMid slice" />
+          </>
+        ) : (
+          <>
+            <circle r={r} fill="#efe2c2" stroke="#8a6c2c" strokeWidth="1.2" />
+            <path d={`M${-r * 0.42} 0l${r * 0.28} ${r * 0.3} ${r * 0.56} ${-r * 0.6}`} stroke={INK} strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          </>
+        )
+      ) : w.kind === "fail" ? (
+        <>
+          <circle r={r} fill="#efe2c2" stroke="#8a6c2c" strokeWidth="1.2" />
+          <path d={`M${-r * 0.36} ${-r * 0.36}l${r * 0.72} ${r * 0.72}M${r * 0.36} ${-r * 0.36}l${-r * 0.72} ${r * 0.72}`} stroke="#8a2a1c" strokeWidth="1.6" strokeLinecap="round" />
+        </>
+      ) : (
+        <>
+          <circle r={r} fill="#fbf3df" stroke={ev.color} strokeWidth="1.1" />
+          <EventMark k={ev.key} color={ev.color} size={r * 1.15} />
+        </>
+      )}
+      {badge && p.felt != null && (
+        <g transform={`translate(${(r * 0.85).toFixed(1)} ${(r * 0.85).toFixed(1)})`}>
+          <FaceIcon v={p.felt} size={r * 1.3} inSvg />
+        </g>
+      )}
+    </g>
+  );
+}
+
+/** A panel's bottom edge, dragged up or down to resize it; it lights gold when hovered or held. */
+function ResizeEdge({ y, x1, x2, label, svgRef, W, value, min, max, onChange }: { y: number; x1: number; x2: number; label: string; svgRef: React.RefObject<SVGSVGElement | null>; W: number; value: number; min: number; max: number; onChange: (v: number) => void }) {
+  const [hot, setHot] = useState(false);
+  const drag = useRef<{ y: number; v: number } | null>(null);
+  return (
+    <g>
+      <line x1={x1} x2={x2} y1={y} y2={y} stroke="#d9b45f" strokeWidth="3" strokeLinecap="round" opacity={hot ? 0.95 : 0} style={{ transition: "opacity 150ms" }} />
+      <rect
+        x={x1}
+        y={y - 6}
+        width={x2 - x1}
+        height={12}
+        fill="transparent"
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label={label}
+        aria-valuenow={Math.round(value)}
+        style={{ cursor: "ns-resize", touchAction: "none" }}
+        onPointerEnter={() => setHot(true)}
+        onPointerLeave={() => !drag.current && setHot(false)}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          e.currentTarget.setPointerCapture(e.pointerId);
+          drag.current = { y: e.clientY, v: value };
+          setHot(true);
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current;
+          if (!d) return;
+          const r = svgRef.current?.getBoundingClientRect();
+          const scale = r ? W / r.width : 1;
+          onChange(Math.round(Math.max(min, Math.min(max, d.v + (e.clientY - d.y) * scale))));
+        }}
+        onPointerUp={() => {
+          drag.current = null;
+          setHot(false);
+        }}
+        onClick={(e) => e.stopPropagation()}
+      />
+    </g>
+  );
+}
+
 /**
  * Every tracked metric on one 1–10 chart, each toggled with a checkbox, with
  * optional strips for the weather and for things you did (quests, habits,
  * journal notes, rewards). The gear in the corner switches how it's drawn.
  */
-export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: string[]; readings: Reading[]; wins: WinLite[]; onAdd?: () => void }) {
+export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metrics: string[]; readings: Reading[]; wins: WinLite[]; onAdd?: () => void; /** Sleep by the morning it ended (Wheel of Time), shown on the day's card (owner, Nov 9). */ nights?: Record<string, { bed: string | null; wake: string | null }> }) {
   const [view, setView] = useState<View>(DEFAULT_VIEW);
+  const gridD = view.grid ?? "some";
+  const dayLines = view.dayLines ?? "dotWeek";
   const [more, setMore] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState<Record<string, boolean>>({});
@@ -176,6 +300,15 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
   const fingers = useRef(new Map<number, number>());
   const gesture = useRef<{ dist: number; mid: number; win: [number, number]; moved: boolean } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  // How many screen pixels one chart unit takes, so labels can be shown by how much room they really have.
+  const [scale, setScale] = useState(0.75);
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setScale(el.getBoundingClientRect().width / 440 || 0.75));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- saved choices are only readable after hydration */
@@ -214,7 +347,8 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
     writeJSON(VIEW_KEY, next);
   }
   // Metrics and XP are on by default; weather and events off until ticked.
-  const isOn = (k: string) => shown[k] ?? !(k === "weather" || EVENTS.some((e) => e.key === k));
+  // Metrics, XP, quests, fails, habits and events are on by default (owner, Nov 19: they sit on the chart); weather, journal and rewards off until ticked.
+  const isOn = (k: string) => shown[k] ?? !(k === "weather" || k === "journal" || k === "rewards");
   function flip(k: string) {
     const next = { ...shown, [k]: !isOn(k) };
     setShown(next);
@@ -235,34 +369,64 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
   const W = 440;
   const L = 28;
   const R = 12;
-  const weatherH = showWeather ? 34 : 0;
-  const T = 10 + weatherH;
-  const plotH = 190;
-  // Events sit with the lines (on them, or as a marker line) unless kept in their own rows.
+  // Events sit on the chart by how they felt, as marker lines, or in their own rows.
   const marks = view.marks ?? "onLine";
+  const split = view.layout === "split";
+  // The visible window, in days (0 … n), each day its waking hours; pinching zooms it.
+  const [v0, v1] = zoom && zoom[0] >= 0 && zoom[1] <= n ? zoom : [0, n];
+  const visDays = Math.max(1, Math.round(v1 - v0));
+  // Zoomed in to a few days: the times show along the bottom and the days are divided by dotted lines.
+  const close = visDays <= 3;
+  // Above the chart: each day's rating and rain. Its date and "+n XP" sit underneath it (owner, Nov 19).
+  // Split (owner, Nov 19): the date sits with its weekday above the chart, and the XP at the very bottom, under the time panel.
+  const headH = split ? 36 : 22;
+  const T = headH + 4;
+  const plotH = Math.max(90, Math.min(360, view.chartH ?? 190));
   const eventsH = activeEvents.length && marks === "lanes" ? 14 + activeEvents.length * 16 : 0;
-  const B = 22 + eventsH;
-  const H = T + plotH + B;
-  const [v0, v1] = zoom && zoom[0] >= start && zoom[1] <= end ? zoom : [start, end];
-  const x = (t: number) => L + ((t - v0) / (v1 - v0)) * (W - L - R);
-  const xDay = (i: number) => x(start + i * DAY + DAY / 2);
+  const timesH = close ? 16 : 0;
+  const footY = T + plotH + timesH + eventsH;
+  // Coins stack under the dates (owner, Nov 20), so they get a little more room there.
+  const footH = split ? 0 : view.xpCoins ? 46 : 30;
+  const plotEnd = footY + footH;
+  const tP = plotEnd + (split ? 6 : 12);
+  const timeH = split ? Math.max(90, Math.min(400, view.timeH ?? 200)) : 0;
+  const xpY = tP + timeH + 22;
+  const sleepY = (split ? xpY + (view.xpCoins ? 18 : 4) : plotEnd) + 16;
+  const H = sleepY + (nights ? 8 : -6);
+  const uOf = (t: number) => {
+    const d = new Date(t);
+    const m = new Date(t);
+    m.setHours(0, 0, 0, 0);
+    const i = Math.round((m.getTime() - start) / DAY);
+    const h = d.getHours() + d.getMinutes() / 60;
+    // Before 7 AM or after 11:30 PM: just inside the day's edge, never on the line between days (owner, Nov 19).
+    return i + Math.max(0.06, Math.min(0.94, (h - H0) / (H1 - H0)));
+  };
+  const xu = (u: number) => L + ((u - v0) / (v1 - v0)) * (W - L - R);
+  const x = (t: number) => xu(uOf(t));
+  const xDay = (i: number) => xu(i + 0.5);
   /** Where a pointer sits, in chart units (0…W). */
   const svgX = (clientX: number) => {
     const r = svgRef.current?.getBoundingClientRect();
     return r ? ((clientX - r.left) / r.width) * W : 0;
   };
-  const tAt = (px: number) => v0 + ((px - L) / (W - L - R)) * (v1 - v0);
-  const dayAt = (px: number) => Math.floor((tAt(px) - start) / DAY);
-  const inView = (i: number) => start + (i + 1) * DAY > v0 && start + i * DAY < v1;
-  const visDays = Math.max(1, Math.round((v1 - v0) / DAY));
-  /** Keep a zoom window inside the span, at least three days wide. */
+  const uAt = (px: number) => v0 + ((px - L) / (W - L - R)) * (v1 - v0);
+  const dayAt = (px: number) => Math.floor(uAt(px));
+  const inView = (i: number) => i + 1 > v0 && i < v1;
+  /** Keep a zoom window inside the span, at least a day wide. */
   function clampWin(a: number, b: number): [number, number] | null {
-    const span = Math.min(end - start, Math.max(3 * DAY, b - a));
-    if (span >= end - start - DAY / 4) return null;
-    const lo = Math.max(start, Math.min(a, end - span));
+    const span = Math.min(n, Math.max(1, b - a));
+    if (span >= n - 0.25) return null;
+    const lo = Math.max(0, Math.min(a, n - span));
     return [lo, lo + span];
   }
   const y = (v: number) => T + ((10 - v) * plotH) / 9;
+  /** The time-of-day panel (split): morning at the top, night at the bottom. */
+  const tY = (h: number) => tP + 8 + ((Math.max(H0, Math.min(H1, h)) - H0) / (H1 - H0)) * (timeH - 16);
+  const hourOf = (t: number) => {
+    const d = new Date(t);
+    return d.getHours() + d.getMinutes() / 60;
+  };
 
   const series = metrics.map((m, i) => {
     const rs = readings.filter((r) => r.metric === m && new Date(r.at).getTime() >= start);
@@ -289,11 +453,77 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
     eventsByDay.set(k, [...(eventsByDay.get(k) ?? []), w]);
   }
 
-  const showXp = isOn("xp");
+  // How the day was: the day's "My day" check-ins, averaged (shown above the chart).
+  const dayRate = days.map((d) => {
+    const vs = readings.filter((r) => r.metric === DAY_METRIC && dayKey(new Date(r.at)) === dayKey(d)).map((r) => r.level);
+    return vs.length ? Math.round(vs.reduce((a, b) => a + b, 0) / vs.length) : null;
+  });
+  // The line things without a face rest on: the first line shown, read at that moment.
+  const restLine = visible[0] ? visible[0].pts.map((p) => [x(p.t), y(p.v)] as [number, number]).sort((a, b) => a[0] - b[0]) : [];
+  const lineAt = (px: number) => {
+    if (!restLine.length) return y(5.5);
+    if (px <= restLine[0][0]) return restLine[0][1];
+    for (let i = 1; i < restLine.length; i++) {
+      const [ax, ay] = restLine[i - 1];
+      const [bx, by] = restLine[i];
+      if (px <= bx) return bx === ax ? by : ay + ((by - ay) * (px - ax)) / (bx - ax);
+    }
+    return restLine[restLine.length - 1][1];
+  };
+  // Everything shown on the chart, placed so none hides another (owner, Nov 19: "making sure that items … aren't overlapping too much").
+  const itemR = close ? 9 : 7.5;
+  const placed: Placed[] = (() => {
+    const out: Placed[] = [];
+    const taken: [number, number][] = restLine.filter(([px]) => px >= L && px <= W - R);
+    const all = activeEvents
+      .flatMap((ev, li) => wins.filter((w) => ev.kinds.includes(w.kind)).map((w, wi) => ({ ev, li, w, wi, t: new Date(w.at).getTime() })))
+      .filter((o) => o.t >= start && o.t < end)
+      .sort((a, b) => a.t - b.t);
+    for (const o of all) {
+      const u = uOf(o.t);
+      if (u < v0 - 0.2 || u > v1 + 0.2) continue;
+      const px = xu(u);
+      const felt = typeof o.w.tone === "number" && FACE_V[o.w.tone] !== undefined ? o.w.tone : null;
+      const want = felt != null ? y(FACE_V[felt]) : lineAt(px) - itemR - 4;
+      const step = itemR * 2 + 2;
+      let py = want;
+      for (const k of [0, -1, 1, -2, 2, -3, 3, -4, 4]) {
+        const c = Math.max(T + itemR + 1, Math.min(T + plotH - itemR - 1, want + k * step));
+        if (taken.every(([tx, ty]) => Math.hypot(tx - px, ty - c) >= step - 1)) {
+          py = c;
+          break;
+        }
+      }
+      taken.push([px, py]);
+      const when = new Date(o.w.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      out.push({ key: `${o.ev.key}-${o.wi}`, x: px, y: py, u, hour: hourOf(o.t), li: o.li, ev: o.ev, w: o.w, felt, label: [`${o.w.title ?? o.ev.label} · ${when}`, felt != null ? faceOf(felt)?.label : null, o.w.details].filter(Boolean).join(" — ") });
+    }
+    return out;
+  })();
+  // In the split panel: each day's things on the right of its column, at their time, nudged down so none hides another.
+  const splitPlaced: Placed[] = (() => {
+    if (!split) return [];
+    const taken: [number, number][] = [];
+    return placed.map((p) => {
+      const px = xu(Math.floor(p.u) + 0.68);
+      let py = tY(p.hour);
+      while (taken.some(([tx, ty]) => Math.abs(tx - px) < itemR * 2 && Math.abs(ty - py) < itemR * 2 + 1)) py += itemR * 2 + 1;
+      taken.push([px, py]);
+      return { ...p, x: px, y: py };
+    });
+  })();
+
+  // XP always shows, as "+n XP" under each day (owner, Nov 19); no toggle.
+  const showXp = true;
+  const shownCount = series.filter((m) => isOn(m.metric)).length + (showWeather ? 1 : 0) + activeEvents.length;
   const xpByDay = days.map((d) => (eventsByDay.get(dayKey(d)) ?? []).reduce((a, w) => a + (w.xp || 0), 0));
-  const xpTop = Math.ceil(Math.max(10, ...xpByDay) / 10) * 10;
   const xpTotal = xpByDay.reduce((a, b) => a + b, 0);
-  const dayW = ((W - L - R) * DAY) / (v1 - v0);
+  const xpMaxShown = Math.max(1, ...xpByDay);
+  const dayW = (W - L - R) / (v1 - v0);
+  // A day's width on screen: 18px or more and every day gets its own date (owner, Nov 19).
+  const everyDay = dayW >= 14 || dayW * scale >= 18;
+  // One choice for the whole view: if the biggest day's "+n XP" won't fit under it, every day's XP rises into the chart.
+  const xpRises = everyDay && `+${xpMaxShown} XP`.length * (dayW >= 22 ? 10 : 9) * 0.56 > dayW * 0.94;
 
   const tickEvery = visDays <= 7 ? 1 : visDays <= 30 ? 7 : 14;
   const hd = hover !== null ? days[hover] : null;
@@ -312,27 +542,22 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
     .join(" · ");
   const hoverIcons = hoverWins.filter((w) => w.icon).slice(0, 6);
   const hoverWeather = hk && weather ? weather[hk] : null;
+  // The night that ended that morning: bed and wake times, and how long (owner, Nov 9: "show sleep/wake times… on the chart").
+  const hoverNight = hk && nights ? nights[hk] : null;
+  const nightWords = hoverNight && (hoverNight.bed || hoverNight.wake)
+    ? [hoverNight.bed ? prettyTime(hoverNight.bed) : "?", hoverNight.wake ? prettyTime(hoverNight.wake) : "?"].join(" → ") + (() => {
+        const m = sleptMinutes({ bed: hoverNight.bed, wake: hoverNight.wake, effort: [], hindrances: [], at: "" });
+        return m ? ` · ${minutesLabel(m)}` : "";
+      })()
+    : null;
   const fmt = (v: number) => (Math.round(v * 10) / 10).toFixed(1);
 
   return (
     <div className="relative z-[1] flex flex-col gap-2">
       {/* Toggles, kept small so the chart leads: XP and each metric as a pill (its swatch is its mark), the rest under "Weather & events". */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <div className="contents" role="group" aria-label="Lines to show">
-          <button
-            type="button"
-            aria-pressed={showXp}
-            onClick={() => flip("xp")}
-            className="flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold"
-            style={showXp ? { background: "rgba(255,250,235,.85)", border: `1.5px solid ${XP_EDGE}`, color: INK } : { border: `1px dashed ${GRID}`, color: INK_SOFT, opacity: 0.75 }}
-          >
-            <svg aria-hidden width="12" height="12" viewBox="0 0 12 12">
-              <rect x="0.5" y="5" width="3" height="6.5" rx="0.8" fill={showXp ? XP_FILL : INK_SOFT} />
-              <rect x="4.5" y="2" width="3" height="9.5" rx="0.8" fill={showXp ? XP_FILL : INK_SOFT} />
-              <rect x="8.5" y="6.5" width="3" height="5" rx="0.8" fill={showXp ? XP_FILL : INK_SOFT} />
-            </svg>
-            XP per day
-          </button>
+        {/* One button for what's on the chart (owner, Nov 19); on a wider screen the lines also show as pills. */}
+        <div className="hidden flex-wrap items-center gap-1.5 sm:flex" role="group" aria-label="Lines to show">
           {series.map((s) => {
             const on = isOn(s.metric);
             return (
@@ -358,34 +583,77 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
             className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold"
             style={{ border: `1px solid ${extrasOn ? "#8a6116" : GRID}`, background: extrasOn ? "rgba(217,180,95,.3)" : undefined, color: INK }}
           >
-            <svg aria-hidden width="14" height="14" viewBox="0 0 24 24">
-              <circle cx="9" cy="9" r="4" fill="#e7b43c" />
-              <path d="M8 19h9.5a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6 1.5A2.8 2.8 0 0 0 8 19z" fill="#f6f1e4" stroke="#7d8aa0" strokeWidth="1.4" />
-            </svg>
-            Weather &amp; events{extrasOn ? ` (${extrasOn} on)` : ""}
+            Show{shownCount ? ` (${shownCount})` : ""}
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path d="M5 9l7 7 7-7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           {more && (
-            <div role="dialog" aria-label="Weather and events" className="pop parchment absolute right-0 top-full z-[6] mt-1.5 flex w-[220px] flex-col py-1.5" style={{ borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 28px rgba(0,0,0,.3)" }}>
-              <label className="relative z-[1] flex min-h-9 items-center gap-2 px-3 text-[14px]" style={{ color: INK }}>
+            <div role="dialog" aria-label="What the chart shows" className="pop parchment absolute bottom-full right-0 z-[6] mb-1.5 flex max-h-[min(46vh,340px)] w-[230px] flex-col overflow-y-auto py-1" style={{ borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 28px rgba(0,0,0,.3)" }}>
+              {series.map((m) => (
+                <label key={m.metric} className="relative z-[1] flex min-h-8 items-center gap-2 px-3 text-[14px]" style={{ color: INK }}>
+                  <input type="checkbox" checked={isOn(m.metric)} onChange={() => flip(m.metric)} />
+                  <span aria-hidden className="inline-block h-[3px] w-3.5 rounded-full" style={{ background: m.color }} />
+                  {m.metric}
+                </label>
+              ))}
+              {series.length > 0 && <span aria-hidden className="mx-3 my-1 block h-px" style={{ background: GRID }} />}
+              <label className="relative z-[1] flex min-h-8 items-center gap-2 px-3 text-[14px]" style={{ color: INK }}>
                 <input type="checkbox" checked={showWeather} onChange={() => flip("weather")} />
-                <svg aria-hidden width="16" height="16" viewBox="0 0 24 24">
-                  <circle cx="9" cy="9" r="4" fill="#e7b43c" />
-                  <path d="M8 19h9.5a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6 1.5A2.8 2.8 0 0 0 8 19z" fill="#f6f1e4" stroke="#7d8aa0" strokeWidth="1.4" />
+                <svg aria-hidden width="16" height="14" viewBox="-9 -7 20 12">
+                  <path d={CLOUD} fill="none" stroke={INK_SOFT} strokeWidth="1.2" />
                 </svg>
                 Weather
               </label>
               {EVENTS.map((e) => (
-                <label key={e.key} className="relative z-[1] flex min-h-9 items-center gap-2 px-3 text-[14px]" style={{ color: INK }}>
+                <label key={e.key} className="relative z-[1] flex min-h-8 items-center gap-2 px-3 text-[14px]" style={{ color: INK }}>
                   <input type="checkbox" checked={isOn(e.key)} onChange={() => flip(e.key)} />
                   <svg aria-hidden width="14" height="14" viewBox="-7 -7 14 14">
-                    <EventMark k={e.key} color={e.color} size={12} />
+                    {/* One ink for the list's marks (owner, Nov 14: flat, single-colour icons). */}
+                    <EventMark k={e.key} color={INK_SOFT} size={12} />
                   </svg>
                   {e.label}
                 </label>
               ))}
+            </div>
+          )}
+        </div>
+        {/* The chart's gear, in the row above it, so changing the layout never moves it (owner, Nov 19). */}
+        <div ref={gearRef} className="relative z-[6] shrink-0">
+          <button
+            type="button"
+            onClick={() => setSettings((o) => !o)}
+            aria-expanded={settings}
+            aria-label="Chart view settings"
+            title="View settings"
+            className="flex h-8 w-8 items-center justify-center rounded-full"
+            style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10", boxShadow: "0 2px 6px rgba(60,40,10,.3)" }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+              {Array.from({ length: 8 }, (_, i) => (
+                <rect key={i} x="10.4" y="1.6" width="3.2" height="4.6" rx="1" fill="currentColor" transform={`rotate(${i * 45} 12 12)`} />
+              ))}
+              <circle cx="12" cy="12" r="6.9" fill="currentColor" />
+              <circle cx="12" cy="12" r="2.7" fill="#e3c06e" />
+            </svg>
+          </button>
+          {settings && (
+            <div role="dialog" aria-label="Chart view settings" className="pop parchment absolute right-0 top-full mt-2 flex w-[250px] flex-col gap-2.5 p-3" style={{ borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 28px rgba(0,0,0,.3)" }}>
+              <Seg label="Time span" value={String(view.range)} options={[["7", "Week"], ["30", "Month"], ["90", "3 months"]]} onPick={(v) => setV({ range: Number(v) as View["range"] })} />
+              <Seg label="Points" value={view.detail} options={[["daily", "Daily average"], ["every", "Every check-in"]]} onPick={(v) => setV({ detail: v as View["detail"] })} />
+              <Seg label="Lines" value={view.smooth ? "smooth" : "straight"} options={[["smooth", "Smooth"], ["straight", "Straight"]]} onPick={(v) => setV({ smooth: v === "smooth" })} />
+              <Seg label="Grid lines" value={gridD} options={[["few", "Few"], ["some", "Some"], ["many", "Many"]]} onPick={(v) => setV({ grid: v as View["grid"] })} />
+              <Seg label="Lines between days" wrap value={dayLines} options={[["dotWeek", "Dotted, weeks solid"], ["dotted", "Dotted"], ["solid", "Solid"], ["weeks", "Weeks only"], ["off", "None"]]} onPick={(v) => setV({ dayLines: v as View["dayLines"] })} />
+              <Seg label="Layout" value={view.layout ?? "merged"} options={[["merged", "Merged"], ["split", "Split"]]} onPick={(v) => setV({ layout: v as View["layout"] })} />
+              {!split && <Seg label="Things you did" value={view.marks ?? "onLine"} options={[["onLine", "On the chart"], ["lines", "Marker lines"], ["lanes", "Own rows"]]} onPick={(v) => setV({ marks: v as View["marks"] })} />}
+              <label className="relative z-[1] flex min-h-8 items-center gap-2 text-[14px]" style={{ color: INK }}>
+                <input type="checkbox" checked={view.dots} onChange={() => setV({ dots: !view.dots })} />
+                Show each point
+              </label>
+              <label className="relative z-[1] flex min-h-8 items-center gap-2 text-[14px]" style={{ color: INK }}>
+                <input type="checkbox" checked={!!view.xpCoins} onChange={() => setV({ xpCoins: !view.xpCoins })} />
+                XP as coins (when zoomed out)
+              </label>
             </div>
           )}
         </div>
@@ -486,81 +754,185 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
             <clipPath id="plot-clip">
               <rect x={L} y={0} width={W - L - R} height={H} />
             </clipPath>
+            <clipPath id="head-clip">
+              <rect x={L} y={0} width={W - L - R + R} height={H} />
+            </clipPath>
+            <clipPath id="time-clip">
+              <rect x={L} y={tP} width={W - L - R} height={timeH} />
+            </clipPath>
           </defs>
-          {/* Weather strip */}
-          {showWeather && weather && (
-            <g clipPath="url(#plot-clip)">
-              {days.map((d, i) => {
-                const w = weather[dayKey(d)];
-                if (!w) return null;
-                const label = n <= 30 || i % 3 === 0;
-                return (
-                  <g key={i}>
-                    {w.rain > 0.02 && (() => {
-                      // A light-blue drop, filled with dark blue as far as the day was wet (an inch fills it).
-                      const metric = !/^en-US/.test(typeof navigator === "undefined" ? "" : navigator.language);
-                      const full = Math.max(0.15, Math.min(1, w.rain / (metric ? 25 : 1)));
-                      const drop = "M0 -6C2.6 -2.6 4 -0.6 4 1.6A4 4 0 0 1 -4 1.6C-4 -0.6 -2.6 -2.6 0 -6Z";
-                      const cx = xDay(i);
-                      const cy = 10 + weatherH - 7;
-                      return (
-                        <g transform={`translate(${cx.toFixed(1)} ${cy})`}>
-                          <clipPath id={`rain-${i}`}>
-                            <rect x="-5" y={(5.6 - 11.6 * full).toFixed(2)} width="10" height="12" />
-                          </clipPath>
-                          <path d={drop} fill="#cfe3f7" stroke="#2f5f9e" strokeWidth="0.9" />
-                          <path d={drop} fill="#2f5f9e" clipPath={`url(#rain-${i})`} />
-                        </g>
-                      );
-                    })()}
-                    {label && (
-                      <text x={xDay(i)} y={20} textAnchor="middle" fontSize={n <= 7 ? 12 : 9.5} fill={INK_SOFT}>
-                        {w.hi}°
+          {/* Above the chart, what belongs to a whole day (owner, Nov 19): its date, how the day was (the "My day"
+              check-in), and the rain, as a cloud that fills with how wet it was. */}
+          <g clipPath="url(#head-clip)">
+            {days.map((d, i) => {
+              if (!inView(i)) return null;
+              if (!everyDay && (n - 1 - i) % tickEvery !== 0) return null;
+              const x0 = xu(i) + 3;
+              const rate = dayRate[i];
+              const w = showWeather && weather ? weather[dayKey(d)] : null;
+              const wide = dayW >= 58;
+              const wd = i === n - 1 ? "Today" : d.toLocaleDateString(undefined, { weekday: "short" });
+              const rx = x0 + 44;
+              const cx = rate != null && wide ? x0 + 64 : x0 + 44;
+              return (
+                <g key={i}>
+                  <text x={wide ? x0 + 1 : xDay(i)} y={15} textAnchor={wide ? "start" : "middle"} fontSize="11.5" fontWeight={i === n - 1 ? 700 : 400} fill={hover === i || i === n - 1 ? INK : INK_SOFT} fontFamily="var(--font-display, Georgia), serif">
+                    {everyDay ? (wide ? wd : wd.slice(0, i === n - 1 ? (dayW >= 30 ? 5 : 1) : dayW >= 22 ? 2 : 1)) : ""}
+                  </text>
+                  {rate != null && wide && (
+                    <g transform={`translate(${rx.toFixed(1)} 11)`}>
+                      <title>{`How the day was: ${rate} of 10`}</title>
+                      <circle r="8" fill="#fffaf0" stroke="#a88a3f" strokeWidth="1" />
+                      <text y="3.6" textAnchor="middle" fontSize="10" fontWeight="700" fill={INK}>
+                        {rate}
                       </text>
-                    )}
-                  </g>
-                );
-              })}
-            </g>
-          )}
-
-          {/* XP per day: gilded columns behind the lines, on their own scale (top label, right). */}
-          {showXp && (
-            <g clipPath="url(#plot-clip)">
-              {xpByDay.map((xp, i) => {
-                if (!xp || !inView(i)) return null;
-                const h = (xp / xpTop) * plotH;
-                const bw = Math.max(2, dayW * 0.62);
-                return (
-                  <rect key={i} x={xDay(i) - bw / 2} y={T + plotH - h} width={bw} height={h} rx={Math.min(3, bw / 3)} fill={XP_FILL} opacity={hover === null || hover === i ? 0.42 : 0.25} stroke={XP_EDGE} strokeWidth="0.8" />
-                );
-              })}
-              <text x={W - R - 2} y={T + 11} textAnchor="end" fontSize="10.5" fontWeight="700" fill={XP_EDGE}>
-                {xpTop} XP
-              </text>
-            </g>
-          )}
+                    </g>
+                  )}
+                  {w && wide && (
+                    <g transform={`translate(${cx.toFixed(1)} 14)`}>
+                      <title>{`${w.hi}° / ${w.lo}°${w.rain > 0.02 ? `, rain ${w.rain.toFixed(2)}` : ""}`}</title>
+                      <clipPath id={`cloud-${i}`}>
+                        <path d={CLOUD} />
+                      </clipPath>
+                      {w.rain > 0.02 && <rect x="-8" y={(3 - 9 * rainShare(w.rain)).toFixed(2)} width="16" height="10" fill="#7d93a8" opacity=".6" clipPath={`url(#cloud-${i})`} />}
+                      <path d={CLOUD} fill="none" stroke={INK} strokeWidth="1" />
+                      {wide && (
+                        <text x="11" y="3" fontSize="9.5" fill={INK_SOFT}>
+                          {w.hi}°
+                        </text>
+                      )}
+                    </g>
+                  )}
+                </g>
+              );
+            })}
+          </g>
 
           {/* Grid */}
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
+          {GRID_LEVELS[gridD].map((v) => (
             <g key={v}>
-              <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke={GRID} strokeWidth="1" opacity={v % 3 === 1 ? 1 : 0.45} />
-              {v % 3 === 1 && (
+              <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke={GRID} strokeWidth="1" opacity={(GRID_LABELS[gridD] as readonly number[]).includes(v) ? 1 : 0.45} />
+              {(GRID_LABELS[gridD] as readonly number[]).includes(v) && (
                 <text x={L - 6} y={y(v) + 4} textAnchor="end" fontSize="12" fill={INK_SOFT}>
                   {v}
                 </text>
               )}
             </g>
           ))}
-          {days.map((d, i) =>
-            (n - 1 - i) % tickEvery === 0 && inView(i) ? (
-              <text key={i} x={xDay(i)} y={T + plotH + 16} textAnchor="middle" fontSize="12" fill={INK_SOFT}>
-                {i === n - 1 ? "today" : d.toLocaleDateString(undefined, visDays <= 7 ? { weekday: "short" } : { month: "short", day: "numeric" })}
-              </text>
-            ) : null
-          )}
-          {hover !== null && <line x1={xDay(hover)} x2={xDay(hover)} y1={T} y2={T + plotH + eventsH + 20} stroke={INK_SOFT} strokeWidth="1" strokeDasharray="3 3" />}
+          {/* Days divided by a thin line, faint when zoomed out and dotted when zoomed in; the hours, dotted and fainter, with their times, once a day is wide enough (owner, Nov 19). */}
+          <g clipPath="url(#plot-clip)">
+            {/* The lines between days, as chosen in the gear (owner, Nov 19); by default dotted, with a solid line where a
+                week begins (on Monday, or where a labelled stretch begins once the dates are spaced out). */}
+            {days.map((d, i) => {
+              if (i === 0 || !inView(i) || dayLines === "off") return null;
+              const week = everyDay ? d.getDay() === 1 : (n - 1 - i) % tickEvery === tickEvery - 1;
+              if (dayLines === "weeks" && !week) return null;
+              const solid = dayLines === "solid" || ((dayLines === "dotWeek" || dayLines === "weeks") && week);
+              const dash = solid ? undefined : "2 3";
+              const op = solid ? (week ? 0.75 : 0.55) : 0.5;
+              const w = week && dayLines !== "dotted" ? 1.1 : 0.8;
+              return (
+                <g key={i}>
+                  <line x1={xu(i)} x2={xu(i)} y1={T} y2={T + plotH} stroke="rgba(110,85,40,.42)" strokeWidth={w} strokeDasharray={dash} opacity={op} />
+                  {split && <line x1={xu(i)} x2={xu(i)} y1={tP} y2={tP + timeH} stroke="rgba(110,85,40,.42)" strokeWidth={w} strokeDasharray={dash} opacity={op} />}
+                </g>
+              );
+            })}
+            {close &&
+              days.flatMap((_, i) =>
+                inView(i)
+                  ? [9, 12, 15, 18, 21].map((h) => {
+                      const hx = xu(i + (h - H0) / (H1 - H0));
+                      return (
+                        <g key={`${i}-${h}`}>
+                          <line x1={hx} x2={hx} y1={T} y2={T + plotH} stroke={GRID} strokeWidth="1" strokeDasharray="1 4" />
+                          <text x={hx} y={T + plotH + 12} textAnchor="middle" fontSize="9.5" fill={INK_SOFT}>
+                            {h === 12 ? "noon" : `${h % 12}${h < 12 ? "a" : "p"}`}
+                          </text>
+                        </g>
+                      );
+                    })
+                  : []
+              )}
+          </g>
+          {/* Under each day: its date, and the XP earned that day (owner, Nov 19). */}
+          <g clipPath="url(#head-clip)">
+            {days.map((d, i) => {
+              if (!inView(i)) return null;
+              // Every day keeps its own date once a day is 14px wide (owner, Nov 19): the day's number alone, with the
+              // month on the first day shown and on the 1st; narrower than that, a date per labelled stretch.
+              if (!everyDay && (n - 1 - i) % tickEvery !== 0) return null;
+              const wide = dayW >= 58;
+                            const label =
+                dayW >= 30
+                  ? d.toLocaleDateString(undefined, wide ? { month: "short", day: "numeric" } : { month: "numeric", day: "numeric" })
+                  : everyDay
+                    ? // Too narrow for "11/1": the 1st shows its month's name ("Nov") instead, every other day its number.
+                      d.getDate() === 1
+                      ? d.toLocaleDateString(undefined, { month: "short" })
+                      : String(d.getDate())
+                    : `${d.getMonth() + 1}/${d.getDate()}`;
+              return (
+                <g key={i}>
+                  <text x={xDay(i)} y={split ? 31 : footY + 12} textAnchor="middle" fontSize={dayW >= 30 ? 11 : 9} fill={hover === i ? INK : INK_SOFT} fontWeight={i === n - 1 ? 700 : 400} fontFamily="var(--font-display, Georgia), serif">
+                    {/* The date at the bottom (owner, Nov 19), the weekday above the chart. */}
+                    {label}
+                  </text>
+                  {/* XP under each date; squished (a month or more), the XP of the days up to this date. */}
+                  {(() => {
+                    const span = everyDay ? 1 : tickEvery;
+                    const sum = xpByDay.slice(Math.max(0, i - span + 1), i + 1).reduce((a, b) => a + (b ?? 0), 0);
+                    if (!sum) return null;
+                    const tip = span > 1 ? `${sum} XP over these ${span} days` : `${sum} XP that day`;
+                    const words = `+${sum} XP`;
+                    const fs = dayW >= 22 ? 10 : 9;
+                    const base = split ? xpY : footY + 25;
+                    // Always "+n XP" (owner, Nov 19); where it won't fit, a small gold bar as tall as the day's XP, its number on hover or tap.
+                    if (!xpRises)
+                      return (
+                        <text x={xDay(i)} y={base} textAnchor="middle" fontSize={fs} fontWeight="700" fill={XP_EDGE}>
+                          <title>{tip}</title>
+                          {words}
+                        </text>
+                      );
+                    // Too narrow for the words: coins stacked under the date (one per 10 XP, owner Nov 20), or else the
+                    // day's XP rises into the chart as a column (drawn behind the lines, below).
+                    if (!view.xpCoins) return null;
+                    const bottom = split ? xpY + 12 : footY + 40;
+                    const rx = Math.min(7, dayW * 0.38);
+                    return (
+                      <g data-xp-coins>
+                        <title>{tip}</title>
+                        {Array.from({ length: Math.min(6, Math.max(1, Math.round(sum / 10))) }, (_, k) => (
+                          <ellipse key={k} cx={xDay(i)} cy={bottom - k * 4} rx={rx} ry="2.6" fill={XP_FILL} stroke={XP_EDGE} strokeWidth=".9" />
+                        ))}
+                      </g>
+                    );
+                  })()}
+                </g>
+              );
+            })}
+          </g>
+          {hover !== null && <line x1={xDay(hover)} x2={xDay(hover)} y1={T} y2={sleepY - 10} stroke={INK_SOFT} strokeWidth="1" strokeDasharray="3 3" />}
 
+          {/* Where "+n XP" won't fit under the days (owner, Nov 19): each day's XP rises into the chart from its foot, a soft
+              warm amber column (owner's pick C5, Nov 20) behind the lines, up to about two-fifths of the way; or stacked coins (one per 10 XP), from the gear. */}
+          {xpRises && !view.xpCoins && (
+            <g clipPath="url(#plot-clip)" data-xp-rise>
+              {xpByDay.map((v, i) => {
+                if (!v || !inView(i)) return null;
+                const cx = xDay(i);
+                const foot = T + plotH;
+                const tip = `+${v} XP`;
+                const h = plotH * 0.42 * (v / xpMaxShown);
+                return (
+                  <rect key={i} x={cx - dayW * 0.32} y={foot - h} width={dayW * 0.64} height={h} rx="2" fill="#e0a94a" opacity={hover === i ? 0.5 : 0.32}>
+                    <title>{tip}</title>
+                  </rect>
+                );
+              })}
+            </g>
+          )}
           {/* Lines */}
           <g clipPath="url(#plot-clip)">
           {visible.map((s) => {
@@ -586,57 +958,86 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
 
           </g>
 
-          {/* Events by the lines: a marker line at the moment, or the icon sitting on the day's average. */}
+          {/* Marker lines: a dashed line at the moment, its mark at the top. */}
           <g clipPath="url(#plot-clip)">
-          {marks !== "lanes" &&
-            activeEvents.flatMap((ev, li) =>
-              wins
-                .filter((w) => ev.kinds.includes(w.kind))
-                .map((w, wi) => {
-                  const t = new Date(w.at).getTime();
-                  if (t < start || t >= end) return null;
-                  const px = x(t);
-                  const di = Math.floor((t - start) / DAY);
-                  if (marks === "lines")
-                    return (
-                      <g key={`${ev.key}-${wi}`}>
-                        <title>{[w.title, w.details].filter(Boolean).join(" — ")}</title>
-                        <line x1={px} x2={px} y1={T} y2={T + plotH} stroke={markColor(w, ev.color)} strokeWidth="1.3" strokeDasharray="3 3" opacity=".75" />
-                        <g transform={`translate(${px.toFixed(1)} ${T + 6 + li * 12})`}>
-                          <EventMark k={ev.key} color={markColor(w, ev.color)} size={9} />
-                        </g>
-                      </g>
-                    );
-                  // On the average of the lines shown, at that moment (the middle when there's nothing to sit on).
-                  const near = visible
-                    .map((s) => {
-                      const inDay = s.pts.filter((p) => p.t >= start + di * DAY && p.t < start + (di + 1) * DAY);
-                      return inDay.length ? inDay.reduce((a, p) => a + p.v, 0) / inDay.length : null;
-                    })
-                    .filter((v): v is number => v !== null);
-                  const avgV = near.length ? near.reduce((a, b) => a + b, 0) / near.length : 5.5;
-                  return (
-                    <g key={`${ev.key}-${wi}`} transform={`translate(${px.toFixed(1)} ${(y(avgV) - 1 - (wi % 3) * 3).toFixed(1)})`}>
-                      {/* Hover: its title and details. A felt event is a coloured + / ● / − button. */}
-                      <title>{[w.title, w.details].filter(Boolean).join(" — ")}</title>
-                      {w.kind === "note" && faceOf(w.tone) ? (
-                        <FaceIcon v={w.tone!} size={18} inSvg />
-                      ) : (
-                        <>
-                          <circle r="7.5" fill="#fbf3df" stroke={ev.color} strokeWidth="1.2" opacity=".95" />
-                          <EventMark k={ev.key} color={ev.color} size={9} />
-                        </>
-                      )}
-                    </g>
-                  );
-                })
-            )}
-
+          {marks === "lines" &&
+            placed.map((p) => (
+              <g key={p.key}>
+                <title>{p.label}</title>
+                <line x1={p.x} x2={p.x} y1={T} y2={T + plotH} stroke={p.ev.color} strokeWidth="1.3" strokeDasharray="3 3" opacity=".75" />
+                <g transform={`translate(${p.x.toFixed(1)} ${T + 6 + p.li * 12})`}>
+                  <EventMark k={p.ev.key} color={p.ev.color} size={9} />
+                </g>
+              </g>
+            ))}
+          {/* Merged (owner, Nov 19): each thing at its time, at the height of the face you gave it; without a face,
+              just above the line at that moment. Nudged up or down so none hides another; the time stays put. */}
+          {marks === "onLine" && !split && placed.map((p) => <ItemMark key={p.key} p={p} r={close ? 9 : 7.5} />)}
           </g>
+
+          {/* Split: the time-of-day panel under the chart, check-ins on the left of each day, things on the right. */}
+          {split && (
+            <g>
+              <rect x={L} y={tP} width={W - L - R} height={timeH} rx="6" fill="rgba(255,250,235,.45)" />
+              {GRID_HOURS[gridD].map((h) => (
+                <g key={h}>
+                  <line x1={L} x2={W - R} y1={tY(h)} y2={tY(h)} stroke={GRID} strokeWidth="1" strokeDasharray="1 4" />
+                  <text x={L - 4} y={tY(h) + 3} textAnchor="end" fontSize="9.5" fill={INK_SOFT}>
+                    {h === 12 ? "noon" : `${h % 12}${h < 12 ? "a" : "p"}`}
+                  </text>
+                </g>
+              ))}
+              <g clipPath="url(#time-clip)">
+                {readings
+                  .filter((r) => isOn(r.metric) && r.metric === (visible[0]?.metric ?? ""))
+                  .map((r, i) => {
+                    const t = new Date(r.at).getTime();
+                    if (t < start || t >= end) return null;
+                    const di = Math.floor(uOf(t));
+                    if (!inView(di)) return null;
+                    const cx = xu(di + 0.3);
+                    const cy = tY(hourOf(t));
+                    return (
+                      <path key={i} d={`M${cx.toFixed(1)} ${(cy - 6).toFixed(1)}L${(cx + 5).toFixed(1)} ${cy.toFixed(1)}L${cx.toFixed(1)} ${(cy + 6).toFixed(1)}L${(cx - 5).toFixed(1)} ${cy.toFixed(1)}Z`} fill="#d9b45f" stroke="#6b4a14" strokeWidth="1">
+                        <title>{`Check-in, ${new Date(r.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}</title>
+                      </path>
+                    );
+                  })}
+                {splitPlaced.map((p) => (
+                  <ItemMark key={p.key} p={p} r={itemR} badge />
+                ))}
+              </g>
+            </g>
+          )}
+
+          {/* Last night's sleep, under each day. */}
+          {nights && (
+            <g clipPath="url(#head-clip)">
+              {days.map((d, i) => {
+                const night = nights[dayKey(d)];
+                const m = night ? sleptMinutes({ bed: night.bed, wake: night.wake, effort: [], hindrances: [], at: "" }) : null;
+                if (!m || !inView(i) || dayW < 46) return null;
+                const x0 = xu(i) + 4;
+                return (
+                  <g key={i} transform={`translate(${x0.toFixed(1)} ${sleepY})`}>
+                    <title>{`Slept ${night?.bed ? prettyTime(night.bed) : "?"} → ${night?.wake ? prettyTime(night.wake) : "?"}`}</title>
+                    <path d="M5.5 -4.6A4 4 0 1 0 9 1.2A3.2 3.2 0 0 1 5.5 -4.6Z" fill="none" stroke={INK_SOFT} strokeWidth="1" />
+                    <text x="12" y="1" fontSize="9.5" fill={INK_SOFT}>
+                      {dayW >= 80 ? `slept ${minutesLabel(m)}` : minutesLabel(m)}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          )}
+
+          {/* Each panel's bottom edge drags to give it more or less room (owner, Nov 19); no grip, the edge itself moves. */}
+          <ResizeEdge y={T + plotH} x1={L} x2={W - R} label="Resize the chart" svgRef={svgRef} W={W} value={plotH} min={90} max={360} onChange={(v) => setV({ chartH: v })} />
+          {split && <ResizeEdge y={tP + timeH} x1={L} x2={W - R} label="Resize the time-of-day panel" svgRef={svgRef} W={W} value={timeH} min={90} max={400} onChange={(v) => setV({ timeH: v })} />}
 
           {/* Event lanes */}
           {marks === "lanes" && activeEvents.map((ev, li) => {
-            const ly = T + plotH + 32 + li * 16;
+            const ly = T + plotH + timesH + 14 + li * 16;
             return (
               <g key={ev.key}>
                 <line x1={L} x2={W - R} y1={ly} y2={ly} stroke={GRID} strokeWidth="1" strokeDasharray="1 4" />
@@ -662,13 +1063,15 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
           })}
         </svg>
 
-        {/* Hover readout */}
+      </figure>
+        {/* The day you tapped, under the chart instead of over it (owner, Nov 19: "the selector should not cover the chart"). */}
         {hd && (
           <div
-            className="fade-in pointer-events-none absolute top-2 z-[3] flex max-w-[230px] flex-col gap-0.5 rounded-lg px-2.5 py-2 text-[13px] shadow-lg"
-            style={{ [hover! > n / 2 ? "left" : "right"]: 12, background: "#fbf3df", border: "1px solid #b39a6a", color: INK }}
+            className="reveal grid grid-cols-1 gap-x-5 gap-y-0.5 rounded-lg px-3 py-2 text-[13px] sm:grid-cols-2"
+            style={{ background: "rgba(251,243,223,.7)", border: `1px solid ${GRID}`, color: INK }}
+            data-day-readout
           >
-            <b className="text-[13.5px]">{hd.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</b>
+            <b className="text-[13.5px] sm:col-span-2">{hd.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</b>
             {hoverVals.map(({ s, v }) => (
               <span key={s.metric} className="flex items-center gap-1.5">
                 <span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: s.color }} />
@@ -688,6 +1091,14 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
                   // eslint-disable-next-line @next/next/no-img-element -- quest portrait
                   <img key={i} src={w.icon!} alt="" className="h-6 w-6 rounded-full object-cover" style={{ border: "1px solid #a58c66" }} />
                 ))}
+              </span>
+            )}
+            {nightWords && (
+              <span className="flex items-center gap-1.5">
+                <svg aria-hidden width="11" height="11" viewBox="0 0 24 24">
+                  <path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z" fill="none" stroke={INK_SOFT} strokeWidth="2.2" strokeLinejoin="round" />
+                </svg>
+                Slept <b className="ml-auto tabular-nums">{nightWords}</b>
               </span>
             )}
             {showWeather && hoverWeather && (
@@ -710,39 +1121,6 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
           </div>
         )}
 
-        {/* Settings, lower right */}
-        <div ref={gearRef} className="absolute bottom-1.5 right-1.5 z-[4]">
-          <button
-            type="button"
-            onClick={() => setSettings((o) => !o)}
-            aria-expanded={settings}
-            aria-label="Chart view settings"
-            title="View settings"
-            className="flex h-9 w-9 items-center justify-center rounded-full"
-            style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10", boxShadow: "0 2px 6px rgba(60,40,10,.3)" }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-              {Array.from({ length: 8 }, (_, i) => (
-                <rect key={i} x="10.4" y="1.6" width="3.2" height="4.6" rx="1" fill="currentColor" transform={`rotate(${i * 45} 12 12)`} />
-              ))}
-              <circle cx="12" cy="12" r="6.9" fill="currentColor" />
-              <circle cx="12" cy="12" r="2.7" fill="#e3c06e" />
-            </svg>
-          </button>
-          {settings && (
-            <div role="dialog" aria-label="Chart view settings" className="pop parchment absolute bottom-full right-0 mb-2 flex w-[250px] flex-col gap-2.5 p-3" style={{ borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 28px rgba(0,0,0,.3)" }}>
-              <Seg label="Time span" value={String(view.range)} options={[["7", "Week"], ["30", "Month"], ["90", "3 months"]]} onPick={(v) => setV({ range: Number(v) as View["range"] })} />
-              <Seg label="Points" value={view.detail} options={[["daily", "Daily average"], ["every", "Every check-in"]]} onPick={(v) => setV({ detail: v as View["detail"] })} />
-              <Seg label="Lines" value={view.smooth ? "smooth" : "straight"} options={[["smooth", "Smooth"], ["straight", "Straight"]]} onPick={(v) => setV({ smooth: v === "smooth" })} />
-              <Seg label="Events" value={view.marks ?? "onLine"} options={[["onLine", "On the line"], ["lines", "Marker lines"], ["lanes", "Own rows"]]} onPick={(v) => setV({ marks: v as View["marks"] })} />
-              <label className="relative z-[1] flex min-h-8 items-center gap-2 text-[14px]" style={{ color: INK }}>
-                <input type="checkbox" checked={view.dots} onChange={() => setV({ dots: !view.dots })} />
-                Show each point
-              </label>
-            </div>
-          )}
-        </div>
-      </figure>
       {(zoom || showXp) && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]" style={{ color: INK_SOFT }}>
           {showXp && (
@@ -759,20 +1137,20 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
       )}
       {visible.every((s) => s.pts.length < 3) && (
         <p className="m-0 text-[13px]" style={{ color: INK_SOFT }}>
-          A few more check-ins and the trends will show. Tap a name to show or hide its line, or + to add an entry.
+          A few more check-ins and the trends will show. Use Show to choose what the chart shows, or + to add an entry.
         </p>
       )}
     </div>
   );
 }
 
-function Seg({ label, value, options, onPick }: { label: string; value: string; options: [string, string][]; onPick: (v: string) => void }) {
+function Seg({ label, value, options, onPick, wrap = false }: { label: string; value: string; options: [string, string][]; onPick: (v: string) => void; wrap?: boolean }) {
   return (
     <div className="relative z-[1] flex flex-col gap-1">
       <span className="text-[12.5px] font-semibold" style={{ color: INK_SOFT }}>
         {label}
       </span>
-      <div role="radiogroup" aria-label={label} className="flex rounded-full p-0.5" style={{ background: "rgba(110,85,40,.14)" }}>
+      <div role="radiogroup" aria-label={label} className={wrap ? "flex flex-wrap gap-0.5 rounded-2xl p-0.5" : "flex rounded-full p-0.5"} style={{ background: "rgba(110,85,40,.14)" }}>
         {options.map(([v, l]) => {
           const on = v === value;
           return (
@@ -782,7 +1160,7 @@ function Seg({ label, value, options, onPick }: { label: string; value: string; 
               role="radio"
               aria-checked={on}
               onClick={() => onPick(v)}
-              className="h-8 flex-1 rounded-full px-1.5 text-[12.5px] font-semibold"
+              className={`h-8 rounded-full px-2 text-[12.5px] font-semibold ${wrap ? "grow" : "flex-1"}`}
               style={on ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", boxShadow: "0 1px 2px rgba(60,40,10,.3)" } : { color: INK }}
             >
               {l}
