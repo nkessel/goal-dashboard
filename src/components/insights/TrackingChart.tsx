@@ -289,6 +289,15 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
   const fingers = useRef(new Map<number, number>());
   const gesture = useRef<{ dist: number; mid: number; win: [number, number]; moved: boolean } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  // How many screen pixels one chart unit takes, so labels can be shown by how much room they really have.
+  const [scale, setScale] = useState(0.75);
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setScale(el.getBoundingClientRect().width / 440 || 0.75));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- saved choices are only readable after hydration */
@@ -495,6 +504,8 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
   const xpByDay = days.map((d) => (eventsByDay.get(dayKey(d)) ?? []).reduce((a, w) => a + (w.xp || 0), 0));
   const xpTotal = xpByDay.reduce((a, b) => a + b, 0);
   const dayW = (W - L - R) / (v1 - v0);
+  // A day's width on screen: 18px or more and every day gets its own date (owner, Nov 19).
+  const everyDay = dayW >= 14 || dayW * scale >= 18;
 
   const tickEvery = visDays <= 7 ? 1 : visDays <= 30 ? 7 : 14;
   const hd = hover !== null ? days[hover] : null;
@@ -731,7 +742,7 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
           <g clipPath="url(#head-clip)">
             {days.map((d, i) => {
               if (!inView(i)) return null;
-              if (dayW < 34 && (n - 1 - i) % tickEvery !== 0) return null;
+              if (!everyDay && (n - 1 - i) % tickEvery !== 0) return null;
               const x0 = xu(i) + 3;
               const rate = dayRate[i];
               const w = showWeather && weather ? weather[dayKey(d)] : null;
@@ -742,7 +753,7 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
               return (
                 <g key={i}>
                   <text x={wide ? x0 + 1 : xDay(i)} y={15} textAnchor={wide ? "start" : "middle"} fontSize="11.5" fontWeight={i === n - 1 ? 700 : 400} fill={hover === i || i === n - 1 ? INK : INK_SOFT} fontFamily="var(--font-display, Georgia), serif">
-                    {dayW >= 18 ? (wide ? wd : wd.slice(0, i === n - 1 ? 5 : 2)) : ""}
+                    {everyDay ? (wide ? wd : wd.slice(0, i === n - 1 ? (dayW >= 30 ? 5 : 1) : dayW >= 22 ? 2 : 1)) : ""}
                   </text>
                   {rate != null && wide && (
                     <g transform={`translate(${rx.toFixed(1)} 11)`}>
@@ -789,7 +800,7 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
             {/* Squished (a month or more): every day gets a light dashed line (owner, Nov 19), and the labelled stretches a solid one. */}
             {days.map((_, i) => {
               if (i === 0 || !inView(i)) return null;
-              const stretch = dayW >= 14 || (n - 1 - i) % tickEvery === tickEvery - 1;
+              const stretch = everyDay || (n - 1 - i) % tickEvery === tickEvery - 1;
               const dash = close ? "2 3" : stretch ? undefined : "2 3";
               const op = close ? 1 : stretch ? 0.7 : 0.4;
               const w = stretch ? 1.1 : 0.8;
@@ -821,23 +832,34 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
           <g clipPath="url(#head-clip)">
             {days.map((d, i) => {
               if (!inView(i)) return null;
-              if (dayW < 30 && (n - 1 - i) % tickEvery !== 0) return null;
+              // Every day keeps its own date once a day is 14px wide (owner, Nov 19): the day's number alone, with the
+              // month on the first day shown and on the 1st; narrower than that, a date per labelled stretch.
+              if (!everyDay && (n - 1 - i) % tickEvery !== 0) return null;
               const wide = dayW >= 58;
+                            const label =
+                dayW >= 30
+                  ? d.toLocaleDateString(undefined, wide ? { month: "short", day: "numeric" } : { month: "numeric", day: "numeric" })
+                  : everyDay
+                    ? // Too narrow for "11/1": the 1st shows its month's name ("Nov") instead, every other day its number.
+                      d.getDate() === 1
+                      ? d.toLocaleDateString(undefined, { month: "short" })
+                      : String(d.getDate())
+                    : `${d.getMonth() + 1}/${d.getDate()}`;
               return (
                 <g key={i}>
-                  <text x={xDay(i)} y={footY + 12} textAnchor="middle" fontSize="11" fill={hover === i ? INK : INK_SOFT} fontWeight={i === n - 1 ? 700 : 400} fontFamily="var(--font-display, Georgia), serif">
+                  <text x={xDay(i)} y={footY + 12} textAnchor="middle" fontSize={dayW >= 30 ? 11 : 10} fill={hover === i ? INK : INK_SOFT} fontWeight={i === n - 1 ? 700 : 400} fontFamily="var(--font-display, Georgia), serif">
                     {/* The date at the bottom (owner, Nov 19), the weekday above the chart. */}
-                    {d.toLocaleDateString(undefined, wide ? { month: "short", day: "numeric" } : { month: "numeric", day: "numeric" })}
+                    {label}
                   </text>
                   {/* XP under each date; squished (a month or more), the XP of the days up to this date. */}
                   {(() => {
-                    const span = dayW >= 22 ? 1 : tickEvery;
+                    const span = everyDay ? 1 : tickEvery;
                     const sum = xpByDay.slice(Math.max(0, i - span + 1), i + 1).reduce((a, b) => a + (b ?? 0), 0);
                     if (!sum) return null;
                     return (
-                      <text x={xDay(i)} y={footY + 25} textAnchor="middle" fontSize="10" fontWeight="700" fill={XP_EDGE}>
+                      <text x={xDay(i)} y={footY + 25} textAnchor="middle" fontSize={dayW >= 22 ? 10 : 8.5} fontWeight="700" fill={XP_EDGE}>
                         <title>{span > 1 ? `${sum} XP over these ${span} days` : `${sum} XP that day`}</title>
-                        {dayW >= 40 ? `+${sum} XP` : `+${sum}`}
+                        {dayW >= 40 ? `+${sum} XP` : span === 1 && dayW < 22 ? sum : `+${sum}`}
                       </text>
                     );
                   })()}
