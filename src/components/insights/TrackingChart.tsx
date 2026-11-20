@@ -786,8 +786,9 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
           ))}
           {/* Days divided by a thin line, faint when zoomed out and dotted when zoomed in; the hours, dotted and fainter, with their times, once a day is wide enough (owner, Nov 19). */}
           <g clipPath="url(#plot-clip)">
+            {/* Squished (a month or more): a divider only where a date is labelled, so the days don't turn to a thicket of lines. */}
             {days.map((_, i) =>
-              i > 0 && inView(i) ? (
+              i > 0 && inView(i) && (dayW >= 14 || (n - 1 - i) % tickEvery === tickEvery - 1) ? (
                 <g key={i}>
                   <line x1={xu(i)} x2={xu(i)} y1={T} y2={T + plotH} stroke="rgba(110,85,40,.42)" strokeWidth="1.1" strokeDasharray={close ? "2 3" : undefined} opacity={close ? 1 : 0.7} />
                   {split && <line x1={xu(i)} x2={xu(i)} y1={tP} y2={tP + timeH} stroke="rgba(110,85,40,.42)" strokeWidth="1.1" strokeDasharray={close ? "2 3" : undefined} opacity={close ? 1 : 0.7} />}
