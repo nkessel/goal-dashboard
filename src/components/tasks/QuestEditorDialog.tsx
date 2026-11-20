@@ -402,6 +402,12 @@ export function QuestEditorDialog({
   const boardLabel = boardId ? (boardOptions?.find((o) => o.id === boardId)?.label.split(" › ").pop() ?? null) : null;
   const [alsoOn, setAlsoOn] = useState<string[]>(task?.also_on ?? []);
   const [stepMenu, setStepMenu] = useState<string | null>(null);
+  /** The sub-quest whose time, progress and XP share are open under its card (from its ⋯). */
+  const [stepDetail, setStepDetail] = useState<string | null>(null);
+  const [stepMenuUp, setStepMenuUp] = useState(false);
+  /** The new sub-quest's details before Enter (its ⋯): a time estimate for now. */
+  const [newStepMinutes, setNewStepMinutes] = useState<number | null>(null);
+  const [newStepMore, setNewStepMore] = useState(false);
   // A sub-quest's ⋯ menu closes on a click outside it or Escape (it stayed open; owner, Nov 5).
   useEffect(() => {
     if (!stepMenu) return;
@@ -619,7 +625,7 @@ export function QuestEditorDialog({
     listQuestStepsAction(taskId)
       .then((rows) => {
         if (rows === null) setStepsUnavailable(true);
-        setSteps(treeOrder((rows ?? []).map((r) => ({ key: r.id, id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, coins: r.coins ?? 0, weight: r.weight ?? null, progress: r.progress ?? (r.done ? 100 : 0), state: r.state ?? null, parentKey: r.parent_id ?? null }))));
+        setSteps(treeOrder((rows ?? []).map((r) => ({ key: r.id, id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, coins: r.coins ?? 0, minutes: r.minutes ?? null, weight: r.weight ?? null, progress: r.progress ?? (r.done ? 100 : 0), state: r.state ?? null, parentKey: r.parent_id ?? null }))));
       })
       .catch(() => {
         setStepsUnavailable(true);
@@ -669,9 +675,11 @@ export function QuestEditorDialog({
   function addStep() {
     const t = newStep.trim();
     if (!t) return;
-    setSteps((list) => [...(list ?? []), { key: `new-${Date.now()}`, title: t, done: false }]);
+    setSteps((list) => [...(list ?? []), { key: `new-${Date.now()}`, title: t, done: false, ...(newStepMinutes ? { minutes: newStepMinutes } : {}) }]);
     setStepsDirty(true);
     setNewStep("");
+    setNewStepMinutes(null);
+    setNewStepMore(false);
   }
   function renameStep(key: string, title: string) {
     setSteps((list) => (list ?? []).map((st) => (st.key === key ? { ...st, title } : st)));
@@ -1419,7 +1427,7 @@ export function QuestEditorDialog({
                         const checked = isHolder ? inside.length > 0 && inside.every((x) => x.done || x.state === "skipped") : st.done;
                         const depth = depthOf(st);
                         return (
-                        <li key={st.key} data-step-key={st.key} className="quest-step flex flex-col rounded-md py-0.5 pl-1" style={depth ? { marginLeft: depth * 22 } : undefined}>
+                        <li key={st.key} data-step-key={st.key} className="quest-step mb-1.5 flex flex-col rounded-[10px] py-0.5 pl-2 pr-0.5" style={{ background: "rgba(255,250,236,.85)", border: "1px solid rgba(139,112,64,.32)", ...(depth ? { marginLeft: depth * 22 } : {}) }}>
                         <div className="flex items-start gap-1.5">
                           {isHolder ? (
                             <button
@@ -1441,16 +1449,17 @@ export function QuestEditorDialog({
                             aria-label={st.state ? `Reopen ${st.title}` : st.done ? `Untick ${st.title}` : `Tick ${st.title}`}
                             disabled={isCompleted}
                             onClick={() => (st.state ? updateStep(st.key, { state: null }) : setStepDone(st.key, !checked))}
-                            className="mt-[5px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px]"
+                            className="mt-[5px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full"
                             style={{
-                              border: `1.5px solid ${checked ? "var(--t-good)" : st.state === "failed" ? "#b5321f" : st.state === "skipped" ? "#9a9286" : isAdventure ? "#8a6c2c" : "var(--t-card-border)"}`,
-                              background: checked ? "var(--t-good)" : st.state === "failed" ? "#b5321f" : st.state === "skipped" ? "#b7b0a4" : "transparent",
+                              // Round gold, like the quest's own check (owner's pick C, Nov 20).
+                              border: `1.5px solid ${checked ? "#8a6116" : st.state === "failed" ? "#b5321f" : st.state === "skipped" ? "#9a9286" : "#a4884f"}`,
+                              background: checked ? "radial-gradient(circle at 35% 30%, #f8e3a0, #c9a24a)" : st.state === "failed" ? "#b5321f" : st.state === "skipped" ? "#b7b0a4" : "transparent",
                             }}
                             title={st.state === "skipped" ? "Skipped — tap to reopen" : st.state === "failed" ? "Failed — tap to reopen" : undefined}
                           >
                             {checked && (
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
-                                <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#3b2a14" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
                               </svg>
                             )}
                             {st.state === "skipped" && (
@@ -1491,7 +1500,14 @@ export function QuestEditorDialog({
                               {progressWords(insideDone, inside.length)}
                             </button>
                           )}
-                          {/* The XP it brings, on its row; its share and how far along sit labelled under it. */}
+                          {/* Its time estimate, once set (⋯ › Time estimate), like the time on a quest card. */}
+                          {!isHolder && st.minutes ? (
+                            <span className="mt-[3px] flex h-7 shrink-0 items-center gap-0.5 text-[12.5px] font-semibold tabular-nums" style={{ color: "var(--t-ink-soft)" }} title="Time estimate">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden><circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="2" /><path d="M12 7.5V12l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                              {st.minutes >= 60 ? `${Math.floor(st.minutes / 60)}h${st.minutes % 60 ? ` ${st.minutes % 60}m` : ""}` : `${st.minutes}m`}
+                            </span>
+                          ) : null}
+                          {/* The XP it brings, on its row; its share and how far along sit behind ⋯ › Time, progress & XP share. */}
                           {!isHolder && (
                             <span className="mt-[3px] flex h-7 shrink-0 items-center text-[12.5px] font-semibold tabular-nums" style={{ color: "var(--t-xp)" }} title="XP this sub-quest brings">
                               {Math.round((wOf.get(st.key) ?? 0) * xp) + (st.xp ?? 0)} XP
@@ -1507,7 +1523,14 @@ export function QuestEditorDialog({
                           <span className="relative shrink-0" data-step-menu>
                             <button
                               type="button"
-                              onClick={() => setStepMenu(stepMenu === st.key ? null : st.key)}
+                              onClick={(e) => {
+                                // Opens upward when it would run past the bottom of the editor (it floats; nothing below moves).
+                                {
+                                  const box = e.currentTarget.closest("[role=dialog]")?.getBoundingClientRect();
+                                  setStepMenuUp(e.currentTarget.getBoundingClientRect().bottom > Math.min(window.innerHeight, box?.bottom ?? window.innerHeight) - 290);
+                                }
+                                setStepMenu(stepMenu === st.key ? null : st.key);
+                              }}
                               aria-haspopup="menu"
                               aria-expanded={stepMenu === st.key}
                               aria-label={`More for ${st.title}`}
@@ -1517,12 +1540,13 @@ export function QuestEditorDialog({
                               ⋯
                             </button>
                             {stepMenu === st.key && (
-                              <span role="menu" className="card-pop-in parchment absolute right-0 top-8 z-30 flex w-[170px] flex-col overflow-hidden py-1" style={{ borderRadius: 12, boxShadow: "0 10px 24px rgba(0,0,0,.3)" }}>
+                              <span role="menu" className={`card-pop-in parchment absolute right-0 ${stepMenuUp ? "bottom-8" : "top-8"} z-30 flex w-[220px] flex-col overflow-hidden py-1`} style={{ borderRadius: 12, boxShadow: "0 10px 24px rgba(0,0,0,.3)" }}>
                                 {(
                                   [
                                     // Order and words from the owner (Nov 4): Skip, then Remove, Failed last, all in black ink.
+                                    ...(!isHolder ? [["detail", "◷", "Time, progress & XP share", "var(--t-ink)"]] : []),
                                     ["sub", "＋", "Add a sub-task", "var(--t-ink)"],
-                                    ...(!isHolder && !(st.coins ?? 0) ? [["coins", "🪙", "Give coins", "var(--t-ink)"]] : []),
+                                    ...(!isHolder && !(st.coins ?? 0) ? [["coins", "◎", "Give coins", "var(--t-ink)"]] : []),
                                     ...(st.state || st.done ? [["open", "↺", "Back to open", "var(--t-ink)"]] : []),
                                     ...(st.state !== "skipped" ? [["skip", "»", "Skip", "var(--t-ink)"]] : []),
                                     ["remove", "−", "Remove", "var(--t-ink)"],
@@ -1536,6 +1560,7 @@ export function QuestEditorDialog({
                                     onClick={() => {
                                       setStepMenu(null);
                                       if (k === "sub") addSubStep(st.key);
+                                      if (k === "detail") setStepDetail((d) => (d === st.key ? null : st.key));
                                       if (k === "coins") updateStep(st.key, { coins: 1 });
                                       if (k === "skip") updateStep(st.key, { state: "skipped", done: false, progress: 0 });
                                       if (k === "fail") updateStep(st.key, { state: "failed", done: false, progress: 0 });
@@ -1554,8 +1579,12 @@ export function QuestEditorDialog({
                           </span>
                         </div>
                         {/* Labelled, and each number is typed over in place (owner, Nov 4): how far along it is, and its share of the quest's XP. */}
-                        {!isHolder && !isCompleted && (
-                          <div className="ml-[26px] mr-9 flex flex-col gap-0.5 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                        {!isHolder && !isCompleted && stepDetail === st.key && (
+                          <div className="reveal ml-[26px] mr-9 flex flex-col gap-0.5 pb-1 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                            <span className="flex items-center gap-2">
+                              <span className="w-[74px] shrink-0">Time</span>
+                              <InlineNumber value={st.minutes ?? 0} min={0} max={1440} suffix=" min" label={`Time estimate for ${st.title}, in minutes`} onChange={(v) => updateStep(st.key, { minutes: v > 0 ? v : null })} className="justify-end font-semibold" style={{ color: "var(--t-ink)" }} />
+                            </span>
                             {!st.done && !st.state && (
                               <span className="flex items-center gap-2">
                                 <span className="w-[74px] shrink-0">Done</span>
@@ -1602,9 +1631,10 @@ export function QuestEditorDialog({
                         });
                       })()}
                       {!isCompleted && addingStep && (
-                        <li className="reveal quest-step flex items-start gap-2 rounded-md py-0.5 pl-1">
+                        <li className="reveal quest-step flex flex-col rounded-[10px] py-0.5 pl-2 pr-0.5" style={{ border: "1.3px dashed rgba(169,132,58,.75)" }}>
+                          <div className="flex items-start gap-2">
                           {/* Same box and type as a saved step, so a step looks the same before and after Enter. */}
-                          <span aria-hidden className="mt-[5px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border-[1.5px] border-dashed text-[13px] leading-none" style={{ borderColor: isAdventure ? "#8a6c2c" : "var(--t-card-border)", color: "var(--t-ink-soft)" }}>
+                          <span aria-hidden className="mt-[5px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-dashed text-[13px] leading-none" style={{ borderColor: isAdventure ? "#8a6c2c" : "var(--t-card-border)", color: "var(--t-ink-soft)" }}>
                             +
                           </span>
                           <input
@@ -1629,7 +1659,7 @@ export function QuestEditorDialog({
                               addStep();
                               // Only fold the add row away when it was left empty on purpose.
                               setTimeout(() => {
-                                if (document.activeElement !== newStepRef.current) setAddingStep(false);
+                                if (document.activeElement !== newStepRef.current && !newStepMore) setAddingStep(false);
                               }, 0);
                             }}
                             autoFocus
@@ -1639,6 +1669,17 @@ export function QuestEditorDialog({
                             className="bare-input min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-[3px] text-[16px] leading-snug focus:outline-none"
                             style={{ color: "var(--t-ink)" }}
                           />
+                          {/* Its ⋯: the details for this one before you press Enter (owner, Nov 20). */}
+                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setNewStepMore((o) => !o)} aria-expanded={newStepMore} aria-label="Details for the new sub-quest" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[17px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
+                            ⋯
+                          </button>
+                          </div>
+                          {newStepMore && (
+                            <span className="reveal ml-[26px] flex items-center gap-2 pb-1 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                              <span className="w-[74px] shrink-0">Time</span>
+                              <InlineNumber value={newStepMinutes ?? 0} min={0} max={1440} suffix=" min" label="Time estimate for the new sub-quest, in minutes" onChange={(v) => setNewStepMinutes(v > 0 ? v : null)} className="justify-end font-semibold" style={{ color: "var(--t-ink)" }} />
+                            </span>
+                          )}
                         </li>
                       )}
                     </ul>
@@ -2369,7 +2410,7 @@ export function QuestEditorDialog({
             SCALE_PARTS.filter((k) => foldedParts.includes(k)).map((k) => <Fragment key={k}>{partNodes[k]}</Fragment>)
           ) : morePick === "color" ? (
             // The card's colour or picture, last in the row as "+ Color" (owner, Nov 20; it was a dot by the place pin).
-            task && <CardLookPicker task={task} />
+            task && <CardLookPicker task={task} part="colour" />
           ) : morePick === "file" ? (
             task && (
               <div className="flex items-center gap-2">
@@ -2526,6 +2567,7 @@ export function QuestEditorDialog({
                     size={72}
                     emptyContent={empty}
                     showEditHint
+                    footer={<CardLookPicker task={task} part="picture" />}
                   />
                   {/* Switch between a tiny task (half height on Today) and a standard quest. */}
                   {!isCompleted && (

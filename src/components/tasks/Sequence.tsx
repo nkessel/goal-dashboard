@@ -509,14 +509,25 @@ function SeqCardBody({ c, n, me, done }: { c: SequenceItem; n?: number; me: bool
         </span>
         <span className="text-[12px]" style={{ color: "#6b5631" }}>
           {done ? "Done" : c.reward ? "Reward at the end" : me ? "This quest" : n === 1 ? "Up first" : `Then, ${ordinal(n ?? 0)}`}
-          {!done && c.minutes ? ` · ${mins(c.minutes)}` : ""}
         </span>
       </span>
-      {!!c.xp && !c.reward && (
-        <span className="shrink-0 text-[13px] font-bold tabular-nums" style={{ color: "#4f6d3c" }}>
-          {c.xp} XP
+      {/* Time with its clock and XP with its ✦, in the same places as on the quest cards (owner, Nov 20). */}
+      {!done && !c.reward && (c.minutes || c.xp) ? (
+        <span className="flex shrink-0 items-center gap-2 text-[12.5px] font-semibold tabular-nums" style={{ color: "#4a3a22" }}>
+          {!!c.minutes && (
+            <span className="flex items-center gap-0.5">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden><circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="2" /><path d="M12 7.5V12l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+              {mins(c.minutes)}
+            </span>
+          )}
+          {!!c.xp && (
+            <span className="flex items-center gap-0.5" style={{ color: "#4f6d3c" }}>
+              <span aria-hidden>✦</span>
+              {c.xp} XP
+            </span>
+          )}
         </span>
-      )}
+      ) : null}
     </>
   );
 }
