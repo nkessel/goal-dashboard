@@ -695,6 +695,16 @@ export const FLOWS = [
     async run(h) {
       await h.goto("/", { name: "habiteditor" });
       await h.tap(/^daily habits/i, "open daily habits", { optional: true, expectMove: true });
+      // Additional Habits (Nov 18): the habits not up today, as their own section under Daily Habits, like Additional Quests.
+      if (await h.tap(/^additional habits/i, "open additional habits", { optional: true, expectMove: true })) {
+        await h.check("additional habits open");
+        // (Playwright's touch tap times out on habit ticks inside the sortable list, so this one is a click.)
+        if (await h.page.evaluate(() => { const el = document.querySelector('[aria-label="Done: Water the garden beds"]'); el?.click(); return !!el; })) {
+          await h.settle(900);
+          await h.check("additional habit done");
+        }
+        await h.tap(/^additional habits/i, "close additional habits", { optional: true, expectMove: true });
+      }
       await h.page.getByText("Gym 🏋️").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
       await h.settle(300);
       // The habit editor (repeat ask 15): sub-habits in view, dragged to reorder, a dot opens XP/coins/Remove.

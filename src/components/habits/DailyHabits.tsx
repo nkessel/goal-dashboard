@@ -48,7 +48,10 @@ export function DailyHabits({
   planned = [],
   core = [],
   bare = false,
+  additional = false,
 }: {
+  /** The habits not up today, as their own section under Daily Habits, like Additional Quests (owner, Nov 18). */
+  additional?: boolean;
   /** Habits in today's plan (core ones and the ones picked for today): they sit in Today's Quests, not here. */
   planned?: string[];
   /** Core habits: a gold star, and they always come up in the day's plan. */
@@ -247,7 +250,8 @@ export function DailyHabits({
   }
   // Planned habits (core + picked for today) live in Today's Quests; this section keeps the rest (owner, Nov 14).
   const plannedSet = new Set(planned);
-  const todays = dueToday.filter((h) => !skipped(h.id) && !isSnoozed(h.id) && plannedSet.has(h.id) === bare);
+  const notToday = ordered.filter((h) => !dueToday.includes(h));
+  const todays = additional ? notToday : dueToday.filter((h) => !skipped(h.id) && !isSnoozed(h.id) && plannedSet.has(h.id) === bare);
   const plannedHere = !bare && dueToday.some((h) => plannedSet.has(h.id) && !skipped(h.id) && !isSnoozed(h.id));
   const [coreOverride, setCoreOverride] = useState<Record<string, boolean>>({});
   const isCore = (id: string) => coreOverride[id] ?? core.includes(id);
@@ -267,8 +271,6 @@ export function DailyHabits({
   }
   const skippedToday = dueToday.filter((h) => skipped(h.id));
   const snoozedToday = dueToday.filter((h) => !skipped(h.id) && isSnoozed(h.id));
-  const notToday = ordered.filter((h) => !dueToday.includes(h));
-  const [showNotToday, setShowNotToday] = useState(false);
 
   /**
    * Days in a row this habit was done, counting only the days it's due.
@@ -390,7 +392,7 @@ export function DailyHabits({
   }
 
   return (
-    bare && todays.length === 0 ? null : (
+    (bare || additional) && todays.length === 0 ? null : (
     <section className="flex flex-col" data-habits-in-today={bare ? "" : undefined}>
       {!bare && (
       <div ref={headerBox} className="group relative">
@@ -398,7 +400,7 @@ export function DailyHabits({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        data-tour="daily-habits"
+        data-tour={additional ? undefined : "daily-habits"}
         // Open, the header and its tray read as one section: one border around both.
         className={`drawer-header relative flex min-h-[58px] w-full flex-col items-center justify-center overflow-hidden px-12 py-2.5 transition-[border-radius] duration-200 ${open ? "rounded-t-2xl" : "rounded-2xl"}`}
         style={
@@ -414,17 +416,30 @@ export function DailyHabits({
       >
         <span className={`flex items-center gap-3 ${isAdventure ? "font-display text-[21px]" : "text-sm font-bold"}`} style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
           {/* A + (as the mark, or before the title) is its own button, laid over this spot. */}
-          {plusFirst || mark === "plus" ? <span ref={plusSpot} aria-hidden className="inline-block h-[30px] w-[30px]" /> : <HabitIcon mark={mark} />}
-          {plusFirst && mark !== "plus" && <HabitIcon mark={mark} />}
-          Daily Habits
+          {additional ? (
+            <>
+              <HabitIcon mark={mark === "plus" ? "seedling" : mark} />
+              Additional Habits
+              <span className="text-[15px]" style={{ color: isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)", fontWeight: 400 }}>
+                ({todays.length})
+              </span>
+            </>
+          ) : (
+            <>
+              {plusFirst || mark === "plus" ? <span ref={plusSpot} aria-hidden className="inline-block h-[30px] w-[30px]" /> : <HabitIcon mark={mark} />}
+              {plusFirst && mark !== "plus" && <HabitIcon mark={mark} />}
+              Daily Habits
+            </>
+          )}
         </span>
-        <HeaderAdornment look={look} habits={todays.map((h) => ({ title: h.title, done: done(h.id) }))} isAdventure={isAdventure} />
+        {!additional && <HeaderAdornment look={look} habits={todays.map((h) => ({ title: h.title, done: done(h.id) }))} isAdventure={isAdventure} />}
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden className="absolute right-5 top-1/2 -translate-y-1/2 transition-transform duration-300" style={{ transform: open ? "translateY(-50%) rotate(180deg)" : "translateY(-50%)" }}>
           <path d="M5.5 9l6.5 6.5L18.5 9" stroke={isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
-      {(plusFirst || mark === "plus") && plusAt && <PlusOverTitle at={plusAt} onClick={() => setEditing("new")} isAdventure={isAdventure} />}
+      {!additional && (plusFirst || mark === "plus") && plusAt && <PlusOverTitle at={plusAt} onClick={() => setEditing("new")} isAdventure={isAdventure} />}
       {/* How the header shows the day's progress. */}
+      {!additional && (
       <button
         type="button"
         data-habit-look
@@ -443,7 +458,8 @@ export function DailyHabits({
       >
         <GearIcon size={17} />
       </button>
-      {lookMenu && (
+      )}
+      {!additional && lookMenu && (
         <div data-habit-look role="radiogroup" aria-label="Header style" className="card-pop-in parchment absolute right-0 top-full z-40 mt-3 flex w-[290px] flex-col gap-1 rounded-xl p-2" style={{ borderRadius: 12, boxShadow: "0 12px 28px rgba(0,0,0,.4)" }}>
           <p className="relative z-[1] m-0 px-1.5 pb-0.5 text-[12px] font-semibold uppercase tracking-wide" style={{ color: "var(--t-ink-soft)" }}>
             The mark
@@ -527,16 +543,16 @@ export function DailyHabits({
               {error}
             </p>
           )}
-          <DndContext id={bare ? "dnd-DailyHabits-today" : "dnd-DailyHabits"} sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <DndContext id={bare ? "dnd-DailyHabits-today" : additional ? "dnd-DailyHabits-more" : "dnd-DailyHabits"} sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={todays.map((h) => h.id)} strategy={verticalListSortingStrategy}>
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {todays.map((h) => {
               const d = done(h.id);
               const s = streak(h);
               return (
-                <SortableHabit key={h.id} id={h.id} disabled={!open && !bare} raised={menuFor === h.id || confirmSkip === h.id}>
+                <SortableHabit key={h.id} id={h.id} disabled={(!open && !bare) || additional} raised={menuFor === h.id || confirmSkip === h.id}>
                 {/* Swipe left for "Snooze for today" (owner, Nov 2). */}
-                <SwipeReveal side="right" label="Snooze today" icon={<SnoozeIcon size={18} />} background="linear-gradient(180deg,#5b6b8a,#3f4c66)" onAction={() => snooze(h, true)} disabled={d}>
+                <SwipeReveal side="right" label="Snooze today" icon={<SnoozeIcon size={18} />} background="linear-gradient(180deg,#5b6b8a,#3f4c66)" onAction={() => snooze(h, true)} disabled={d || additional}>
                 <div
                   // The cleaning habit's whole card opens and closes its tray (not only its title).
                   onClick={(e) => {
@@ -646,7 +662,8 @@ export function DailyHabits({
                       const subs = h.id === cleanId ? [] : subsOf(h);
                       const n = subs.filter((st) => ticked(h, st.id)).length;
                       const count = !subs.length ? "" : n >= subs.length ? "✓ all done" : n === 0 ? `${subs.length} habit${subs.length === 1 ? "" : "s"}` : `${subs.length - n} of ${subs.length} left`;
-                      const rest = [scheduleLabel(h), h.description].filter(Boolean).join(" · ");
+                      // Not up today: when it's next due, or that it was done today anyway.
+                      const rest = additional ? (d ? "Done today" : nextLabel(h, day)) : [scheduleLabel(h), h.description].filter(Boolean).join(" · ");
                       if (!count && !rest) return null;
                       return (
                         <span className="flex flex-wrap items-center gap-x-1.5 text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
@@ -889,7 +906,7 @@ export function DailyHabits({
               {todays.length ? "Today’s chosen habits are in Today’s Quests." : "Today’s habits are all in Today’s Quests ✦"}
             </p>
           )}
-          {!bare && (<>
+          {!bare && !additional && (<>
           {skippedToday.length > 0 && (
             <p className="m-0 px-2 pt-2 text-center text-[13.5px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.85 }}>
               {skippedToday.map((h, i) => (
@@ -915,44 +932,6 @@ export function DailyHabits({
                 </span>
               ))}
             </p>
-          )}
-          {/* Habits not up today: still here to see and edit. */}
-          {notToday.length > 0 && (
-            <div className="mt-2 flex flex-col items-center gap-1.5">
-              <button type="button" onClick={() => setShowNotToday((v) => !v)} aria-expanded={showNotToday} className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.85 }}>
-                Not today ({notToday.length})
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: showNotToday ? "rotate(90deg)" : undefined }}>
-                  <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-              <Fold open={!!showNotToday}>
-                <ul className="m-0 flex w-full list-none flex-col gap-1.5 p-0">
-                  {notToday.map((h) => (
-                    <li key={h.id}>
-                      <button
-                        type="button"
-                        onClick={() => setEditing(h)}
-                        title="Edit habit"
-                        className={`flex min-h-11 w-full items-center gap-3 rounded-2xl px-3 py-1.5 text-left opacity-80 hover:opacity-100 ${isAdventure ? "parchment" : ""}`}
-                        style={isAdventure ? { borderRadius: 16 } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
-                      >
-                        <span className="relative z-[1] min-w-0 flex-1">
-                          <span className="block text-[15px] font-semibold leading-snug" style={{ color: "var(--t-ink)" }}>
-                            {h.title}
-                          </span>
-                          <span className="block text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-                            {nextLabel(h, day)}
-                          </span>
-                        </span>
-                        <span aria-hidden className="relative z-[1] text-[14px]" style={{ color: "var(--t-ink-soft)" }}>
-                          ✎
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </Fold>
-            </div>
           )}
           <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
             <li>
