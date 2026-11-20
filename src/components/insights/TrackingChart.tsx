@@ -916,7 +916,7 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
           {hover !== null && <line x1={xDay(hover)} x2={xDay(hover)} y1={T} y2={sleepY - 10} stroke={INK_SOFT} strokeWidth="1" strokeDasharray="3 3" />}
 
           {/* Where "+n XP" won't fit under the days (owner, Nov 19): each day's XP rises into the chart from its foot, a soft
-              gold column behind the lines, up to about two-fifths of the way; or stacked coins (one per 10 XP), from the gear. */}
+              warm amber column (owner's pick C5, Nov 20) behind the lines, up to about two-fifths of the way; or stacked coins (one per 10 XP), from the gear. */}
           {xpRises && !view.xpCoins && (
             <g clipPath="url(#plot-clip)" data-xp-rise>
               {xpByDay.map((v, i) => {
@@ -926,7 +926,7 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
                 const tip = `+${v} XP`;
                 const h = plotH * 0.42 * (v / xpMaxShown);
                 return (
-                  <rect key={i} x={cx - dayW * 0.32} y={foot - h} width={dayW * 0.64} height={h} rx="2" fill={XP_FILL} opacity={hover === i ? 0.6 : 0.38}>
+                  <rect key={i} x={cx - dayW * 0.32} y={foot - h} width={dayW * 0.64} height={h} rx="2" fill="#e0a94a" opacity={hover === i ? 0.5 : 0.32}>
                     <title>{tip}</title>
                   </rect>
                 );
