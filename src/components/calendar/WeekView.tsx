@@ -123,9 +123,9 @@ export function WeekView({
   const [hourPx, setHourPx] = useState(isAdventure ? ADVENTURE_HOUR_PX : DEFAULT_HOUR_PX);
   // 7 AM–10:30 PM by default; the hours before and after open from a button (owner, Nov 6: "The user should have to click a button to see before 7am and after 10:30pm").
   const [early, setEarly] = useState(false);
-  const [late, setLate] = useState(false);
+  // null: the late hours follow the quests (a quest running past 10:30 PM opens them; owner, Nov 19: "Yes").
+  const [lateChoice, setLate] = useState<boolean | null>(null);
   const H0 = early ? HOUR_START : DAY_FROM;
-  const H1 = late ? HOUR_END + 1 : DAY_UNTIL;
   const [gripY, setGripY] = useState<number | null>(null);
   const [itemMenu, setItemMenu] = useState<{ x: number; y: number; target: MenuTarget } | null>(null);
   const HOUR_PX = hourPx;
@@ -237,6 +237,19 @@ export function WeekView({
   const timeBg = isAdventure ? TIME_BG : "var(--t-card)";
   const nowMinute = useNowMinute();
   const hydrated = useHydrated();
+  // A quest on a shown day that starts before the 10:30 PM fold and ends after it would be cut at the fold: the
+  // late hours open by themselves (until you fold them with the button).
+  const crossesLate =
+    hydrated &&
+    tasks.some((t) => {
+      if (!showsOnCalendar(t)) return false;
+      const { start, end } = getTaskDisplayWindow(t);
+      const fold = new Date(start);
+      fold.setHours(Math.floor(DAY_UNTIL), Math.round((DAY_UNTIL % 1) * 60), 0, 0);
+      return start < fold && end > fold && days.some((d) => isSameDay(d, start));
+    });
+  const late = lateChoice ?? crossesLate;
+  const H1 = late ? HOUR_END + 1 : DAY_UNTIL;
   const now = nowMinute ? new Date(nowMinute * 60_000) : null;
   const hourCount = Math.ceil(H1 - H0);
   const gridMinutes = (H1 - H0) * 60;
@@ -1075,9 +1088,10 @@ export function WeekView({
     const dayIndex = days.findIndex((d) => isSameDay(d, start));
     if (dayIndex === -1) continue;
     if (outside(start, end, days[dayIndex])) continue;
-    const top = offset(start, days[dayIndex]);
-    // A short quest (a 15-minute mini-quest) still gets room for its card: at least ~30px tall.
+    // A short quest (a 15-minute mini-quest) still gets room for its card: at least ~30px tall. One that starts
+    // late at night moves up just enough that its card stays inside the grid, not cut at the bottom.
     const minMins = Math.max(20, (30 / HOUR_PX) * 60);
+    const top = Math.max(0, Math.min(offset(start, days[dayIndex]), gridMinutes - minMins));
     items.push({ kind: "task", key: `t-${sessionRef(task)}`, dayIndex, top, bottom: Math.max(top + minMins, offset(end, days[dayIndex])), start, end, task });
   }
 
@@ -1245,7 +1259,7 @@ export function WeekView({
       <div className="relative" style={{ paddingBottom: 30 }}>
       {/* Earlier and later hours: on the time bar itself, just above and below its first and last marks (owner, Nov 12). */}
       <HoursButton side="early" open={early} hidden={hidden.early} isAdventure={isAdventure} top={Math.max(0, headTop - 26)} onToggle={() => setEarly((v) => !v)} />
-      <HoursButton side="late" open={late} hidden={hidden.late} isAdventure={isAdventure} top={headTop + (gridMinutes / 60) * HOUR_PX + 4} onToggle={() => setLate((v) => !v)} />
+      <HoursButton side="late" open={late} hidden={hidden.late} isAdventure={isAdventure} top={headTop + (gridMinutes / 60) * HOUR_PX + 4} onToggle={() => setLate(!late)} />
       {seamless && (
         // The time column stays put while the days scroll under it (a sticky cell can't leave its grid cell, so it's its own layer).
         // Its parchment is the card's own, lined up with it, so the strip doesn't show as a different colour (owner, Nov 12).
