@@ -348,7 +348,7 @@ export function DailyHabits({
           const out = await saveOrQueue("completeRite", { id: h.id, day }, `rite:${h.id}:${day}`);
           // "How do you feel?" (owner, Nov 19), once it's saved.
           // Its completion screen, with "How do you feel?" like the other celebrations (owner, Nov 19).
-          if (!out.queued) celebrateProgress({ title: h.title, xp: h.xp_value ?? 0, fromPct: 0, toPct: 100, heading: "Habit kept!", barCaption: "Done for today", felt: { kind: "habit", riteId: h.id, day } });
+          if (!out.queued) celebrateProgress({ title: h.title, xp: h.xp_value ?? 0, fromPct: 0, toPct: 100, heading: "Habit complete 🥳", barCaption: "Done for today", felt: { kind: "habit", riteId: h.id, day } });
         }
         else {
           await saveOrQueue("uncompleteRite", { id: h.id, day }, `rite:${h.id}:${day}`);

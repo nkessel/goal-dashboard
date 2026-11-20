@@ -264,7 +264,7 @@ export function EveningRites({
           const out = await saveOrQueue("completeRite", { id: r.id, day, pct }, `rite:${r.id}:${day}`);
           // "How do you feel?" (owner, Nov 19), once it's saved.
           // Its completion screen, with "How do you feel?" like the other celebrations (owner, Nov 19).
-          if (!out.queued) celebrateProgress({ title: r.title, xp: r.xp_value ?? 0, fromPct: 0, toPct: 100, heading: "Rite kept!", barCaption: "Done for tonight", felt: { kind: "habit", riteId: r.id, day } });
+          if (!out.queued) celebrateProgress({ title: r.title, xp: r.xp_value ?? 0, fromPct: 0, toPct: 100, heading: "Habit complete 🥳", barCaption: "Done for tonight", felt: { kind: "habit", riteId: r.id, day } });
         }
         else {
           await saveOrQueue("uncompleteRite", { id: r.id, day }, `rite:${r.id}:${day}`);
