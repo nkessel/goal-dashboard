@@ -539,6 +539,11 @@ export const FLOWS = [
           await esc(h);
           await h.settle(400);
         }
+        // "+ Color" is last in the + row (owner, Nov 20).
+        if (await h.tap((p) => p.getByRole("group", { name: "More details" }).getByRole("button", { name: /color/i }).first(), "+ color", { optional: true, expectMove: true })) {
+          await h.settle(500);
+          await h.check("+ color: its panel");
+        }
         await esc(h);
       }
     },

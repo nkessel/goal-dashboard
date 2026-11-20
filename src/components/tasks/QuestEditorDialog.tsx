@@ -7,7 +7,6 @@ import { InlineNumber } from "@/components/ui/InlineNumber";
 import { saveQuestPlace, useQuestPlace } from "@/lib/use-quest-places";
 import { DrivePicks } from "./DrivePicks";
 import { CardLookPicker } from "@/components/calendar/CardLookPicker";
-import { useCalCardLook } from "@/lib/use-quest-cal";
 import { driveWords, useQuestDrive } from "@/lib/use-quest-cal";
 import { useProgressUnit, saveProgressUnit } from "@/lib/use-progress-units";
 import { pctOf, type ProgressUnit } from "@/lib/progress-units";
@@ -704,7 +703,6 @@ export function QuestEditorDialog({
   const dueAt = dueIso(dueDate, dueTime);
   const place = useQuestPlace(task?.id);
   const drive = useQuestDrive(task?.id);
-  const cardLook = useCalCardLook(task?.id);
 
   // ---- Saving as you go (existing quests) ----------------------------------
   const autosave = Boolean(task) && !review;
@@ -1348,315 +1346,33 @@ export function QuestEditorDialog({
       )}
     </div>
   );
-  const partNodes: Record<EditorPart, React.ReactNode> = {
-    showsIn: (
-      <>
-              {/* Where it shows on Today: Today's Quests, Additional Quests, or the backlog (just its board). One choice. */}
-              {!doingNow && !isCompleted && !fixedSchedule && (
-                <div className="flex items-center gap-2">
-                  <span className={`${labelCls} shrink-0`}>Priority</span>
-                  <div
-                    role="radiogroup"
-                    aria-label="Priority: primary objective (Today's Quests), secondary objective (Additional Quests) or backlog (only on its board)"
-                    className="grid min-h-9 min-w-0 flex-1 grid-cols-3 gap-0.5 rounded-[18px] p-[3px]"
-                    style={{ background: "rgba(70,50,20,.09)", boxShadow: "inset 0 1px 2px rgba(70,50,20,.14)" }}
-                  >
-                    {(
-                      [
-                        { v: "today" as const, label: `Primary objective: shows in Today's ${isAdventure ? "Quests" : "Tasks"}`, short: "Primary objective" },
-                        { v: "additional" as const, label: `Secondary objective: shows in Additional ${isAdventure ? "Quests" : "Tasks"}`, short: "Secondary objective" },
-                        { v: "none" as const, label: "Backlog: only on its board", short: "Backlog" },
-                      ]
-                    ).map((o) => {
-                      const on = placement === o.v;
-                      return (
-                        <button
-                          key={o.v}
-                          type="button"
-                          role="radio"
-                          aria-checked={on}
-                          aria-label={o.label}
-                          title={o.label}
-                          onClick={() => setPlacement(o.v)}
-                          className="flex min-h-[30px] min-w-0 items-center justify-center gap-1 rounded-[15px] px-1.5 py-0.5 text-[12px] font-semibold leading-[1.1] transition-[background,box-shadow] duration-150"
-                          style={{
-                            background: on ? (isAdventure ? "linear-gradient(180deg,#f6e3a8,#dcb763)" : "var(--t-card)") : "transparent",
-                            boxShadow: on ? "0 1px 3px rgba(60,40,10,.3), 0 0 0 1px rgba(138,97,22,.55)" : undefined,
-                            color: on ? "#2a1c10" : "var(--t-ink-soft)",
-                          }}
-                        >
-                          <span
-                            aria-hidden
-                            className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full"
-                            style={{ border: `1.5px solid ${on ? "#6b4a12" : "rgba(110,90,50,.55)"}` }}
-                          >
-                            {on && <span className="block h-1.5 w-1.5 rounded-full" style={{ background: "#6b4a12" }} />}
-                          </span>
-                          <span className="text-left">{o.short}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-      </>
-    ),
-    time: (
-      <>
-              {/* Time to complete */}
-              {!doingNow && (
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center gap-2.5">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- same clock glyph as the quest card */}
-                    <img src="/design/ui-clock.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
-                    <span className={`${labelCls} shrink-0`}>Time</span>
-                    {/* 5, 10, 15 or 30 minutes, or your own (owner, Nov 3). */}
-                    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
-                      {ESTIMATE_PICKS.map((m) => {
-                        const on = Number(estimate) === m && !estOther;
-                        return (
-                          <button
-                            key={m}
-                            type="button"
-                            aria-pressed={on}
-                            onClick={() => (setEstOther(false), pickEstimate(on ? "" : String(m)))}
-                            className="h-8 min-w-10 rounded-full px-2.5 text-[13px] font-semibold tabular-nums"
-                            style={on ? { background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" } : { border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: "rgba(255,250,235,.35)" }}
-                          >
-                            {m}m
-                          </button>
-                        );
-                      })}
-                      {estOther ? (
-                        <span className="reveal flex h-8 items-center gap-1 rounded-full border pl-1 pr-2.5" style={{ borderColor: "#8a6116" }}>
-                          <input
-                            type="number"
-                            autoFocus
-                            onFocus={(e) => e.currentTarget.select()}
-                            inputMode="numeric"
-                            min={0}
-                            step={5}
-                            value={estimate}
-                            onChange={(e) => pickEstimate(e.target.value)}
-                            placeholder="—"
-                            aria-label="Minutes to complete"
-                            // One colour inside the pill: no field wash behind the number (owner, Nov 5).
-                            style={{ background: "transparent", boxShadow: "none" }}
-                            className="bare-input h-7 w-14 rounded-full border-0 bg-transparent px-1 text-center text-[16px] tabular-nums [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                          />
-                          <span className="text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
-                            min
-                          </span>
-                        </span>
-                      ) : (
-                        <button type="button" onClick={() => setEstOther(true)} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: "rgba(255,250,235,.35)" }}>
-                          Other
-                        </button>
-                      )}
-                    </span>
-                  </div>
-                </div>
-              )}
-      </>
-    ),
-    sequence: (
-      <>
-              {/* Sub-quests and the sequence from one place (owner, Nov 4 and 13: "sequence and steps should be
-                  accessible from the same pill"): a checklist inside this quest, or quests one after another. */}
-              {!doingNow && !review && (
-                <div className="flex flex-col gap-1.5" data-subseq>
-                  {/* Two pills, side by side (owner, Nov 20: "the two pills for each, sub-quests and sequence"): one tap
-                      each, no menu of choices. Sequence opens the sequence window (or, on a new quest, its panel here). */}
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {!stepsUnavailable && !isCompleted && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setStepsFolded(false);
-                          setAddingStep(true);
-                          requestAnimationFrame(() => newStepRef.current?.focus());
-                        }}
-                        className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-3"
-                        title="A checklist inside this quest"
-                      >
-                        <StepsGlyph size={15} />
-                        <span className="text-[13.5px] font-semibold" style={{ color: "var(--t-ink)" }}>
-                          Sub-quests
-                        </span>
-                        {(() => {
-                          const n = (steps ?? []).length || (steps === null ? (task?.steps_total ?? 0) : 0);
-                          return n ? (
-                            <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-                              {n}
-                            </span>
-                          ) : null;
-                        })()}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => (task ? setSeqDialog(true) : setSeqOpen((o) => !o))}
-                      aria-expanded={task ? undefined : seqOpen}
-                      data-open={!task && seqOpen ? "true" : undefined}
-                      className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-3"
-                      title="Quests before or after this one"
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden style={{ color: "var(--t-ink-soft)" }}>
-                        <circle cx="5" cy="12" r="2.6" stroke="currentColor" strokeWidth="1.8" />
-                        <circle cx="19" cy="12" r="2.6" stroke="currentColor" strokeWidth="1.8" />
-                        <path d="M8 12h8M13.5 9.2 16.3 12l-2.8 2.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      <span className="text-[13.5px] font-semibold" style={{ color: "var(--t-ink)" }}>
-                        Sequence
-                      </span>
-                      {(() => {
-                        const n = task ? (task.behind?.length ?? 0) : seqLinks.length;
-                        return n ? (
-                          <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-                            {n}
-                          </span>
-                        ) : null;
-                      })()}
-                    </button>
-                  </div>
-                  {!task && seqOpen && (
-                    <div className="reveal flex flex-col gap-2 rounded-xl px-3 py-2.5" style={{ border: "1px dashed rgba(139,112,64,.5)" }}>
-                      <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-                        A quest after another stays stacked out of sight until that one is done.
-                      </p>
-                      {seqLinks.length > 0 && (
-                        <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[14px]">
-                          {seqLinks.map((l, i) => (
-                            <li key={i} className="flex min-h-8 items-center gap-2">
-                              <span className="shrink-0 text-[12.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
-                                {l.rel === "after" ? "Comes after" : "Then"}
-                              </span>
-                              <span className="min-w-0 flex-1 truncate">
-                                {l.pick.id ? "" : "＋ "}
-                                {l.pick.title}
-                              </span>
-                              <button type="button" onClick={() => setSeqLinks((ls) => ls.filter((_, j) => j !== i))} aria-label={`Remove ${l.pick.title}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
-                                <CloseIcon size={9} />
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      {seqAdding ? (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[12.5px] font-semibold">{seqAdding === "after" ? "This quest comes after…" : "After this quest comes…"}</span>
-                          <QuestPicker
-                            autoFocus
-                            exclude={seqLinks.map((l) => l.pick.id).filter(Boolean) as string[]}
-                            onPick={(p) => {
-                              setSeqLinks((ls) => [...ls, { rel: seqAdding, pick: p }]);
-                              setSeqAdding(null);
-                            }}
-                          />
-                          <button type="button" onClick={() => setSeqAdding(null)} className="self-start text-[12.5px] underline" style={{ color: "var(--t-ink-soft)" }}>
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap gap-1.5">
-                          <button type="button" onClick={() => setSeqAdding("after")} className="flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px dashed rgba(139,112,64,.6)" }}>
-                            ↑ Comes after a quest
-                          </button>
-                          <button type="button" onClick={() => setSeqAdding("before")} className="flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px dashed rgba(139,112,64,.6)" }}>
-                            ↓ Add what comes next
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {task && seqDialog && (
-                    <SequenceDialog
-                      taskId={task.id}
-                      title={title}
-                      isAdventure={isAdventure}
-                      addFollowUp={seqFollow}
-                      onClose={() => (setSeqDialog(false), setSeqFollow(false))}
-                      onEditSelf={() => setSeqDialog(false)}
-                      onStepsMoved={() => {
-                        setStepsDirty(false);
-                        setStepsReload((n) => n + 1);
-                      }}
-                    />
-                  )}
-                </div>
-              )}
-      </>
-    ),
-    // Shown right under the "Scheduled" button (in Time to complete), not as a part of its own.
-    scheduling: null,
-    matrix: (
-      <>
-              {/* Plot on the matrix, with "not actionable yet" beside it */}
-              {task && !isCompleted && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (onPlot) onPlot();
-                      else window.location.assign(`/matrix?plot=${task.id}`);
-                    }}
-                    className="hover-glow flex min-h-9 items-center justify-center gap-2 rounded-full border px-3 text-[13px] font-semibold"
-                    style={{ borderColor: chipBorder, color: "var(--t-ink)" }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- matrix glyph */}
-                    <img src="/design/ui-target.png" alt="" width={18} height={18} />
-                    Plot on the Priority Matrix
-                  </button>
-                  <label className="flex min-h-9 cursor-pointer items-center gap-2 text-[13px]" title="Keep it as an aspiration on its board, off Today and the map">
-                    <input type="checkbox" checked={aspiration} onChange={(e) => setAspiration(e.target.checked)} className="h-4 w-4 shrink-0" style={{ accentColor: isAdventure ? "#8a6c2c" : "var(--t-accent)" }} />
-                    <span className="font-semibold">Not actionable yet</span>
-                  </label>
-                </div>
-              )}
-      </>
-    ),
-    steps: (
-      <>
-              {/* Steps: a checklist inside the quest */}
-              {!doingNow && !stepsUnavailable && (addingStep || (steps ?? []).length > 0 || (steps === null && (task?.steps_total ?? 0) > 0)) && (
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2.5">
-                    <StepsGlyph />
-                    <button type="button" onClick={() => setStepsFolded((f) => !f)} aria-expanded={!stepsFolded} className="flex items-center gap-1.5" title={stepsFolded ? "Show the sub-quests" : "Fold the sub-quests away"}>
-                      <span className={labelCls}>Sub-quests</span>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: stepsFolded ? undefined : "rotate(90deg)", color: "var(--t-ink-soft)" }}>
-                        <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                    {steps && steps.length > 0 && (
-                      <span className="flex min-w-0 flex-1 items-center gap-2 whitespace-nowrap text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
-                        {/* How far the sub-quests carry the quest, labelled (owner, Nov 4). */}
-                        <span className="h-2.5 min-w-[40px] max-w-[140px] flex-1 overflow-hidden rounded-full" style={{ background: "#141a13", border: "1px solid #8a6c2c", boxShadow: "inset 0 1px 3px rgba(0,0,0,.6)" }} aria-label={`Sub-quests ${stepsShare(steps)}% done`}>
-                          <span className="block h-full rounded-full transition-[width] duration-300" style={{ width: `${stepsShare(steps)}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)", boxShadow: "0 0 6px rgba(242,210,126,.5)" }} />
-                        </span>
-                        <span>{stepsShare(steps)}% done</span>
-                      </span>
-                    )}
-                    {stepXpPop !== null && (
-                      <span aria-live="polite" className="power-spark text-[13px] font-bold" style={{ color: "var(--t-xp)" }}>
-                        +{stepXpPop} XP
-                      </span>
-                    )}
-                    {/* With sub-quests on the list, Add sits under the last one (owner, Nov 13). */}
-                    {!isCompleted && steps !== null && !addingStep && steps.length === 0 && (
-                      <button aria-label="Add a sub-quest"
-                        type="button"
-                        onClick={() => (setAddingStep(true), setStepsFolded(false))}
-                        className="hover-glow ml-auto flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-bold"
-                        style={{ background: isAdventure ? "linear-gradient(180deg,#f2d58a,#d9b45f)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff", border: isAdventure ? "1px solid #8a6116" : undefined, boxShadow: "0 1px 3px rgba(60,40,10,.3)" }}
-                      >
-                        <span aria-hidden className="text-[16px] leading-none">+</span> {steps.length ? "Add" : "Add sub-quests"}
-                      </button>
-                    )}
-                  </div>
-                  {stepsFolded ? null : steps === null && (task?.steps_total ?? 0) > 0 ? (
+  /** The sub-quests drawer: out of the "+ Sub-quests" pill, with a caret pointing up at it. */
+  const stepsHas = (steps ?? []).length > 0 || (steps === null && (task?.steps_total ?? 0) > 0);
+  const stepsOpen = !stepsFolded && (addingStep || stepsHas);
+  const stepsDrawer = (
+    <div className="relative mt-1.5 flex flex-col gap-1 rounded-xl px-3 pb-2.5 pt-2" style={{ background: "#f7eed6", border: "1px solid rgba(139,112,64,.4)" }} data-steps-drawer>
+      <span aria-hidden className="absolute -top-[6px] left-6 h-[11px] w-[11px] rotate-45" style={{ background: "#f7eed6", borderLeft: "1px solid rgba(139,112,64,.4)", borderTop: "1px solid rgba(139,112,64,.4)" }} />
+      {((steps && steps.length > 0) || stepXpPop !== null) && (
+        <span className="flex min-w-0 items-center gap-2 whitespace-nowrap text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
+          {steps && steps.length > 0 && (
+            <>
+              {/* How far the sub-quests carry the quest, labelled (owner, Nov 4). */}
+              <span className="h-2.5 min-w-[40px] max-w-[160px] flex-1 overflow-hidden rounded-full" style={{ background: "#141a13", border: "1px solid #8a6c2c", boxShadow: "inset 0 1px 3px rgba(0,0,0,.6)" }} aria-label={`Sub-quests ${stepsShare(steps)}% done`}>
+                <span className="block h-full rounded-full transition-[width] duration-300" style={{ width: `${stepsShare(steps)}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)", boxShadow: "0 0 6px rgba(242,210,126,.5)" }} />
+              </span>
+              <span>{stepsShare(steps)}% done</span>
+            </>
+          )}
+          {stepXpPop !== null && (
+            <span aria-live="polite" className="power-spark text-[13px] font-bold" style={{ color: "var(--t-xp)" }}>
+              +{stepXpPop} XP
+            </span>
+          )}
+        </span>
+      )}
+                  {steps === null && (task?.steps_total ?? 0) > 0 ? (
                     // Loading: hold the steps' place so the editor doesn't jump when they arrive.
-                    <ul className="m-0 flex list-none flex-col p-0 pl-[22px]" aria-busy="true" aria-label="Loading sub-quests">
+                    <ul className="m-0 flex list-none flex-col p-0" aria-busy="true" aria-label="Loading sub-quests">
                       {Array.from({ length: task?.steps_total ?? 0 }).map((_, i) => (
                         <li key={i} className="flex items-center gap-2 py-[5px] pl-1">
                           <span className="h-[18px] w-[18px] shrink-0 rounded-[5px]" style={{ border: `1.5px solid ${isAdventure ? "#8a6c2c" : "var(--t-card-border)"}`, opacity: 0.5 }} />
@@ -1665,7 +1381,7 @@ export function QuestEditorDialog({
                       ))}
                     </ul>
                   ) : steps === null || (steps.length === 0 && !addingStep) ? null : (
-                    <ul className="m-0 flex list-none flex-col p-0 pl-[22px]">
+                    <ul className="m-0 flex list-none flex-col p-0">
                       {(() => {
                         const ordered = treeOrder(steps);
                         const wl = stepWeights(steps);
@@ -1918,19 +1634,286 @@ export function QuestEditorDialog({
                       )}
                     </ul>
                   )}
-                  {!isCompleted && steps !== null && steps.length > 0 && !addingStep && !stepsFolded && (
+                  {!isCompleted && steps !== null && steps.length > 0 && !addingStep && (
                     <button
                       type="button"
                       aria-label="Add a sub-quest"
                       onClick={() => setAddingStep(true)}
-                      className="hover-glow ml-[22px] mt-1 flex h-8 items-center gap-1 self-start rounded-full px-3 text-[13px] font-bold"
+                      className="hover-glow mt-1 flex h-8 items-center gap-1 self-start rounded-full px-3 text-[13px] font-bold"
                       style={{ background: isAdventure ? "linear-gradient(180deg,#f2d58a,#d9b45f)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff", border: isAdventure ? "1px solid #8a6116" : undefined, boxShadow: "0 1px 3px rgba(60,40,10,.3)" }}
                     >
                       <span aria-hidden className="text-[16px] leading-none">+</span> Add sub-quest
                     </button>
                   )}
+    </div>
+  );
+  const partNodes: Record<EditorPart, React.ReactNode> = {
+    showsIn: (
+      <>
+              {/* Where it shows on Today: Today's Quests, Additional Quests, or the backlog (just its board). One choice. */}
+              {!doingNow && !isCompleted && !fixedSchedule && (
+                <div className="flex items-center gap-2">
+                  <span className={`${labelCls} shrink-0`}>Priority</span>
+                  <div
+                    role="radiogroup"
+                    aria-label="Priority: primary objective (Today's Quests), secondary objective (Additional Quests) or backlog (only on its board)"
+                    className="grid min-h-9 min-w-0 flex-1 grid-cols-3 gap-0.5 rounded-[18px] p-[3px]"
+                    style={{ background: "rgba(70,50,20,.09)", boxShadow: "inset 0 1px 2px rgba(70,50,20,.14)" }}
+                  >
+                    {(
+                      [
+                        { v: "today" as const, label: `Primary objective: shows in Today's ${isAdventure ? "Quests" : "Tasks"}`, short: "Primary objective" },
+                        { v: "additional" as const, label: `Secondary objective: shows in Additional ${isAdventure ? "Quests" : "Tasks"}`, short: "Secondary objective" },
+                        { v: "none" as const, label: "Backlog: only on its board", short: "Backlog" },
+                      ]
+                    ).map((o) => {
+                      const on = placement === o.v;
+                      return (
+                        <button
+                          key={o.v}
+                          type="button"
+                          role="radio"
+                          aria-checked={on}
+                          aria-label={o.label}
+                          title={o.label}
+                          onClick={() => setPlacement(o.v)}
+                          className="flex min-h-[30px] min-w-0 items-center justify-center gap-1 rounded-[15px] px-1.5 py-0.5 text-[12px] font-semibold leading-[1.1] transition-[background,box-shadow] duration-150"
+                          style={{
+                            background: on ? (isAdventure ? "linear-gradient(180deg,#f6e3a8,#dcb763)" : "var(--t-card)") : "transparent",
+                            boxShadow: on ? "0 1px 3px rgba(60,40,10,.3), 0 0 0 1px rgba(138,97,22,.55)" : undefined,
+                            color: on ? "#2a1c10" : "var(--t-ink-soft)",
+                          }}
+                        >
+                          <span
+                            aria-hidden
+                            className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full"
+                            style={{ border: `1.5px solid ${on ? "#6b4a12" : "rgba(110,90,50,.55)"}` }}
+                          >
+                            {on && <span className="block h-1.5 w-1.5 rounded-full" style={{ background: "#6b4a12" }} />}
+                          </span>
+                          <span className="text-left">{o.short}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
+      </>
+    ),
+    time: (
+      <>
+              {/* Time to complete */}
+              {!doingNow && (
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2.5">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- same clock glyph as the quest card */}
+                    <img src="/design/ui-clock.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
+                    <span className={`${labelCls} shrink-0`}>Time</span>
+                    {/* 5, 10, 15 or 30 minutes, or your own (owner, Nov 3). */}
+                    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+                      {ESTIMATE_PICKS.map((m) => {
+                        const on = Number(estimate) === m && !estOther;
+                        return (
+                          <button
+                            key={m}
+                            type="button"
+                            aria-pressed={on}
+                            onClick={() => (setEstOther(false), pickEstimate(on ? "" : String(m)))}
+                            className="h-8 min-w-10 rounded-full px-2.5 text-[13px] font-semibold tabular-nums"
+                            style={on ? { background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" } : { border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: "rgba(255,250,235,.35)" }}
+                          >
+                            {m}m
+                          </button>
+                        );
+                      })}
+                      {estOther ? (
+                        <span className="reveal flex h-8 items-center gap-1 rounded-full border pl-1 pr-2.5" style={{ borderColor: "#8a6116" }}>
+                          <input
+                            type="number"
+                            autoFocus
+                            onFocus={(e) => e.currentTarget.select()}
+                            inputMode="numeric"
+                            min={0}
+                            step={5}
+                            value={estimate}
+                            onChange={(e) => pickEstimate(e.target.value)}
+                            placeholder="—"
+                            aria-label="Minutes to complete"
+                            // One colour inside the pill: no field wash behind the number (owner, Nov 5).
+                            style={{ background: "transparent", boxShadow: "none" }}
+                            className="bare-input h-7 w-14 rounded-full border-0 bg-transparent px-1 text-center text-[16px] tabular-nums [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          />
+                          <span className="text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+                            min
+                          </span>
+                        </span>
+                      ) : (
+                        <button type="button" onClick={() => setEstOther(true)} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: "rgba(255,250,235,.35)" }}>
+                          Other
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
+      </>
+    ),
+    sequence: (
+      <>
+              {/* Sub-quests and the sequence from one place (owner, Nov 4 and 13: "sequence and steps should be
+                  accessible from the same pill"): a checklist inside this quest, or quests one after another. */}
+              {!doingNow && !review && (
+                <div className="flex flex-col gap-1.5" data-subseq>
+                  {/* Two pills, side by side (owner, Nov 20: "the two pills for each, sub-quests and sequence"): one tap
+                      each, no menu of choices. Sequence opens the sequence window (or, on a new quest, its panel here). */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {/* "+ Sub-quests" and "+ Sequence", no icons, like the other + pills (owner, Nov 20). */}
+                    {!stepsUnavailable && !isCompleted && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (stepsOpen) {
+                            setStepsFolded(true);
+                            setAddingStep(false);
+                            return;
+                          }
+                          setStepsFolded(false);
+                          if (!stepsHas) {
+                            setAddingStep(true);
+                            requestAnimationFrame(() => newStepRef.current?.focus());
+                          }
+                        }}
+                        aria-expanded={stepsOpen}
+                        data-open={stepsOpen ? "true" : undefined}
+                        className="qe-fact flex h-8 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold"
+                        title="A checklist inside this quest"
+                      >
+                        <span aria-hidden className="text-[13px] leading-none opacity-70">{stepsOpen ? "−" : "+"}</span>
+                        Sub-quests
+                        {(() => {
+                          const n = (steps ?? []).length || (steps === null ? (task?.steps_total ?? 0) : 0);
+                          return n ? <span style={{ color: "var(--t-ink-soft)" }}>· {n}</span> : null;
+                        })()}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => (task ? setSeqDialog(true) : setSeqOpen((o) => !o))}
+                      aria-expanded={task ? undefined : seqOpen}
+                      data-open={!task && seqOpen ? "true" : undefined}
+                      className="qe-fact flex h-8 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold"
+                      title="Quests before or after this one"
+                    >
+                      <span aria-hidden className="text-[13px] leading-none opacity-70">+</span>
+                      Sequence
+                      {(() => {
+                        const n = task ? (task.behind?.length ?? 0) : seqLinks.length;
+                        return n ? <span style={{ color: "var(--t-ink-soft)" }}>· {n}</span> : null;
+                      })()}
+                    </button>
+                  </div>
+                  {!stepsUnavailable && <Fold open={stepsOpen}>{stepsDrawer}</Fold>}
+                  {!task && seqOpen && (
+                    <div className="reveal flex flex-col gap-2 rounded-xl px-3 py-2.5" style={{ border: "1px dashed rgba(139,112,64,.5)" }}>
+                      <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                        A quest after another stays stacked out of sight until that one is done.
+                      </p>
+                      {seqLinks.length > 0 && (
+                        <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[14px]">
+                          {seqLinks.map((l, i) => (
+                            <li key={i} className="flex min-h-8 items-center gap-2">
+                              <span className="shrink-0 text-[12.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
+                                {l.rel === "after" ? "Comes after" : "Then"}
+                              </span>
+                              <span className="min-w-0 flex-1 truncate">
+                                {l.pick.id ? "" : "＋ "}
+                                {l.pick.title}
+                              </span>
+                              <button type="button" onClick={() => setSeqLinks((ls) => ls.filter((_, j) => j !== i))} aria-label={`Remove ${l.pick.title}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
+                                <CloseIcon size={9} />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {seqAdding ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[12.5px] font-semibold">{seqAdding === "after" ? "This quest comes after…" : "After this quest comes…"}</span>
+                          <QuestPicker
+                            autoFocus
+                            exclude={seqLinks.map((l) => l.pick.id).filter(Boolean) as string[]}
+                            onPick={(p) => {
+                              setSeqLinks((ls) => [...ls, { rel: seqAdding, pick: p }]);
+                              setSeqAdding(null);
+                            }}
+                          />
+                          <button type="button" onClick={() => setSeqAdding(null)} className="self-start text-[12.5px] underline" style={{ color: "var(--t-ink-soft)" }}>
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          <button type="button" onClick={() => setSeqAdding("after")} className="flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px dashed rgba(139,112,64,.6)" }}>
+                            ↑ Comes after a quest
+                          </button>
+                          <button type="button" onClick={() => setSeqAdding("before")} className="flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px dashed rgba(139,112,64,.6)" }}>
+                            ↓ Add what comes next
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {task && seqDialog && (
+                    <SequenceDialog
+                      taskId={task.id}
+                      title={title}
+                      isAdventure={isAdventure}
+                      addFollowUp={seqFollow}
+                      onClose={() => (setSeqDialog(false), setSeqFollow(false))}
+                      onEditSelf={() => setSeqDialog(false)}
+                      onStepsMoved={() => {
+                        setStepsDirty(false);
+                        setStepsReload((n) => n + 1);
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+      </>
+    ),
+    // Shown right under the "Scheduled" button (in Time to complete), not as a part of its own.
+    scheduling: null,
+    matrix: (
+      <>
+              {/* Plot on the matrix, with "not actionable yet" beside it */}
+              {task && !isCompleted && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onPlot) onPlot();
+                      else window.location.assign(`/matrix?plot=${task.id}`);
+                    }}
+                    className="hover-glow flex min-h-9 items-center justify-center gap-2 rounded-full border px-3 text-[13px] font-semibold"
+                    style={{ borderColor: chipBorder, color: "var(--t-ink)" }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- matrix glyph */}
+                    <img src="/design/ui-target.png" alt="" width={18} height={18} />
+                    Plot on the Priority Matrix
+                  </button>
+                  <label className="flex min-h-9 cursor-pointer items-center gap-2 text-[13px]" title="Keep it as an aspiration on its board, off Today and the map">
+                    <input type="checkbox" checked={aspiration} onChange={(e) => setAspiration(e.target.checked)} className="h-4 w-4 shrink-0" style={{ accentColor: isAdventure ? "#8a6c2c" : "var(--t-accent)" }} />
+                    <span className="font-semibold">Not actionable yet</span>
+                  </label>
+                </div>
+              )}
+      </>
+    ),
+    steps: (
+      <>
+              {/* The sub-quests open from their "+ Sub-quests" pill (owner, Nov 20: the pill is the header; the drawer
+                  comes out of it and returns to it). Only when the pills aren't shown (a review) do they sit here. */}
+              {review && !doingNow && !stepsUnavailable && stepsDrawer}
       </>
     ),
     xp: (
@@ -2348,8 +2331,8 @@ export function QuestEditorDialog({
   const foldedParts = layout.order.filter((k) => layout.folded.includes(k) && partShown[k]);
   // No "More" fold (owner, Nov 3): the extra parts are small pills in a row, each opening its own panel in place.
   const SCALE_PARTS: EditorPart[] = ["importance", "urgency", "difficulty", "energy"];
-  const pillKeys: string[] = [...new Set<string>(foldedParts.filter((k) => k !== "stats" && k !== "template").map((k) => (SCALE_PARTS.includes(k) ? "scales" : k)))].concat(task ? ["file"] : []);
-  const pillName = (k: string) => (k === "scales" ? "Importance & effort" : k === "file" ? "Add a file" : k === "matrix" ? "Matrix" : (MORE_NAMES[k as EditorPart] ?? k).replace(/^./, (c) => c.toUpperCase()));
+  const pillKeys: string[] = [...new Set<string>(foldedParts.filter((k) => k !== "stats" && k !== "template").map((k) => (SCALE_PARTS.includes(k) ? "scales" : k)))].concat(task ? ["file", "color"] : []);
+  const pillName = (k: string) => (k === "scales" ? "Importance & effort" : k === "file" ? "Add a file" : k === "color" ? "Color" : k === "matrix" ? "Matrix" : (MORE_NAMES[k as EditorPart] ?? k).replace(/^./, (c) => c.toUpperCase()));
   const morePills = pillKeys.length > 0 && (
     <div className="flex flex-col gap-2 border-t pt-2" style={{ borderColor: "rgba(139,112,64,.25)" }}>
       <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="More details">
@@ -2364,6 +2347,9 @@ export function QuestEditorDialog({
         <div key={morePick} className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
           {morePick === "scales" ? (
             SCALE_PARTS.filter((k) => foldedParts.includes(k)).map((k) => <Fragment key={k}>{partNodes[k]}</Fragment>)
+          ) : morePick === "color" ? (
+            // The card's colour or picture, last in the row as "+ Color" (owner, Nov 20; it was a dot by the place pin).
+            task && <CardLookPicker task={task} />
           ) : morePick === "file" ? (
             task && (
               <div className="flex items-center gap-2">
@@ -2767,19 +2753,8 @@ export function QuestEditorDialog({
                         {drive && <span className="shrink-0 whitespace-nowrap" style={{ opacity: 0.8 }}>· 🚗 {driveWords(drive)}</span>}
                       </button>
                     )}
-                    {/* The card's background, a colour or a picture: on Today, boards and the calendar (owner, Nov 12). */}
-                    {task && !doingNow && (
-                      <button type="button" onClick={() => setFactOpen((o) => (o === "look" ? null : "look"))} aria-expanded={factOpen === "look"} aria-label="Card colour or picture" title="Card colour or picture" className="qe-fact flex h-9 items-center gap-1 rounded-full px-2.5 text-[13.5px] font-semibold" data-open={factOpen === "look" ? "true" : undefined}>
-                        <span aria-hidden className="h-4 w-4 rounded-full" style={{ border: "1.5px solid #8a6116", background: cardLook?.color ?? (cardLook?.image ? "conic-gradient(#d9b45f, #7c9a5a, #6fa8dc, #d9b45f)" : "linear-gradient(180deg, #fbf3dc, #eedcb3)") }} />
-                      </button>
-                    )}
 
                   </div>
-                  {factOpen === "look" && task && (
-                    <div key="look" className="reveal qe-fact-panel rounded-xl p-3">
-                      <CardLookPicker task={task} />
-                    </div>
-                  )}
                   {factOpen === "place" && task && (
                     <div key="place" className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
                     <div className="flex items-center gap-2">
