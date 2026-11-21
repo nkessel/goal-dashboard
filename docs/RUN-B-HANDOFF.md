@@ -21,6 +21,8 @@ The live app is https://goal-dashboard-kappa.vercel.app. Cloud sessions can't si
 
 The Run B list from the dev plan, updated with what has happened since it was written (Nov 18).
 
+**0. Bugs first (owner, Nov 21 7:12 AM: "everything is extra buggy now... long welcome screen comes up but disappears on interaction, can't check in sleep, etc etc"; 7:14: fine if not fixed right away, but it must work by some point in the timeline).** Before any other item, take one of these if it isn't claimed: (a) on the live app, the welcome screen opens (the long version) and vanishes on the first tap, so its sleep check-in can't be done; (b) find the other new bugs: run `npm run ui-check` on all flows against `main`, compare with the last clean report, and walk Today, welcome, check-in, Insights and calendar for errors, regressions from the Nov 20–21 merges (check-in work, faces/feel, sequence, time ranges, additional habits) and the overnight D0/D1/L1 changes. Fix each on `main` as a bug fix (no review needed), log it in `docs/SHIPPED.md`, and say in WAITING what you couldn't reproduce. Not D0's save path (checked Nov 21: no failed saves in the database, keys match), nor L1's file split (code moved unchanged).
+
 **1. Merge what the owner said OK to (Nov 19, 00:43 UTC: "ok let's do it").** Run A got the OK but stopped on its usage limit before merging most of it. As of this writing:
 
 | Branch | Status | What to do |

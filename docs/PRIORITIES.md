@@ -8,6 +8,8 @@ Related: `docs/BUILD-PLAN.md` (tasks for lighter models), `docs/REPEAT-ASKS.md`,
 
 ---
 
+**Bugs first (owner, Nov 21):** the live app is buggy after the Nov 20–21 merges (welcome screen opens and vanishes on the first tap, so sleep can't be checked in; more he hasn't listed). Every session takes these before anything else: details in `docs/RUN-B-HANDOFF.md` item 0.
+
 **Lighter-model sessions: work from `docs/BUILD-PLAN.md` (Nov 14), top to bottom.**
 
 ## 0. Start here: top dev priorities (owner, Nov 11: "save our top dev priorities to continue with another account")
