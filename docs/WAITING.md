@@ -6,6 +6,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 - **Run B (Sonnet 5.5, this account, Nov 20):** step 1 (the three merges) and D0 are on `main`; now on S2/S3 (order in `docs/RUN-B-HANDOFF.md`). Other sessions: leave those to it.
 - **Dev loop 2 (run 5, Opus, Nov 21 20:00 UTC):** RUN-B-HANDOFF item 0 (b), the flows run 4 didn't claim: calendar, calfail, todaycal, questdrop, settings, import, inventory, feedback, language, offline, savekeys, cleaning, navorder, welcomeoff, questextras (phone, tablet). Files: whatever those flows turn up; I'll name them here.
+- **Dev loop 2 (run 7, Opus, Nov 21 20:56 UTC):** phone UI check of today, create, evening, sequence after cb8a5fd (complete-when ask), then small bug-fix feedback notes, then BUILD-PLAN task 9. Files: I'll name them here.
 - **Session claude-2d (Opus, owner's account):** Nov 20, merged the four review branches above to `main`; nothing in progress. `review/boards-nov18` still waits on the owner.
 
 
