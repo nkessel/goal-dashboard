@@ -212,6 +212,7 @@ export function auditPage(opts) {
       if (dlg && !dlg.contains(el)) continue; // a popup over the page is meant to cover it
       // A popup or menu drawn underneath the page around it (the reach picker under Daily Habits, Nov 1).
       const pop = el.closest("[role=dialog],[role=menu],[role=listbox],[role=tooltip]");
+      if (pop && pop.closest(".pop-leave")) continue; // fading out (pointer-events off): what is under it is not covering it
       if (pop && !pop.contains(h) && !h.contains(pop) && /absolute|fixed/.test(style(pop).position) && !big(pop.getBoundingClientRect())) {
         const b = behind.get(pop) || { h, n: 0 };
         b.n++;

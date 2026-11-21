@@ -13,7 +13,6 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 **Shipped Nov 20 (merged to `main` from `merge-nov20`, owner: "do what you think is best"):** `review/faces-feel`, `review/insights-nov19`, `review/insights-timeline`, `review/subquests-sequence`. See `docs/SHIPPED.md`. Review pages: https://claude.ai/artifact/DgobEgqytFM6qsSuC2bZeJ and https://claude.ai/artifact/69UKiWJeE7BgPnJLRU8q6E
 - **Follow-up (Sonnet, a fix):** Insights is now clean (Nov 21: the draft lives in a `checkin-draft` cookie and the server draws it and "Last night"), but on Today the check-in still moves Today's Quests once (~120-130px, steps "check-in open" and "habit sub-habits open"; entry kept in `known-issues.json`). Find that cause (not the Last night fetch).
 
-- **Bug for a fixer (found by Run B's calendar UI check, Nov 21):** `popup-behind` error on the tablet's "Apply these settings to all future repeats?" dialog (step "series look: saved for all"): the dialog is drawn under another element; portal it to the body. Came in with the boards merge; not from Cal 1d.
 
 ## 0a. Work in progress and waiting on the owner (Nov 12)
 
