@@ -351,6 +351,18 @@ export function startFakeDb({ port = 54329, fixtures = {}, quiet = true } = {}) 
       if (url.pathname.startsWith("/storage/") || url.pathname.startsWith("/auth/")) return respond(res, 200, {});
       const m = url.pathname.match(/^\/rest\/v1\/(rpc\/)?(\w+)$/);
       if (!m) return respond(res, 404, { message: "not found" });
+      if (m[1] && m[2] === "set_profile_extra") {
+        const a = JSON.parse(body || "{}");
+        const prof = T("profiles").find((r) => r.id === a.p_owner);
+        if (prof) {
+          const lw = { ...(prof.life_wheel ?? {}) };
+          if (a.p_value === null) delete lw[a.p_key];
+          else lw[a.p_key] = a.p_value;
+          prof.life_wheel = lw;
+        }
+        log.writes.push("rpc set_profile_extra");
+        return respond(res, 200, null);
+      }
       if (m[1]) {
         log.unsupported.push(`rpc ${m[2]} (answered null)`);
         return respond(res, 200, null);

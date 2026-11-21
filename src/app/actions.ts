@@ -1,5 +1,6 @@
 "use server";
 
+import { writeExtra } from "@/lib/data/extras";
 import { cleanHabitTicks, habitTicksSeed, type HabitTicks, type HabitTicksSeed } from "@/lib/habit-ticks";
 import { isTentativeTitle } from "@/lib/tentative";
 import { revalidatePath } from "next/cache";
@@ -145,7 +146,7 @@ export async function setBoardDreamAction(boardId: string, isDream: boolean) {
   else ids.delete(boardId);
   const live = new Set(boards.map((b) => b.id));
   const dreamBoards = [...ids].filter((id) => live.has(id));
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, dreamBoards } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "dreamBoards", dreamBoards);
   if (error) throw new Error(`Couldn't move the board: ${error.message}`);
   revalidatePath("/boards");
   revalidatePath(`/boards/${boardId}`);
@@ -706,7 +707,7 @@ export async function archiveTaskAction(taskId: string) {
   const { data: steps } = await db.from("quest_steps").select("*").eq("owner_id", ownerId).eq("task_id", taskId);
   const extras = await readExtras(ownerId);
   const list = [{ at: new Date().toISOString(), task: row, steps: (steps ?? []) as Record<string, unknown>[] }, ...archivedOf(extras).filter((a) => a.task.id !== taskId)].slice(0, 60);
-  const { error } = await db.from("profiles").update({ life_wheel: { ...extras, archivedQuests: list } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "archivedQuests", list);
   if (error) throw new Error(`Couldn't archive it: ${error.message}`);
   await deleteTaskAction(taskId);
 }
@@ -729,7 +730,7 @@ export async function restoreArchivedQuestAction(taskId: string) {
   const { error } = await db.from("tasks").insert(task);
   if (error) throw new Error(`Couldn't bring it back: ${error.message}`);
   if (hit.steps.length) await db.from("quest_steps").insert(hit.steps.map((st) => ({ ...st, owner_id: ownerId }))).then(() => {}, () => {});
-  await db.from("profiles").update({ life_wheel: { ...extras, archivedQuests: all.filter((a) => a.task.id !== taskId) } }).eq("id", ownerId);
+  await writeExtra(ownerId, "archivedQuests", all.filter((a) => a.task.id !== taskId));
   revalidatePath("/");
   revalidatePath("/boards", "layout");
   return { title: String(hit.task.title ?? "") };
@@ -2048,7 +2049,7 @@ export async function rateForDayAction(day: "today" | "tomorrow", taskId: string
   if (rating && rating >= 1 && rating <= 5) mine[taskId] = Math.round(rating);
   // Keep only the last few days.
   const kept = Object.fromEntries(Object.entries({ ...all, [key]: mine }).sort(([a], [b]) => b.localeCompare(a)).slice(0, 4));
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, dayRatings: kept } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "dayRatings", kept);
   if (error) throw new Error(`Couldn't save that: ${error.message}`);
   // Rated first (highest first), then the rest in their current order.
   const order = (ids: string[]) => {
@@ -2080,7 +2081,7 @@ export async function unrateForDayAction(day: "today" | "tomorrow", taskId: stri
   const all = (extras.dayRatings as Record<string, Record<string, number>> | undefined) ?? {};
   const mine = { ...(all[key] ?? {}) };
   delete mine[taskId];
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, dayRatings: { ...all, [key]: mine } } }).eq("id", ownerId);
+  await writeExtra(ownerId, "dayRatings", { ...all, [key]: mine });
   if (!wasOn) {
     if (day === "today") await tasksData.setManualPriority(taskId, ownerId, false);
     else {
@@ -2103,10 +2104,9 @@ function cleanHabitPlan(raw: unknown): HabitPlan {
   return { core: ids(r.core), days };
 }
 async function saveHabitPlan(ownerId: string, plan: HabitPlan) {
-  const extras = await readExtras(ownerId);
   // Keep only the last few days.
   const days = Object.fromEntries(Object.entries(plan.days).sort(([a], [b]) => b.localeCompare(a)).slice(0, 5));
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, habitPlan: { core: plan.core, days } } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "habitPlan", { core: plan.core, days });
   if (error) throw new Error(`Couldn't save that: ${error.message}`);
 }
 const planDayKey = (day: "today" | "tomorrow") => (day === "today" ? tomorrowData.appDayKey() : tomorrowData.nextDayKey(tomorrowData.appDayKey()));
@@ -2526,7 +2526,7 @@ export async function saveNightAction(input: { bed: string | null; wake: string 
   const log = { ...wheel.log };
   if (night) log[day] = night;
   else delete log[day];
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, wheelOfTime: { ...wheel, log } } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "wheelOfTime", { ...wheel, log });
   if (error) throw new Error(`Couldn't save last night: ${error.message}`);
   revalidatePath("/insights");
   return { day, night };
@@ -2539,7 +2539,7 @@ export async function setWheelOfTimeAction(input: { effort?: string[]; hindrance
   const extras = await readExtras(ownerId);
   const wheel = cleanWheel(extras.wheelOfTime);
   const next = cleanWheel({ ...wheel, ...(input.effort ? { effort: input.effort } : {}), ...(input.hindrances ? { hindrances: input.hindrances } : {}), ...("target" in input ? { target: input.target } : {}), ...(input.weights ? { weights: input.weights } : {}) });
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, wheelOfTime: next } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "wheelOfTime", next);
   if (error) throw new Error(`Couldn't save that: ${error.message}`);
   revalidatePath("/insights");
   return { effort: next.effort, hindrances: next.hindrances, target: next.target, weights: next.weights };
@@ -2624,7 +2624,7 @@ export async function setTopPriorityAction(text: string, othersIn: string[] = []
   const extras = await readExtras(ownerId);
   const day = tomorrowData.appDayKey();
   const priorities = [{ text: t, others, day, at: new Date().toISOString() }, ...cleanPriorities(extras.priorities).filter((p) => p.day !== day)].slice(0, 120);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, priorities } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "priorities", priorities);
   if (error) throw new Error(`Couldn't save that: ${error.message}`);
   return { text: t, others, day };
 }
@@ -2879,8 +2879,7 @@ export async function setShareSettingsAction(patch: Record<string, boolean>) {
 export async function saveSupportNoteAction(text: string) {
   const ownerId = await requireProfileId();
   const clean = text.replace(/\r/g, "").replace(/\n{3,}/g, "\n\n").trim().slice(0, 600);
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, support: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "support", clean);
   if (error) throw new Error("Couldn't save that.");
   revalidatePath("/friends", "layout");
   return clean;
@@ -3117,9 +3116,7 @@ const WHEEL_PREFIX = "◎ ";
 export async function setLifeWheelTopicsAction(topics: string[]) {
   const ownerId = await requireProfileId();
   const clean = [...new Set(topics.map((t) => t.replace(/\s+/g, " ").trim().slice(0, 20)).filter(Boolean))].slice(0, 12);
-  const { supabaseAdmin } = await import("@/lib/supabase/server");
-  const { data: cur } = await supabaseAdmin().from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...(cur?.life_wheel ?? {}), topics: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "topics", clean);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath("/insights");
   return clean;
@@ -3515,8 +3512,7 @@ export async function saveStreaksAction(list: { id: string; name: string; word: 
     word: s.word.split(",").map((w) => w.replace(/^\s*#/, "").trim().toLowerCase()).filter(Boolean).join(", ").slice(0, 60),
     since: new Date(Date.parse(s.since) || Date.now()).toISOString(),
   }));
-  const { data: cur } = await supabaseAdmin().from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...(cur?.life_wheel ?? {}), streaks: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "streaks", clean);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath("/insights");
   return clean;
@@ -3527,8 +3523,7 @@ export async function saveRitualsAction(list: import("@/lib/rituals").Ritual[]) 
   const ownerId = await requireProfileId();
   const { cleanRituals } = await import("@/lib/rituals");
   const clean = cleanRituals(list);
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, rituals: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "rituals", clean);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath("/insights");
   return clean;
@@ -3541,7 +3536,7 @@ async function addRitual(ownerId: string, title: string, note: string | null) {
   const same = list.find((r) => r.title.toLowerCase() === title.toLowerCase());
   if (same) return same.id;
   const id = `r${Math.random().toString(36).slice(2, 10)}`;
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, rituals: [...list, { id, title, note, log: [] }] } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "rituals", [...list, { id, title, note, log: [] }]);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath("/insights");
   return id;
@@ -3569,7 +3564,7 @@ export async function saveInventoryAction(inventory: unknown) {
   // Packing lists are saved by their own window (below); the backpack never writes over them.
   const stored = ((cur?.life_wheel ?? {}) as { inventory?: { packing?: unknown } }).inventory?.packing;
   if (stored !== undefined) (clean as { packing: unknown }).packing = stored;
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...(cur?.life_wheel ?? {}), inventory: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "inventory", clean);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath("/settings");
   return clean;
@@ -3591,7 +3586,7 @@ export async function savePackingListsAction(lists: unknown) {
   const { data: cur } = await supabaseAdmin().from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
   const lw = cur?.life_wheel ?? {};
   const inventory = { ...((lw as { inventory?: Record<string, unknown> }).inventory ?? {}), packing: clean };
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...lw, inventory } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "inventory", inventory);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return clean;
 }
@@ -3604,8 +3599,7 @@ export async function saveCleaningAction(cleaning: unknown) {
   const { normalizeCleaning } = await import("@/lib/cleaning");
   const clean = normalizeCleaning(cleaning);
   if (!clean) throw new Error("Nothing to save.");
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, cleaning: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "cleaning", clean);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return clean;
 }
@@ -3636,7 +3630,7 @@ export async function fightMessAction(input: { day: string; spaceId: string; bef
     spaces: c.spaces.map((s) => (s.id === space.id ? { ...s, level: levelOfTen(after), mess: after, ratedOn: day } : s)),
     battles: [...(c.battles ?? []), { on: day, spaceId: space.id, before, after, minutes, took: n(input.took, 5), gave: n(input.gave, 5), xp: xpEarned }],
   })!;
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, cleaning: next } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "cleaning", next);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   const award = xpEarned > 0 ? await xp.awardXp(ownerId, xpEarned, "mess_battle") : null;
   revalidatePath("/");
@@ -3725,8 +3719,7 @@ export async function saveWeatherPlaceAction(place: { lat: number; lon: number; 
   const lat = Math.round(Number(place.lat) * 100) / 100;
   const lon = Math.round(Number(place.lon) * 100) / 100;
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error("That place doesn't look right.");
-  const { data: cur } = await supabaseAdmin().from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...(cur?.life_wheel ?? {}), weather: { lat, lon, name: place.name?.slice(0, 60) ?? null } } }).eq("id", ownerId);
+  await writeExtra(ownerId, "weather", { lat, lon, name: place.name?.slice(0, 60) ?? null });
 }
 
 // ---------------------------------------------------------------------------
@@ -3754,7 +3747,7 @@ export async function setProgressUnitAction(taskId: string, unit: import("@/lib/
   const u = unit ? cleanUnit(unit) : null;
   if (u) all[taskId] = u;
   else delete all[taskId];
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, progressUnits: all } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "progressUnits", all);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return u;
 }
@@ -3776,7 +3769,7 @@ export async function setQuestPlaceAction(taskId: string, place: string | null) 
   const p = place?.replace(/\s+/g, " ").trim().slice(0, 80) || null;
   if (p) all[taskId] = p;
   else delete all[taskId];
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, questPlaces: all } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "questPlaces", all);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return p;
 }
@@ -3813,7 +3806,7 @@ export async function setQuestWindowAction(taskId: string, win: QuestWindow | nu
   const w = cleanWindow(win);
   if (w) all[taskId] = w;
   else delete all[taskId];
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, questWindows: all } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "questWindows", all);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return w;
 }
@@ -3844,7 +3837,7 @@ export async function setQuestDriveAction(taskId: string, minutes: number | null
   const m = minutes && minutes > 0 ? Math.min(600, Math.round(minutes)) : null;
   if (m) all[taskId] = m;
   else delete all[taskId];
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, questDrives: all } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "questDrives", all);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath("/calendar");
   return m;
@@ -3858,7 +3851,7 @@ export async function setCalCardLookAction(taskId: string, look: CalCardLook | n
   const l = cleanLook(look);
   if (l) all[taskId] = l;
   else delete all[taskId];
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, calCardLooks: all } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "calCardLooks", all);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return l;
 }
@@ -3878,7 +3871,7 @@ export async function setEventQuestsAction(on: boolean) {
   const cur = readEventQuestSettingsOf(extras);
   // Turning it on starts from now: events already past stay as they are.
   const next = { ...cur, on, ...(on && !cur.on ? { since: new Date().toISOString() } : {}) };
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, eventQuests: next } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "eventQuests", next);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath("/calendar");
   revalidatePath("/");
@@ -3891,10 +3884,7 @@ export async function recordEventQuestAction(taskId: string, eventId: string) {
   if (!QUEST_ID.test(taskId) || !eventId || eventId.length > 300) return;
   const extras = await readExtras(ownerId);
   const cur = readEventQuestSettingsOf(extras);
-  await supabaseAdmin()
-    .from("profiles")
-    .update({ life_wheel: { ...extras, eventQuests: { ...cur, made: { ...(cur.made ?? {}), [eventId]: taskId } } } })
-    .eq("id", ownerId);
+  await writeExtra(ownerId, "eventQuests", { ...cur, made: { ...(cur.made ?? {}), [eventId]: taskId } });
 }
 
 /** The gem each reward wears on its tag (a diamond unless chosen), kept on the account by reward id. */
@@ -3915,7 +3905,7 @@ export async function setRewardGemAction(rewardId: string, kind: string) {
   const all = { ...((extras.rewardGems as Record<string, string> | undefined) ?? {}) };
   if (kind === "diamond") delete all[rewardId];
   else all[rewardId] = kind;
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, rewardGems: all } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "rewardGems", all);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
 }
 
@@ -3926,7 +3916,7 @@ export async function setBoardMistAction(boardId: string, mist: boolean) {
   const extras = await readExtras(ownerId);
   const list = (Array.isArray(extras.clearBoards) ? (extras.clearBoards as unknown[]) : []).filter((x): x is string => typeof x === "string" && x !== boardId);
   const next = mist ? list : [...list, boardId].slice(-200);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, clearBoards: next } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "clearBoards", next);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath(`/boards/${boardId}`);
 }
@@ -3942,7 +3932,7 @@ export async function saveBoardOrderAction(boardId: string, order: { by: string;
   // Keep the newest 200 boards' choices.
   const keys = Object.keys(next);
   if (keys.length > 200) for (const k of keys.slice(0, keys.length - 200)) delete next[k];
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, boardOrders: next } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "boardOrders", next);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
 }
 
@@ -3961,7 +3951,7 @@ export async function saveQuestTemplateAction(tpl: unknown) {
   const extras = await readExtras(ownerId);
   const list = normalizeTemplates(extras.templates).filter((t) => t.id !== clean.id);
   const next = [...list, clean].sort((a, b) => a.name.localeCompare(b.name));
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, templates: next } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "templates", next);
   if (error) throw new Error(`Couldn't save the template: ${error.message}`);
   return next;
 }
@@ -3971,7 +3961,7 @@ export async function deleteQuestTemplateAction(id: string) {
   const { normalizeTemplates } = await import("@/lib/quest-templates");
   const extras = await readExtras(ownerId);
   const next = normalizeTemplates(extras.templates).filter((t) => t.id !== id);
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, templates: next } }).eq("id", ownerId);
+  await writeExtra(ownerId, "templates", next);
   return next;
 }
 
@@ -4051,7 +4041,7 @@ export async function answerDeadlineGuessAction(taskId: string, dueAt: string | 
   const asked = { ...((extras.toucanDueAsked as Record<string, string> | undefined) ?? {}), [taskId.slice(0, 40)]: new Date().toISOString() };
   // Keep the record small: the most recent 200 answers.
   const kept = Object.fromEntries(Object.entries(asked).sort((a, b) => b[1].localeCompare(a[1])).slice(0, 200));
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, toucanDueAsked: kept } }).eq("id", ownerId);
+  await writeExtra(ownerId, "toucanDueAsked", kept);
   revalidatePath("/");
 }
 
@@ -4062,7 +4052,7 @@ export async function snoozeToucanAction(taskId: string, days = 1) {
   const now = Date.now();
   const kept = Object.fromEntries(Object.entries((extras.toucanSnooze as Record<string, string> | undefined) ?? {}).filter(([, until]) => Date.parse(until) > now));
   kept[taskId.slice(0, 40)] = new Date(now + Math.max(0.01, Math.min(30, days)) * 86_400_000).toISOString();
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, toucanSnooze: kept } }).eq("id", ownerId);
+  await writeExtra(ownerId, "toucanSnooze", kept);
 }
 
 /** Save how long a quest will take (the first rung: estimate, schedule, do). */
@@ -4082,7 +4072,7 @@ async function readCoach(ownerId: string) {
   return { extras, coach: cleanCoach(extras.coach) };
 }
 async function writeCoach(ownerId: string, extras: Record<string, unknown>, coach: import("@/lib/coach").CoachState) {
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, coach } }).eq("id", ownerId);
+  await writeExtra(ownerId, "coach", coach);
 }
 
 /** The conversation so far (recent part), what it remembers and your promises. */
@@ -4301,7 +4291,7 @@ export async function starCheckInAction(keys: string[], on: boolean) {
     else star.delete(k);
   }
   marks.star = [...star].slice(-500);
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, checkInMarks: marks } }).eq("id", ownerId);
+  await writeExtra(ownerId, "checkInMarks", marks);
   revalidatePath("/insights");
 }
 
@@ -4315,7 +4305,7 @@ export async function removeCheckInAction(keys: string[], how: "archive" | "dele
     const extras = await readExtras(ownerId);
     const marks = { ...((extras.checkInMarks as { star?: string[]; archived?: string[] } | undefined) ?? {}) };
     marks.archived = [...new Set([...(marks.archived ?? []), ...clean])].slice(-2000);
-    await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, checkInMarks: marks } }).eq("id", ownerId);
+    await writeExtra(ownerId, "checkInMarks", marks);
   }
   revalidatePath("/insights");
   revalidatePath("/");
@@ -4413,8 +4403,7 @@ export async function applyCatchUpAction(boardIds: string[], orderedIds: string[
   );
   const current = (await schedulingData.listSchedulingList(ownerId)).map((t) => t.id).filter((id) => !ids.includes(id));
   await schedulingData.setSchedulingOrder(ownerId, [...ids, ...current]);
-  const extras = await readExtras(ownerId);
-  await db.from("profiles").update({ life_wheel: { ...extras, catchUp: { boards: boardIds.slice(0, 20), at: new Date().toISOString() } } }).eq("id", ownerId);
+  await writeExtra(ownerId, "catchUp", { boards: boardIds.slice(0, 20), at: new Date().toISOString() });
   revalidatePath("/", "layout");
 }
 
@@ -4427,7 +4416,7 @@ export async function saveToucanPrefsAction(patch: { mode?: "simple" | "lite" | 
     mode: patch.mode && ["simple", "lite", "full"].includes(patch.mode) ? patch.mode : (prev.mode ?? "full"),
     retired: Array.isArray(patch.retired) ? patch.retired.filter((x) => typeof x === "string").map((x) => x.slice(0, 200)).slice(0, 200) : (prev.retired ?? []),
   };
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, toucanPrefs: next } }).eq("id", ownerId);
+  await writeExtra(ownerId, "toucanPrefs", next);
 }
 
 export async function toucanPrefsAction() {
@@ -4443,8 +4432,7 @@ export async function saveToucanStyleAction(style: unknown) {
   const ownerId = await requireProfileId();
   const { cleanStyle } = await import("@/lib/toucan-style");
   const clean = cleanStyle(style);
-  const extras = await readExtras(ownerId);
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, toucanStyle: clean } }).eq("id", ownerId);
+  await writeExtra(ownerId, "toucanStyle", clean);
   revalidatePath("/", "layout");
   return clean;
 }
@@ -4454,8 +4442,7 @@ export async function savePaletteAction(palette: string) {
   const ownerId = await requireProfileId();
   const { isPalette } = await import("@/lib/palettes");
   if (!isPalette(palette)) throw new Error("That isn't one of the colour themes.");
-  const extras = await readExtras(ownerId);
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, palette } }).eq("id", ownerId);
+  await writeExtra(ownerId, "palette", palette);
   revalidatePath("/", "layout");
 }
 
@@ -4463,7 +4450,7 @@ export async function saveMapPrefsAction(boardId: string, prefs: Record<string, 
   const ownerId = await requireProfileId();
   const extras = await readExtras(ownerId);
   const all = { ...((extras.mapPrefs as Record<string, unknown>) ?? {}), [boardId.slice(0, 40)]: JSON.parse(JSON.stringify(prefs ?? {})) };
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, mapPrefs: all } }).eq("id", ownerId);
+  await writeExtra(ownerId, "mapPrefs", all);
 }
 
 /* ── Quest sequences ─────────────────────────────────────────────────── */
@@ -4688,7 +4675,7 @@ export async function saveBossPlanAction(bossId: string, text: string) {
   const t = text.slice(0, 4000);
   if (t.trim()) plans[bossId] = t;
   else delete plans[bossId];
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, bossPlans: plans } }).eq("id", ownerId);
+  await writeExtra(ownerId, "bossPlans", plans);
 }
 
 // ---- App-wide defaults for settings kept on each device.
@@ -4927,7 +4914,7 @@ export async function saveOwnWordsAction(words: OwnWords) {
     at: Date.now(),
   };
   const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, words: { ...((extras.words as object) ?? {}), ...clean } } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "words", { ...((extras.words as object) ?? {}), ...clean });
   if (error) throw new Error(error.message);
 }
 
@@ -4939,8 +4926,7 @@ const WELCOME_LAYOUT_KEYS = ["welcomeMode", "toucanAskBg", "toucanAskMist", "tou
 export async function saveNavOrderAction(order: string[]) {
   const ownerId = await requireProfileId();
   const { normalizeNavOrder } = await import("@/lib/nav-order");
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, navOrder: normalizeNavOrder(order) } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "navOrder", normalizeNavOrder(order));
   if (error) throw new Error(`Couldn't save: ${error.message}`);
 }
 
@@ -4954,8 +4940,7 @@ export async function saveWelcomeLayoutAction(layout: WelcomeLayout) {
   const clean: WelcomeLayout = { at: Date.now() };
   for (const k of WELCOME_LAYOUT_KEYS) if (layout[k] !== undefined) clean[k] = layout[k];
   if (JSON.stringify(clean).length > 8000) throw new Error("Too much to keep.");
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, welcomeLayout: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "welcomeLayout", clean);
   if (error) throw new Error(error.message);
 }
 
@@ -5024,8 +5009,7 @@ export async function saveInterestCalendarsAction(list: import("@/lib/interest-c
   const ownerId = await requireProfileId();
   const { normalizeInterest } = await import("@/lib/interest-calendars");
   const clean = normalizeInterest(list) ?? [];
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, interestCalendars: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "interestCalendars", clean);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath("/calendar");
   return clean;
@@ -5054,8 +5038,7 @@ export async function saveKeepInTouchAction(list: import("@/lib/keep-in-touch").
   const ownerId = await requireProfileId();
   const { normalizeFriends } = await import("@/lib/keep-in-touch");
   const clean = normalizeFriends(list);
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, keepInTouch: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "keepInTouch", clean);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return clean;
 }
@@ -5102,10 +5085,7 @@ export async function welcomePartsXpAction(partsIn: { key: string; xp: number }[
   const fresh = parts.filter((p) => !paid.includes(p.key) && p.xp > 0);
   if (!fresh.length) return { xp: 0, totalXp: null as number | null };
   const amount = fresh.reduce((a, p) => a + p.xp, 0);
-  const { error } = await supabaseAdmin()
-    .from("profiles")
-    .update({ life_wheel: { ...extras, welcomeXp: { day, paid: [...paid, ...fresh.map((p) => p.key)] } } })
-    .eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "welcomeXp", { day, paid: [...paid, ...fresh.map((p) => p.key)] });
   if (error) throw new Error(`Couldn't record that: ${error.message}`);
   const res = await xp.awardXp(ownerId, amount, "daily_check_in");
   return { xp: amount, totalXp: res.totalXp as number | null };
@@ -5129,8 +5109,7 @@ export async function trackedEventsAction(): Promise<string[]> {
 export async function saveTrackedEventsAction(list: string[]): Promise<string[]> {
   const ownerId = await requireProfileId();
   const clean = cleanTracked(list);
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, trackedEvents: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "trackedEvents", clean);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return clean;
 }
@@ -5144,8 +5123,7 @@ export async function focusQuestionsAction(): Promise<string[]> {
 export async function saveFocusQuestionsAction(list: string[]): Promise<string[]> {
   const ownerId = await requireProfileId();
   const clean = (Array.isArray(list) ? list : []).map((q) => String(q ?? "").trim().replace(/\s+/g, " ").slice(0, 160)).filter(Boolean).slice(0, 40);
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, focusQuestions: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "focusQuestions", clean);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return clean;
 }
@@ -5153,8 +5131,7 @@ export async function saveFocusQuestionsAction(list: string[]): Promise<string[]
 /* ── Dawn & dusk: the morning routine planned the night before (owner, Nov 9) ─────────── */
 
 async function saveDawn(ownerId: string, dawn: import("@/lib/dawn").Dawn) {
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, dawn } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "dawn", dawn);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
 }
 
@@ -5311,8 +5288,7 @@ export async function saveTourAction(state: TourState) {
     exploreId: state.exploreId && /^[0-9a-f-]{36}$/i.test(state.exploreId) ? state.exploreId : null,
     createId: state.createId && /^[0-9a-f-]{36}$/i.test(state.createId) ? state.createId : null,
   };
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, tour: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "tour", clean);
   if (error) throw new Error(error.message);
   return clean;
 }
@@ -5395,7 +5371,7 @@ export async function tourCompletePracticeAction(taskId: string) {
 async function saveHabitTicks(ownerId: string, extras: Record<string, unknown>, ticks: HabitTicks) {
   // The last 14 days are enough for an undo.
   const days = Object.fromEntries(Object.entries(ticks.days).sort(([a], [b]) => b.localeCompare(a)).slice(0, 14));
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, habitTicks: { many: ticks.many, days } } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "habitTicks", { many: ticks.many, days });
   if (error) throw new Error(`Couldn't save: ${error.message}`);
 }
 

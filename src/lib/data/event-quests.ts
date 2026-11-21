@@ -1,3 +1,4 @@
+import { writeExtra } from "@/lib/data/extras";
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import type { GoogleCalendarEvent, GoogleCalendarInfo } from "@/lib/google-calendar";
@@ -94,9 +95,6 @@ export async function makeEventQuests(
   const { data: cur } = await db.from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
   const latest = cur?.life_wheel ?? {};
   const latestSettings = readEventQuestSettings(latest);
-  await db
-    .from("profiles")
-    .update({ life_wheel: { ...latest, eventQuests: { ...latestSettings, made: pruneMade({ ...(latestSettings.made ?? {}), ...added }) } } })
-    .eq("id", ownerId);
+  await writeExtra(ownerId, "eventQuests", { ...latestSettings, made: pruneMade({ ...(latestSettings.made ?? {}), ...added }) });
   return tasks;
 }
