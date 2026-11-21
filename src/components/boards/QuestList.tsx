@@ -15,6 +15,28 @@ const SORTS: { key: Sort; label: string }[] = [
   { key: "az", label: "A–Z" },
 ];
 const KEY = "quest-list-sort";
+const PAST_KEY = "quest-list-past-due";
+/** Due soonest: which past-due quests show (owner, Nov 13: "hide (or show) items that are past due… choose the
+ *  past due window"). Days back, 0 = none, -1 = all. */
+const PAST_PICKS: { days: number; label: string }[] = [
+  { days: -1, label: "All past due" },
+  { days: 7, label: "Last week" },
+  { days: 30, label: "Last month" },
+  { days: 0, label: "Hide past due" },
+];
+
+/** "3d ago", "2h ago", "just now": when a quest was made or last changed. */
+function agoWords(iso: string | null | undefined) {
+  if (!iso) return null;
+  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (m < 2) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.round(h / 24);
+  if (d < 45) return `${d}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
 function dueWords(iso: string | null | undefined) {
   if (!iso) return null;
@@ -29,12 +51,15 @@ function dueWords(iso: string | null | undefined) {
 export function QuestList({ tasks, boards, isAdventure }: { tasks: Task[]; boards: Record<string, string>; isAdventure: boolean }) {
   const [sort, setSort] = useState<Sort>("made");
   const [editing, setEditing] = useState<Task | null>(null);
+  const [pastDays, setPastDays] = useState(-1);
   const router = useRouter();
   useEffect(() => {
     try {
       const s = localStorage.getItem(KEY) as Sort | null;
       // eslint-disable-next-line react-hooks/set-state-in-effect -- the remembered sort is only known in the browser
       if (s && SORTS.some((x) => x.key === s)) setSort(s);
+      const p = Number(localStorage.getItem(PAST_KEY));
+      if (PAST_PICKS.some((x) => x.days === p) && localStorage.getItem(PAST_KEY) !== null) setPastDays(p);
     } catch {}
   }, []);
   const pick = (s: Sort) => {
@@ -43,8 +68,10 @@ export function QuestList({ tasks, boards, isAdventure }: { tasks: Task[]; board
       localStorage.setItem(KEY, s);
     } catch {}
   };
+  const [now] = useState(() => Date.now());
   const shown = useMemo(() => {
-    const t = [...tasks];
+    let t = [...tasks];
+    if (sort === "due" && pastDays !== -1) t = t.filter((x) => !x.due_at || new Date(x.due_at).getTime() >= now - pastDays * 86_400_000);
     const time = (s: string | null | undefined) => (s ? new Date(s).getTime() : Infinity);
     if (sort === "made") t.sort((a, b) => time(b.created_at) - time(a.created_at));
     if (sort === "changed") t.sort((a, b) => time(b.updated_at) - time(a.updated_at));
@@ -52,7 +79,7 @@ export function QuestList({ tasks, boards, isAdventure }: { tasks: Task[]; board
     if (sort === "xp") t.sort((a, b) => b.xp_value - a.xp_value);
     if (sort === "az") t.sort((a, b) => a.title.localeCompare(b.title));
     return t;
-  }, [tasks, sort]);
+  }, [tasks, sort, pastDays, now]);
   const ink = isAdventure ? "#2a1c10" : "var(--t-ink)";
   const soft = isAdventure ? "#6b5631" : "var(--t-ink-soft)";
   return (
@@ -75,6 +102,31 @@ export function QuestList({ tasks, boards, isAdventure }: { tasks: Task[]; board
           );
         })}
       </div>
+      {sort === "due" && (
+        <div className="due-in flex flex-wrap items-center gap-1" role="radiogroup" aria-label="Past due quests">
+          {PAST_PICKS.map((p) => {
+            const on = p.days === pastDays;
+            return (
+              <button
+                key={p.days}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => {
+                  setPastDays(p.days);
+                  try {
+                    localStorage.setItem(PAST_KEY, String(p.days));
+                  } catch {}
+                }}
+                className="h-7 rounded-full px-2.5 text-[12.5px] font-semibold"
+                style={on ? { background: "rgba(217,180,95,.85)", color: "#2a1c10", border: "1px solid #8a6116" } : { color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", border: `1px solid ${isAdventure ? "rgba(217,180,95,.35)" : "var(--t-card-border)"}` }}
+              >
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
       {shown.length === 0 ? (
         <p className="text-center text-[15px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.8 }}>
           No open quests. A clear road!
@@ -85,6 +137,10 @@ export function QuestList({ tasks, boards, isAdventure }: { tasks: Task[]; board
             const img = (t.icon_source === "ai" || t.icon_source === "library") && t.icon_key ? t.icon_key : null;
             const board = t.board_id ? boards[t.board_id] : null;
             const due = dueWords(t.due_at);
+            // The measure it's sorted by, on every row (owner, Nov 13: "display the metric quests are being sorted by").
+            const metric =
+              sort === "made" ? `Made ${agoWords(t.created_at) ?? ""}` : sort === "changed" ? `Changed ${agoWords(t.updated_at) ?? ""}` : sort === "due" ? (due ? `Due ${due}` : "No due date") : null;
+            const pastDue = !!t.due_at && new Date(t.due_at).getTime() < now;
             return (
               <li key={t.id} className="due-in">
                 <button type="button" onClick={() => setEditing(t)} className="hover-glow flex min-h-12 w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left">
@@ -100,9 +156,10 @@ export function QuestList({ tasks, boards, isAdventure }: { tasks: Task[]; board
                     <span className="line-clamp-2 block text-[15px] leading-snug" style={{ color: ink }}>
                       {t.title}
                     </span>
-                    {(board || due) && (
+                    {(board || due || metric) && (
                       <span className="block truncate text-[12.5px]" style={{ color: soft }}>
-                        {[board, due && `Due ${due}`].filter(Boolean).join(" · ")}
+                        {metric && <span style={{ fontWeight: 700, color: sort === "due" && pastDue ? "var(--t-warn)" : soft }}>{metric}</span>}
+                        {[metric ? "" : null, board, sort !== "due" && due ? `Due ${due}` : null].filter((x) => x !== null).join(" · ")}
                       </span>
                     )}
                   </span>

@@ -75,8 +75,14 @@ export function makeFixtures() {
     // Written in [brackets]: a maybe, drawn as a dashed outline with no fill (owner, Nov 12).
     task("[Stretch and tea on the porch]", at(5.5, 45)),
     task("Rune puzzle: fix the printer", at(-19, 30)),
+    // A quest marked failed (owner, Nov 17: "failed quest shouldn't show as green").
+    task("Call the venue about the deposit", { status: "completed", completed_at: inHours(-20), failed_at: inHours(-20), ...at(-21, 60) }),
     task("Take out the trash", { is_tiny: true, is_manual_priority: true, due_at: inHours(8), estimate_minutes: 15 }),
   );
+  // A repeating calendar event made into quests: two weekly gym sessions in one series (owner, Nov 18).
+  const gym1 = task("Gym with Sam", { ...at(2.5, 60), google_calendar_event_id: "ev-gym-1" });
+  const gym2 = task("Gym with Sam", { ...at(2.5 + 24 * 7, 60), google_calendar_event_id: "ev-gym-2" });
+  tasks.push(gym1, gym2);
   // One quest in two calendar spots (owner, Nov 5): the registration continues tomorrow.
   const goblin = tasks.find((t) => t.title.startsWith("Goblin paperwork"));
   const task_sessions = [{ id: randomUUID(), owner_id: OWNER_ID, task_id: goblin.id, starts_at: inHours(26.5), ends_at: inHours(27.5), google_calendar_event_id: null }];
@@ -158,6 +164,8 @@ export function makeFixtures() {
             ],
           },
           rituals: [{ id: "r1", name: "Couples covenant", done: [day(-12), day(-40)] }],
+          questSeries: { [gym1.id]: "g:ev-gym", [gym2.id]: "g:ev-gym" },
+          eventQuests: { on: false, made: { "ev-gym-1": gym1.id, "ev-gym-2": gym2.id } },
           // Per-quest extras kept in the catch-all until they move to columns (split plan, S2): a place, a driving time,
           // a calendar card colour and a "12 of 32 pages" count, on quests that Today, a board and the calendar show.
           questPlaces: { [reading.id]: "Natick library", [pickup.id]: "CVS on Main Street", [goblin.id]: "Registry of Motor Vehicles" },

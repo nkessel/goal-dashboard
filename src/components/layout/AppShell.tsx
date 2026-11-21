@@ -22,7 +22,7 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { BackToToday } from "@/components/layout/BackToToday";
 import { BackToSettings } from "@/components/layout/BackToSettings";
 import { FocusTimerPill } from "@/components/one-thing/FocusTimerPill";
-import { FailSceneHost, FeedbackDock, KeptTarget, Walkthrough } from "@/components/layout/LazyShell";
+import { FailSceneHost, FeedbackDock, KeptTarget, SeriesLookAsk, Walkthrough } from "@/components/layout/LazyShell";
 import { PlanMyDayHost } from "@/components/calendar/PlanMyDay";
 import { NotificationPreview } from "@/components/notifications/NotificationPreview";
 import { Suspense } from "react";
@@ -88,6 +88,7 @@ export async function AppShell({
       {profileId && <WelcomeLayoutSync />}
       {profileId && <OfflineSync profileId={profileId} />}
       {profileId && <Walkthrough />}
+      {profileId && <SeriesLookAsk />}
       {profileId && (
         <Suspense fallback={null}>
           <MissingPortraits profileId={profileId} />

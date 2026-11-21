@@ -11,6 +11,7 @@ import { EveningRoutineTile } from "./EveningRoutineTile";
 import { StatsTile } from "./StatsTile";
 import { SetAsDefault } from "./SetAsDefault";
 import { PlanningSettings } from "./PlanningSettings";
+import { RollerTrimSettings } from "./RollerTrimSettings";
 import { DawnSettingsPanel } from "@/components/dawn/DawnSettingsPanel";
 import { notFound } from "next/navigation";
 import { auth, signOut } from "@/auth";
@@ -370,6 +371,11 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
 
           <SettingsRow id="planning" theme={profile.theme} defaultOpen={opens("planning")} label="Planning & evening" rightLabel="Evening routine · planning steps" icon={<span style={{ fontSize: 14 }}>🗺</span>}>
             <PlanningSettings isAdventure={isAdventure} withPair={admin} />
+          </SettingsRow>
+          </SectionItem>
+          <SectionItem id="boards-look">
+          <SettingsRow id="boards-look" theme={profile.theme} defaultOpen={opens("boards-look")} label="Boards" rightLabel="Roller trim" icon={<span style={{ fontSize: 14 }}>▤</span>}>
+            <RollerTrimSettings />
           </SettingsRow>
           </SectionItem>
         </ReorderableSections>

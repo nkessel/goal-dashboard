@@ -21,7 +21,7 @@ export default async function BoardDetailPage({ params }: { params: Promise<{ bo
           <QuestSpotlight />
         </Suspense>
         <BoardTrail ancestors={data.head.ancestors} current={data.head.title} isAdventure={theme === "adventure"} />
-        <BoardBody data={data} theme={theme} arrange mist={!(profile?.life_wheel?.clearBoards ?? []).includes(boardId)} order={profile?.life_wheel?.boardOrders?.[boardId]} />
+        <BoardBody data={data} theme={theme} arrange mist={false /* the mist is off for now (owner, Nov 16: "it's getting too annoying"); the next step still stands out */} order={profile?.life_wheel?.boardOrders?.[boardId]} />
         {boardId !== UNCATEGORIZED_ID && <BoardFabMenu boardId={boardId} theme={theme} />}
       </div>
     </AppShell>

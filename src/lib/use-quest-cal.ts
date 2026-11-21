@@ -81,7 +81,11 @@ export function saveCalCardLook(taskId: string, look: CalCardLook | null) {
   else delete next[taskId];
   looks = next;
   emit();
-  return setCalCardLookAction(taskId, look);
+  return setCalCardLookAction(taskId, look).then((r) => {
+    // One of a repeating event's quests: ask whether the rest should wear it too (owner, Nov 18).
+    window.dispatchEvent(new CustomEvent("series-look-check", { detail: { taskId } }));
+    return r;
+  });
 }
 
 /** "25 min", "1 hr", "1 hr 15". */
