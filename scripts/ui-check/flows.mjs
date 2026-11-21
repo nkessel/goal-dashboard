@@ -2107,4 +2107,34 @@ export const FLOWS = [
       }
     },
   },
+  {
+    // Per-quest extras (split plan, S2): the fixtures give two quests a place, a drive time, a card colour and a
+    // "12 of 32 pages" count; these shots are the before/after for moving them to columns.
+    name: "questextras",
+    async run(h) {
+      await h.goto("/", { name: "questextras", reset: true });
+      await h.settle(1500);
+      if (await h.tap("text=Pick up medication", "open the quest", { expectMove: true })) {
+        await h.settle(600);
+        await h.check("quest editor: place on its pill");
+        if (await h.tap((p) => p.getByRole("button", { name: /^location: cvs on main street/i }).first(), "place pill", { optional: true, expectMove: true })) {
+          await h.check("quest editor: place panel");
+        }
+        // Progress counted in pills ("1 of 4 pills") and the card's colour, from the pills under the divider.
+        if (await h.tap((p) => p.getByRole("button", { name: /^progress$/i }).first(), "progress pill", { optional: true, expectMove: true })) {
+          await h.settle(500);
+          await h.check("quest editor: 1 of 4 pills");
+        } else h.record({ kind: "step-skipped", severity: "info", target: "questextras", detail: "no Progress pill in the editor" });
+        if (await h.tap((p) => p.getByRole("button", { name: /^color$/i }).first(), "color pill", { optional: true, expectMove: true })) {
+          await h.settle(500);
+          await h.check("quest editor: card colour");
+        }
+      }
+      await h.goto("/calendar?view=day", { name: "questextras-calendar" });
+      await h.settle(1500);
+      await h.page.locator("[title^='Edit \"Goblin']").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+      await h.settle(300);
+      await h.check("calendar: card colour and place");
+    },
+  },
 ];

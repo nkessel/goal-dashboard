@@ -4,7 +4,6 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Run B scheduled session (Sonnet 5.5, Nov 21 ~12:15 UTC):** S2 only (ui-check fixtures + a flow for place / card look / drive / progress count; no app code). Leave `scripts/ui-check/fixtures.mjs` and the new flow alone until this line is gone.
 - **Session claude-2d (Opus, Nov 21 7:15 AM ET):** merging `review/boards-nov18` to `main` (owner approved Nov 21). Other sessions: don't touch calendar, boards, BoardGrid, failed-now or the series-look files until this line is gone.
 - **Run B (Sonnet 5.5, this account, Nov 20):** step 1 (the three merges) and D0 are on `main`; now on S2/S3 (order in `docs/RUN-B-HANDOFF.md`). Other sessions: leave those to it.
 - **Session claude-2d (Opus, owner's account):** Nov 20, merged the four review branches above to `main`; nothing in progress. `review/boards-nov18` still waits on the owner.
