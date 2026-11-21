@@ -13,6 +13,7 @@ import type { Task } from "@/lib/data/types";
 import { FocusFollowUp, FocusPlanner, type Focus } from "./FocusPlanner";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 import { CloseIcon } from "@/components/ui/Icons";
+import { useDrawZone } from "@/lib/use-draw-zone";
 
 type Kind = "week" | "month";
 type Seed = { id: string; text: string; fate: SeedFate | null; made?: string | null };
@@ -108,6 +109,7 @@ export function PlanRitual(props: {
   wheel: { topics: string[]; last: Record<string, { level: number; at: string }> };
   calendar: { dayKeys: string[]; tasks: Task[]; events: GoogleCalendarEvent[]; toSchedule: Task[]; folders: { name: string; open: boolean }[] };
 }) {
+  const zone = useDrawZone();
   const { kind, theme } = props;
   const router = useRouter();
   // In the order chosen in Settings, without the steps you've hidden.
@@ -275,7 +277,7 @@ export function PlanRitual(props: {
                       <span aria-hidden style={{ color: "#5a8a3a" }}>✓</span>
                       <span className="min-w-0 flex-1 truncate">{t.title}</span>
                       <span className="shrink-0 text-[12px]" style={{ color: SOFT }}>
-                        {new Date(t.completed_at).toLocaleDateString(undefined, { weekday: "short" })}
+                        {new Date(t.completed_at).toLocaleDateString(undefined, { weekday: "short", timeZone: zone })}
                       </span>
                     </li>
                   ))}
@@ -598,6 +600,7 @@ function MindSweep({ seeds, onChange, cls, style }: { seeds: Seed[]; onChange: (
 
 /** Stale, overdue or someday quests: decide on each, one tap. */
 function ReviewList({ groups, reviewed, onDone, gold, someday = false }: { groups: { title: string; items: Lite[] }[]; reviewed: Record<string, string>; onDone: (id: string, choice: string) => void; gold: React.CSSProperties; someday?: boolean }) {
+  const zone = useDrawZone();
   const [busy, start] = useTransition();
   const router = useRouter();
   const choices: { k: "keep" | "schedule" | "someday" | "drop"; label: string }[] = someday
@@ -635,7 +638,7 @@ function ReviewList({ groups, reviewed, onDone, gold, someday = false }: { group
                     <span className="text-[15px] font-semibold" style={{ color: INK }}>
                       {i.title}
                       {i.board && <span className="ml-1.5 text-[12px] font-normal" style={{ color: SOFT }}>{i.board}</span>}
-                      {i.due && <span className="ml-1.5 text-[12px] font-normal" style={{ color: "var(--t-warn)" }}>due {new Date(i.due).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>}
+                      {i.due && <span className="ml-1.5 text-[12px] font-normal" style={{ color: "var(--t-warn)" }}>due {new Date(i.due).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: zone })}</span>}
                     </span>
                     <div className="flex flex-wrap gap-1">
                       {choices.map((c) => (

@@ -20,7 +20,7 @@ Take them in order. Each is the owner's own ask (note id prefix in brackets; rea
 
 0. **Check-in drawn by the server (done on Insights Nov 21; Today still shifts once, see WAITING):** the saved draft and the "Last night" card come from the browser after load, so Insights and Today move once. Details in `docs/WAITING.md` top section.
 
-1. **Bug: adding a quest in "Choose tomorrow's quests" clears the whole list** [2664d546], and the quest creator button there is faulty [234f0d70]. Loses work, so first. (`evening/TomorrowQuests.tsx`: local `ticked`/`rowsLocal` state is likely reset when `queued` changes after the add.)
+1. ~~Bug: adding a quest in "Choose tomorrow's quests" clears the whole list [2664d546, 234f0d70]~~: shipped Nov 14 (see `docs/SHIPPED.md`).
 2. **Right-click menus open as popup menus, not inline trays** [841971c2] (app-wide; quest card ⋯ / right-click, habits, rites).
 3. **Today's "auto-scheduler"/calendar sheet** [a3fe0686]: movable, the calendars' colours as on the calendar screen, choose which calendars show.
 4. **Sleep check-in**: a sleep-notes field under the faces [d38e5f85]; its Save beside the Sleep quality button, not below [1416c34f].

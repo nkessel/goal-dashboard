@@ -242,7 +242,8 @@ const nowMs = () => Date.now();
 
 const GOLD_BTN = { background: "linear-gradient(180deg,#f6dd98,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" } as const;
 
-export function Walkthrough() {
+/** `since`: when the account was made. Accounts older than a day keep the feedback button above the walkthrough. */
+export function Walkthrough({ since }: { since?: string | null } = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const look = useTourLook();
@@ -484,6 +485,17 @@ export function Walkthrough() {
     return () => mo.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- go reads the live state each time
   }, [step]);
+
+  // Existing accounts keep the feedback button (and its box) above the walkthrough's dark layers; a brand-new
+  // one meets it on the tour's last step (owner, Nov 20 c6ba4030: "for existing users like me it should always be showing").
+  const veteran = !!since && Date.parse(since) < nowMs() - 86_400_000;
+  const liftFeedback = showing && veteran;
+  useEffect(() => {
+    if (!liftFeedback) return;
+    const e = document.documentElement;
+    e.setAttribute("data-tour-feedback", "");
+    return () => e.removeAttribute("data-tour-feedback");
+  }, [liftFeedback]);
 
   if (!s || !showing) return null;
   // A tap in the dark around a show-and-tell step: his card gives a small bow, so you know where to look.

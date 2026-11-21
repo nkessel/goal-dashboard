@@ -4,7 +4,6 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Dev loop 2 (Opus, Nov 21 8:58 AM ET, run 2 of the hourly loop; still working past 10 AM ET):** hydration fixes in `boards/QuestList.tsx`, `plan/*`, `tasks/CompletedTaskRow.tsx`, `matrix/PriorityMatrix.tsx`, new `lib/use-draw-zone.ts`; the feedback button over the walkthrough (`tour/Walkthrough.tsx`, `layout/AppShell.tsx`, `globals.css`). **A later run of this loop that finds this line under 2 hours old: leave those files and take the next feedback notes or BUILD-PLAN instead.**
 - **Run B (Sonnet 5.5, this account, Nov 20):** step 1 (the three merges) and D0 are on `main`; now on S2/S3 (order in `docs/RUN-B-HANDOFF.md`). Other sessions: leave those to it.
 - **Session claude-2d (Opus, owner's account):** Nov 20, merged the four review branches above to `main`; nothing in progress. `review/boards-nov18` still waits on the owner.
 
@@ -36,6 +35,11 @@ Started in the owner's Claude project threads; written here so another account c
 - **Waiting on the owner's iPhone** (cloud sessions can't check these): Due pill date picking and Find a time in the quest editor; hold-and-drag reordering in packing lists; the /import pills; long-press on calendar cards and sideways swipe on the hours; plus the "Needs a real-iPhone look" list at the end of section 0.
 
 ---
+
+## Open for the next Dev loop 2 run (not claimed)
+
+- RUN-B-HANDOFF item 0 (b) continues: the UI check on the flows not yet re-run since the Nov 20–21 merges (see that item).
+- Walkthrough intro wording (notes c6ba4030 second half, af13ecc0): his edited text with "I am the Great Toucan Spirit" and options for the bold **exciting**: new wording, so a review page first (`tour/Walkthrough.tsx` line ~71). Not built.
 
 ## Parked: remind the owner, brainstorm first, or not asked for
 
