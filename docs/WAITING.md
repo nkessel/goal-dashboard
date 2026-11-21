@@ -5,6 +5,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 ## In progress right now (claim before you start; remove your line when you ship)
 
 - **Run B (Sonnet 5.5, this account, Nov 20):** step 1 (the three merges) and D0 are on `main`; now on S2/S3 (order in `docs/RUN-B-HANDOFF.md`). Other sessions: leave those to it.
+- **Dev loop 2 (run 3, Opus, Nov 21 15:00 UTC):** RUN-B-HANDOFF item 0 (b) continued: UI check on welcome, toucanask, insights, faces, sequence, calendar; the calendar tablet `popup-behind` dialog bug. Files: whatever those flows turn up; I'll name them here.
 - **Session claude-2d (Opus, owner's account):** Nov 20, merged the four review branches above to `main`; nothing in progress. `review/boards-nov18` still waits on the owner.
 
 - **Waiting on the owner's design review**: `review/complete-earlier-more` (quest editor › Complete › Earlier…: Today · Yesterday · More…, which opens the five days before yesterday and a date field for any day; owner note Nov 21) · https://claude.ai/artifact/2caq35AXp8XRge4dkQqPN6 · Nov 21.
