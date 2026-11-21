@@ -125,6 +125,22 @@ export function WeekView({
   const [early, setEarly] = useState(false);
   // null: the late hours follow the quests (a quest running past 10:30 PM opens them; owner, Nov 19: "Yes").
   const [lateChoice, setLate] = useState<boolean | null>(null);
+  // Just placed at a time behind the early/late buttons (from a picker): open those hours so it's seen (planner step 2c).
+  useEffect(() => {
+    let at: string | null = null;
+    try {
+      at = window.sessionStorage.getItem("cal-reveal");
+      if (at) window.sessionStorage.removeItem("cal-reveal");
+    } catch {
+      /* storage unavailable */
+    }
+    if (!at) return;
+    const d = new Date(at);
+    const hr = d.getHours() + d.getMinutes() / 60;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from storage after a placement
+    if (hr < DAY_FROM) setEarly(true);
+    else if (hr >= DAY_UNTIL) setLate(true);
+  }, [tasks]);
   const H0 = early ? HOUR_START : DAY_FROM;
   const [gripY, setGripY] = useState<number | null>(null);
   const [itemMenu, setItemMenu] = useState<{ x: number; y: number; target: MenuTarget } | null>(null);
@@ -1638,24 +1654,25 @@ function DaysZoom({ span, isAdventure, onChange, onStep }: { span: number; isAdv
   );
   return (
     <span data-days-zoom className="ml-auto flex shrink-0 items-center gap-1" style={{ color: ink }}>
-      <button type="button" className={btn} aria-label="Fewer days (closer)" title="Fewer days (closer)" onClick={() => onStep(Math.max(1, Math.ceil(span - 0.01) - 1))}>
-        {glass(true)}
+      {/* Farther on the left, closer on the right (owner, Nov 17: "reverse the directionality"). */}
+      <button type="button" className={btn} aria-label="More days (farther)" title="More days (farther)" onClick={() => onStep(Math.min(MAX_SPAN, Math.floor(span + 0.01) + 1))}>
+        {glass(false)}
       </button>
       <input
         type="range"
         min={0}
         max={1000}
         step={1}
-        value={v}
+        value={1000 - v}
         aria-label="Days shown"
         aria-valuetext={spanWords(span)}
-        title="Slide for more or fewer days"
-        onChange={(e) => onChange(Math.exp((Number(e.target.value) / 1000) * LOG))}
+        title="Slide right to come closer, left for more days"
+        onChange={(e) => onChange(Math.exp(((1000 - Number(e.target.value)) / 1000) * LOG))}
         className="gilded-range w-24 sm:w-36 lg:w-48"
-        style={{ "--p": `${v / 10}%` } as React.CSSProperties}
+        style={{ "--p": `${(1000 - v) / 10}%` } as React.CSSProperties}
       />
-      <button type="button" className={btn} aria-label="More days (farther)" title="More days (farther)" onClick={() => onStep(Math.min(MAX_SPAN, Math.floor(span + 0.01) + 1))}>
-        {glass(false)}
+      <button type="button" className={btn} aria-label="Fewer days (closer)" title="Fewer days (closer)" onClick={() => onStep(Math.max(1, Math.ceil(span - 0.01) - 1))}>
+        {glass(true)}
       </button>
       <span className="w-[58px] text-right text-[12.5px] font-semibold tabular-nums">{spanWords(span)}</span>
     </span>

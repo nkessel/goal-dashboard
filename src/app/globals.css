@@ -2844,6 +2844,15 @@ input[type="time"]::-webkit-datetime-edit-hour-field:focus, input[type="time"]::
     inset 0 0 0 3px rgba(120, 140, 80, 0.28),
     0 2px 5px rgba(50, 60, 20, 0.22);
 }
+/* A failed quest: faded parchment with a rust edge, never the done green (owner, Nov 17). */
+.quest-card-failed {
+  background: linear-gradient(180deg, #efe4d2, #e2cfb3);
+  border-color: #a8503e;
+  box-shadow:
+    inset 0 0 0 2px rgba(250, 240, 226, 0.5),
+    inset 0 0 0 3px rgba(168, 80, 62, 0.22),
+    0 2px 5px rgba(60, 30, 10, 0.2);
+}
 .quest-art {
   border: 1px solid rgba(122, 90, 40, 0.55);
   box-shadow: 0 1px 2px rgba(60, 40, 10, 0.25);
@@ -3574,3 +3583,24 @@ html[data-tour-open] [data-perched-owl] { visibility: hidden; }
   animation: fog-breathe 6s ease-in-out infinite alternate;
 }
 @media (prefers-reduced-motion: reduce) { .tq-mist::after { animation: none; } }
+/* A card's own colour or picture is its background only: the portrait keeps its own colours (owner, Nov 17). */
+.quest-card-look .quest-art { mix-blend-mode: normal; }
+
+/* A board scroll's bottom roller as a handle (owner, Nov 12–13): pull it to unroll more quests. */
+.scroll-pull { cursor: ns-resize; border: 0; padding: 0; }
+.scroll-pull::before, .scroll-pull::after { pointer-events: none; }
+.scroll-pull:hover, .scroll-pull:focus-visible { filter: brightness(1.12); }
+.scroll-pull-count {
+  position: absolute; left: 50%; top: 50%; translate: -50% -50%;
+  display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;
+  font: 700 11px/14px var(--font-sans, system-ui); letter-spacing: .02em; color: #3a2a0c;
+  text-shadow: 0 1px 0 rgba(255, 238, 190, .55);
+}
+/* Roller trim (owner, Nov 20): swoosh 4B either side of "N more", or hairlines, or nothing. */
+.scroll-pull-count { gap: 8px; letter-spacing: .14em; text-transform: uppercase; font-size: 10.5px; }
+.roller-swoosh { color: #6b3f12; opacity: .9; flex: none; }
+.roller-swoosh.r { transform: scaleX(-1); }
+.scroll-pull .roller-swoosh { width: 27px; height: 8px; }
+.scroll-pull .roller-hair { width: 18px; }
+.scroll-pull-count { gap: 5px; letter-spacing: .1em; }
+.roller-hair { width: 56px; height: 0; border-top: 1px solid rgba(107, 63, 18, .55); border-bottom: 1px solid rgba(255, 244, 205, .7); flex: none; }

@@ -14,3 +14,4 @@ export const PackingWindow = dynamic(() => import("@/components/settings/Packing
 export const Walkthrough = dynamic(() => import("@/components/tour/Walkthrough").then((m) => m.Walkthrough), { ssr: false });
 export const KeptTarget = dynamic(() => import("@/components/xp/KeptTarget").then((m) => m.KeptTarget), { ssr: false });
 export const FailSceneHost = dynamic(() => import("@/components/tasks/FailQuest").then((m) => m.FailSceneHost), { ssr: false });
+export const SeriesLookAsk = dynamic(() => import("@/components/calendar/SeriesLookAsk").then((m) => m.SeriesLookAsk), { ssr: false });

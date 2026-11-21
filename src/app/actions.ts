@@ -565,6 +565,18 @@ export async function updateTaskAction(
     earlyBonusPerDay: input.earlyBonusPerDay,
     isTiny: input.isTiny,
   });
+  // A longer quest grows its block on the calendar (owner, Nov 5 and 15: "changed the time from 60 to 90
+  // minutes, the quest didn't update in the calendar view"). A shorter one keeps its block for now.
+  const est = input.estimateMinutes;
+  if (before && before.status === "open" && before.is_on_calendar && before.scheduled_start && before.scheduled_end && est && est > 0 && est !== before.estimate_minutes) {
+    const start = new Date(before.scheduled_start);
+    const len = Math.round((new Date(before.scheduled_end).getTime() - start.getTime()) / 60_000);
+    if (est > len) {
+      const { accessToken } = await requireSessionMaybeGoogle();
+      await attachCalendarEvent(accessToken ?? null, ownerId, before, start, new Date(start.getTime() + est * 60_000), false).catch(() => {});
+      revalidatePath("/calendar");
+    }
+  }
   revalidatePath("/");
   revalidatePath("/matrix");
   revalidatePath("/power-ups");
@@ -828,17 +840,20 @@ async function attachCalendarEvent(
     await tasksData.rescheduleTask(task.id, profileId, start.toISOString(), end.toISOString(), eventId, countAsReschedule);
     return;
   }
+  // The app's time first, Google after: a Google refusal (someone else's event, a deleted one, an expired
+  // permission) never stops the quest from moving (calendar planner step 2b).
+  await tasksData.rescheduleTask(task.id, profileId, start.toISOString(), end.toISOString(), eventId, countAsReschedule);
   if (eventId) {
-    await updateCalendarEvent(accessToken, eventId, { start, end });
+    await updateCalendarEvent(accessToken, eventId, { start, end }).catch((e) => console.warn("Google didn't take the move:", e instanceof Error ? e.message : e));
   } else {
-    eventId = await createCalendarEvent(accessToken, {
+    const made = await createCalendarEvent(accessToken, {
       title: task.title,
       description: task.description ?? undefined,
       start,
       end,
-    });
+    }).catch(() => null);
+    if (made) await supabaseAdmin().from("tasks").update({ google_calendar_event_id: made }).eq("id", task.id).eq("owner_id", profileId).is("google_calendar_event_id", null);
   }
-  await tasksData.rescheduleTask(task.id, profileId, start.toISOString(), end.toISOString(), eventId, countAsReschedule);
 }
 
 /**
@@ -864,7 +879,9 @@ export async function scheduleTaskAction(
   const task = await tasksData.getTask(taskId, profileId);
   if (!task) throw new Error("Task not found");
 
-  await attachCalendarEvent(accessToken, profileId, task, new Date(startISO), new Date(endISO));
+  // Same start, new length (a resize, or shortening it to its time): not a reschedule.
+  const sameStart = !!task.scheduled_start && new Date(task.scheduled_start).getTime() === new Date(startISO).getTime();
+  await attachCalendarEvent(accessToken, profileId, task, new Date(startISO), new Date(endISO), !sameStart);
   revalidatePath("/");
   revalidatePath("/calendar");
 }
@@ -3467,7 +3484,10 @@ export async function moveOffSchedulingAction(taskId: string, toToday: boolean) 
 export async function saveSchedulerSettingsAction(settings: Record<string, unknown>) {
   const ownerId = await requireProfileId();
   const clean = JSON.parse(JSON.stringify(settings ?? {}));
-  const { error } = await supabaseAdmin().from("profiles").update({ scheduler: clean }).eq("id", ownerId);
+  // Merged onto what's saved (planner step 2d): a copy from another tab or an older screen that lacks a part
+  // no longer wipes it ("Keep it here on lunch made it disappear").
+  const { data: cur } = await supabaseAdmin().from("profiles").select("scheduler").eq("id", ownerId).maybeSingle<{ scheduler: Record<string, unknown> | null }>();
+  const { error } = await supabaseAdmin().from("profiles").update({ scheduler: { ...(cur?.scheduler ?? {}), ...clean } }).eq("id", ownerId);
   if (error) throw new Error(/scheduler/.test(error.message) ? "Saved on this device (your account needs a quick database update to keep it everywhere)." : `Couldn't save: ${error.message}`);
 }
 
@@ -3857,7 +3877,7 @@ export async function setCalCardLookAction(taskId: string, look: CalCardLook | n
 }
 
 // ---------------------------------------------------------------------------
-// Calendar events as quests (owner, Nov 18; XP by the event's length, Nov 19)
+// Calendar events as quests (owner, Nov 18; XP by the event's length, Nov 19), and one look for a repeating event's quests (owner, Nov 18)
 
 /** Whether upcoming calendar events become quests by themselves. */
 export async function eventQuestsSettingAction(): Promise<{ on: boolean }> {
@@ -3878,13 +3898,103 @@ export async function setEventQuestsAction(on: boolean) {
   return { on };
 }
 
-/** "Make it a quest" on an event: remember it, so it's never made again and its event stays on removal. */
-export async function recordEventQuestAction(taskId: string, eventId: string) {
+/** "Make it a quest" on an event: remember it (never made again, its event kept on removal) and its series. */
+export async function recordEventQuestAction(taskId: string, eventId: string, recurringEventId?: string | null) {
   const ownerId = await requireProfileId();
   if (!QUEST_ID.test(taskId) || !eventId || eventId.length > 300) return;
   const extras = await readExtras(ownerId);
   const cur = readEventQuestSettingsOf(extras);
+  const series = { ...((extras.questSeries as Record<string, string> | undefined) ?? {}) };
+  if (recurringEventId && recurringEventId.length < 300) series[taskId] = `g:${recurringEventId}`;
   await writeExtra(ownerId, "eventQuests", { ...cur, made: { ...(cur.made ?? {}), [eventId]: taskId } });
+  if (recurringEventId) await writeExtra(ownerId, "questSeries", series);
+}
+
+type LookTask = Pick<Task, "id" | "title" | "icon_key" | "icon_source" | "xp_value" | "coin_value" | "board_id" | "color" | "scheduled_start" | "status">;
+function lookOf(t: LookTask, card: CalCardLook | null): import("@/lib/series-look").SeriesLook {
+  return { iconKey: t.icon_key, iconSource: t.icon_source, xp: t.xp_value, coins: t.coin_value ?? null, boardId: t.board_id, color: t.color, card };
+}
+const dayKeyOf = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/New_York" }) : "");
+
+/**
+ * After a quest of a repeating event is edited: does its look differ from the series' (so it's worth
+ * asking "Just this one · This and later · All")? Null when it isn't part of a series or nothing differs.
+ */
+export async function seriesAskAction(taskId: string): Promise<{ title: string; others: number } | null> {
+  const ownerId = await requireProfileId();
+  if (!QUEST_ID.test(taskId)) return null;
+  const extras = await readExtras(ownerId);
+  const key = (extras.questSeries as Record<string, string> | undefined)?.[taskId];
+  if (!key) return null;
+  const { lookFor, sameLook } = await import("@/lib/series-look");
+  const db = supabaseAdmin();
+  const { data: t } = await db.from("tasks").select("id, title, icon_key, icon_source, xp_value, coin_value, board_id, color, scheduled_start, status").eq("id", taskId).eq("owner_id", ownerId).maybeSingle<LookTask>();
+  if (!t) return null;
+  const card = cleanLook((extras.calCardLooks as Record<string, unknown> | undefined)?.[taskId]);
+  const mine = lookOf(t, card);
+  // Kept as it is for this one only: don't ask again until it changes once more.
+  const kept = (extras.seriesKept as Record<string, string> | undefined)?.[taskId];
+  if (kept && kept === JSON.stringify(mine)) return null;
+  const siblings = Object.entries((extras.questSeries as Record<string, string>) ?? {}).filter(([id, k]) => k === key && id !== taskId).map(([id]) => id);
+  if (!siblings.length) return null;
+  const saved = lookFor((extras.seriesLooks as Record<string, import("@/lib/series-look").SeriesEntry[]> | undefined)?.[key], dayKeyOf(t.scheduled_start));
+  if (saved) return sameLook(saved, mine) ? null : { title: t.title, others: siblings.length };
+  // No look saved yet: ask when this one differs from another of the series.
+  const { data: other } = await db.from("tasks").select("id, title, icon_key, icon_source, xp_value, coin_value, board_id, color, scheduled_start, status").eq("owner_id", ownerId).in("id", siblings.slice(0, 50)).limit(1).maybeSingle<LookTask>();
+  if (!other) return null;
+  const otherCard = cleanLook((extras.calCardLooks as Record<string, unknown> | undefined)?.[other.id]);
+  return sameLook(lookOf(other, otherCard), mine) ? null : { title: t.title, others: siblings.length };
+}
+
+/** Save a quest's look for its whole series ("all"), from its day on ("following"), or keep it to itself ("one"). */
+export async function applySeriesLookAction(taskId: string, scope: import("@/lib/series-look").SeriesScope) {
+  const ownerId = await requireProfileId();
+  if (!QUEST_ID.test(taskId)) throw new Error("Unknown quest.");
+  const extras = await readExtras(ownerId);
+  const key = (extras.questSeries as Record<string, string> | undefined)?.[taskId];
+  if (!key) throw new Error("That quest isn't part of a repeating event.");
+  const { withLook } = await import("@/lib/series-look");
+  const db = supabaseAdmin();
+  const { data: t } = await db.from("tasks").select("id, title, icon_key, icon_source, xp_value, coin_value, board_id, color, scheduled_start, status").eq("id", taskId).eq("owner_id", ownerId).maybeSingle<LookTask>();
+  if (!t) throw new Error("Unknown quest.");
+  const card = cleanLook((extras.calCardLooks as Record<string, unknown> | undefined)?.[taskId]);
+  const look = lookOf(t, card);
+  if (scope === "one") {
+    const kept = { ...((extras.seriesKept as Record<string, string> | undefined) ?? {}), [taskId]: JSON.stringify(look) };
+    await writeExtra(ownerId, "seriesKept", kept);
+    return { changed: 0 };
+  }
+  const day = dayKeyOf(t.scheduled_start);
+  const siblings = Object.entries((extras.questSeries as Record<string, string>) ?? {}).filter(([id, k]) => k === key && id !== taskId).map(([id]) => id);
+  let targets: LookTask[] = [];
+  if (siblings.length) {
+    const { data } = await db.from("tasks").select("id, title, icon_key, icon_source, xp_value, coin_value, board_id, color, scheduled_start, status").eq("owner_id", ownerId).in("id", siblings);
+    targets = ((data ?? []) as LookTask[]).filter((x) => scope === "all" || (x.scheduled_start && dayKeyOf(x.scheduled_start) >= day));
+  }
+  // The picture and colours go on every one; XP, coins and board only on ones not finished yet (what a
+  // finished quest paid stays as it was).
+  const open = targets.filter((x) => x.status === "open").map((x) => x.id);
+  const all = targets.map((x) => x.id);
+  if (all.length) {
+    await db.from("tasks").update({ icon_key: look.iconKey ?? null, icon_source: look.iconSource ?? "library", color: look.color ?? null }).eq("owner_id", ownerId).in("id", all);
+  }
+  if (open.length) {
+    await db.from("tasks").update({ xp_value: look.xp ?? 15, coin_value: look.coins ?? null, board_id: look.boardId ?? null }).eq("owner_id", ownerId).in("id", open);
+  }
+  const cards = { ...((extras.calCardLooks as Record<string, CalCardLook> | undefined) ?? {}) };
+  for (const id of all) {
+    if (card) cards[id] = card;
+    else delete cards[id];
+  }
+  const looks = { ...((extras.seriesLooks as Record<string, import("@/lib/series-look").SeriesEntry[]> | undefined) ?? {}) };
+  looks[key] = withLook(looks[key], look, scope, day);
+  const { error } = await writeExtra(ownerId, "seriesLooks", looks);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  const { error: cardErr } = await writeExtra(ownerId, "calCardLooks", cards);
+  if (cardErr) throw new Error(`Couldn't save: ${cardErr.message}`);
+  revalidatePath("/calendar");
+  revalidatePath("/");
+  return { changed: all.length };
 }
 
 /** The gem each reward wears on its tag (a diamond unless chosen), kept on the account by reward id. */

@@ -47,7 +47,12 @@ export function WhenPicker({ minutes, title, isAdventure, initial, placing, onPi
     const i = Math.round((dayStartOf(new Date(initial)).getTime() - today.getTime()) / 86_400_000);
     return i >= 0 && i < DAYS ? i : 0;
   });
-  const [pick, setPick] = useState<number | null>(() => (initial ? Date.parse(initial) : null));
+  // A current time outside the days shown (yesterday, or far ahead) isn't a pick: placing would move it there unseen.
+  const [pick, setPick] = useState<number | null>(() => {
+    if (!initial) return null;
+    const i = Math.round((dayStartOf(new Date(initial)).getTime() - today.getTime()) / 86_400_000);
+    return i >= 0 && i < DAYS ? Date.parse(initial) : null;
+  });
 
   useEffect(() => {
     let live = true;
@@ -135,6 +140,20 @@ export function WhenPicker({ minutes, title, isAdventure, initial, placing, onPi
     return i === 0 ? "Today" : i === 1 ? "Tmrw" : d.toLocaleDateString(undefined, { weekday: "short" });
   };
 
+  // Another day keeps the time of day you picked (planner step 2a: "Tmrw" used to leave the pick on today
+  // while the foot said tomorrow).
+  const goDay = (i: number) => {
+    setDayIdx(i);
+    if (pick === null) return;
+    const d = new Date(today);
+    d.setDate(d.getDate() + i);
+    const old = new Date(pick);
+    const at = new Date(d);
+    at.setHours(old.getHours(), old.getMinutes(), 0, 0);
+    const lo = d.getTime() + range.from * 60_000;
+    const hi = d.getTime() + range.to * 60_000 - len;
+    setPick(Math.max(lo, Math.min(hi, at.getTime())));
+  };
   const dayChipOf = (ms: number) => dayChip(Math.round((dayStartOf(new Date(ms)).getTime() - today.getTime()) / 86_400_000));
   // Drag the quest's card along the day; a red line marks where it starts (owner, Nov 10).
   const dragging = useRef(false);
@@ -177,7 +196,7 @@ export function WhenPicker({ minutes, title, isAdventure, initial, placing, onPi
       {/* The week, a chip per day. */}
       <div role="tablist" aria-label="Day" className="flex gap-1 overflow-x-auto [scrollbar-width:none]">
         {Array.from({ length: DAYS }, (_, i) => (
-          <button key={i} type="button" role="tab" aria-selected={dayIdx === i} onClick={() => setDayIdx(i)} className="h-8 shrink-0 rounded-full px-3 text-[13px] font-semibold" style={dayIdx === i ? { background: isAdventure ? "#2e3b26" : "var(--t-accent)", color: isAdventure ? "#f2d27e" : "#fff" } : { color: soft, border: "1px solid rgba(139,112,64,.35)" }}>
+          <button key={i} type="button" role="tab" aria-selected={dayIdx === i} onClick={() => goDay(i)} className="h-8 shrink-0 rounded-full px-3 text-[13px] font-semibold" style={dayIdx === i ? { background: isAdventure ? "#2e3b26" : "var(--t-accent)", color: isAdventure ? "#f2d27e" : "#fff" } : { color: soft, border: "1px solid rgba(139,112,64,.35)" }}>
             {dayChip(i)}
           </button>
         ))}
@@ -256,7 +275,7 @@ export function WhenPicker({ minutes, title, isAdventure, initial, placing, onPi
               ‹
             </button>
             <span className="min-w-0 flex-1 text-center text-[13px] font-semibold tabular-nums" style={{ color: clash ? "var(--t-warn)" : ink }}>
-              {dayChip(dayIdx)} {hm(pick)}–{hm(pick + len)}
+              {dayChipOf(pick)} {hm(pick)}–{hm(pick + len)}
               {clash ? " · overlaps" : ""}
             </span>
             <button type="button" onClick={() => nudge(1)} aria-label="15 minutes later" className="flex h-8 w-8 items-center justify-center rounded-full" style={{ border: "1px solid rgba(139,112,64,.5)", color: ink }}>
@@ -268,7 +287,16 @@ export function WhenPicker({ minutes, title, isAdventure, initial, placing, onPi
             Tap a time, or pick a free spot above.
           </span>
         )}
-        <button type="button" disabled={pick === null || placing} data-submit onClick={() => pick !== null && onPick({ start: new Date(pick).toISOString(), end: new Date(pick + len).toISOString() })} className="h-9 shrink-0 rounded-full px-4 text-[14px] font-bold disabled:opacity-50" style={{ background: gold, border: "1.5px solid #4a3913", color: "#2a1c10" }}>
+        <button type="button" disabled={pick === null || placing} data-submit onClick={() => {
+            if (pick === null) return;
+            // The calendar opens its early or late hours if this lands there (planner step 2c).
+            try {
+              window.sessionStorage.setItem("cal-reveal", new Date(pick).toISOString());
+            } catch {
+              /* storage unavailable */
+            }
+            onPick({ start: new Date(pick).toISOString(), end: new Date(pick + len).toISOString() });
+          }} className="h-9 shrink-0 rounded-full px-4 text-[14px] font-bold disabled:opacity-50" style={{ background: gold, border: "1.5px solid #4a3913", color: "#2a1c10" }}>
           {placing ? "Placing…" : "Place it ✓"}
         </button>
       </div>

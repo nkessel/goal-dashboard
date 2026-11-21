@@ -96,10 +96,13 @@ export function GoogleEventChip({
   // The calendar's right-click menu asks for this event's popup or its quest.
   useEffect(() => {
     const on = (e: Event) => {
-      const d = (e as CustomEvent<{ id: string; action: "edit" | "quest" }>).detail;
+      const d = (e as CustomEvent<{ id: string; action: "edit" | "quest" | "delete" }>).detail;
       if (d?.id !== event.id) return;
       if (d.action === "quest") setCreating(true);
-      else setOpen(true);
+      else {
+        setOpen(true);
+        if (d.action === "delete") setAskDelete(true);
+      }
     };
     window.addEventListener("gcal-item", on);
     return () => window.removeEventListener("gcal-item", on);
@@ -169,8 +172,9 @@ export function GoogleEventChip({
   }
 
   function onQuestCreated(id?: string) {
-    // Remembered on the account: its event stays when the quest is removed, and it's never made again.
-    if (id) void recordEventQuestAction(id, event.id).catch(() => {});
+    // Remembered on the account: its event stays when the quest is removed, and a repeating event's quests
+    // share one look (owner, Nov 18).
+    if (id) void recordEventQuestAction(id, event.id, event.recurringEventId ?? null).catch(() => {});
     const ids = readHidden();
     ids.add(event.id);
     writeHidden(ids);
@@ -186,7 +190,8 @@ export function GoogleEventChip({
   const tentative = isTentativeTitle(event.title);
   // Fit inside the card (owner, Nov 14: the time spilled over the card's edge): the title's first line and the
   // time must fit; shrink the words down to 80% first, then leave the time out.
-  let scale = roomy;
+  // A maybe ([bracketed]) keeps its words at their normal size however roomy the card (owner, Nov 17).
+  let scale = tentative ? Math.min(1, roomy) : roomy;
   let showTimeLine = !!timeLabel && !oneLine;
   let titleLines = scale > 1.15 ? 3 : 2;
   if (compact && boxH && !oneLine) {
@@ -233,6 +238,12 @@ export function GoogleEventChip({
           </svg>
         </div>
         <div className="min-w-0 flex-1">
+          {/* The time on top (owner, Nov 17). */}
+          {showTimeLine && (
+            <p className="truncate leading-tight" style={{ color: isAdventure ? "#22374a" : "var(--t-ink-soft)", fontSize: 10.5 * (1 + (scale - 1) * 0.6), opacity: 0.8 }}>
+              {timeLabel}
+            </p>
+          )}
           <p
             className={oneLine ? "truncate leading-tight" : compact ? `${titleLines === 3 ? "line-clamp-3" : titleLines === 2 ? "line-clamp-2" : "line-clamp-1"} leading-[1.15] [overflow-wrap:normal] [word-break:normal]` : "truncate leading-tight"}
             style={{ color: isAdventure ? "#22374a" : "var(--t-ink)", fontSize: (compact ? 11.5 : 13.5) * scale, fontWeight: 500 }}
@@ -246,11 +257,6 @@ export function GoogleEventChip({
               event.title
             )}
           </p>
-          {showTimeLine && (
-            <p className="truncate leading-tight" style={{ color: isAdventure ? "#22374a" : "var(--t-ink-soft)", fontSize: 10.5 * (1 + (scale - 1) * 0.6), opacity: 0.8 }}>
-              {timeLabel}
-            </p>
-          )}
           {!compact && !event.isAllDay && (
             <p className="truncate leading-tight" style={{ color: "var(--t-ink-soft)", fontSize: 10.5 }}>
               {formatTimeRange(start, end)}
