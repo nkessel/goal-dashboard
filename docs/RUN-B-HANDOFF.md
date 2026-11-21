@@ -43,7 +43,7 @@ Waiting on the owner's review, **don't merge** without his OK: `review/boards-no
 
 **5. D1:** the new quest columns (`place`, `card_look`, `progress_unit`). Nothing reads them yet.
 
-**6. When 1:** `src/lib/when.ts` and its checks (`docs/plans/2026-11-17-due-and-scheduling-plan.md`, section 6 step 1). Nothing visible. The owner approved one "Complete by" date with Flexible / Fixed and the word "Auto-schedule"; nothing else in that plan is approved.
+**6. When 1 (done Nov 21):** `src/lib/when.ts` and its checks (`docs/plans/2026-11-17-due-and-scheduling-plan.md`, section 6 step 1). Nothing visible. The owner approved one "Complete by" date with Flexible / Fixed and the word "Auto-schedule"; nothing else in that plan is approved.
 
 **7. Cal 1a** (`docs/CALENDAR-PLANNER-DESIGN.md`): partly done. The UI check has `--server-tz <zone>` and a `first-picture` check in the calendar flow. Left: run it in two time zones by default (UTC server, New York browser) and fail on hydration errors.
 
