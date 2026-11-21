@@ -3,9 +3,11 @@
 import { useState } from "react";
 import type { Task } from "@/lib/data/types";
 import { EditTaskModal } from "./EditTaskModal";
+import { useDrawZone } from "@/lib/use-draw-zone";
 
 /** A finished quest in a list; click to edit its details or XP, or restore it. */
 export function CompletedTaskRow({ task, theme = "calm" }: { task: Task; theme?: "calm" | "adventure" }) {
+  const zone = useDrawZone();
   const [open, setOpen] = useState(false);
   const isAdventure = theme === "adventure";
 
@@ -31,7 +33,7 @@ export function CompletedTaskRow({ task, theme = "calm" }: { task: Task; theme?:
           <span className="min-w-0 flex-1 break-words leading-snug">{task.title}</span>
           {task.completed_at && (
             <span className="shrink-0 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
-              {new Date(task.completed_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+              {new Date(task.completed_at).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: zone })}
             </span>
           )}
           <span className="w-14 shrink-0 text-right text-[14.5px]">+{task.xp_value} XP</span>

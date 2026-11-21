@@ -1,4 +1,5 @@
 import { cookies, headers } from "next/headers";
+import { habitTicksSeed } from "@/lib/habit-ticks";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { auth, signIn } from "@/auth";
@@ -22,6 +23,7 @@ import {
   listCompletedTasksForOwner,
   countCompletedTasksForOwner,
 } from "@/lib/data/tasks";
+import { buildCheckInInit, DRAFT_COOKIE } from "@/lib/checkin-init";
 import { getProfileById } from "@/lib/data/profiles";
 import { getWeeklyXpEarned, currentWeekStart } from "@/lib/data/xp";
 import { listFriendIds } from "@/lib/data/friendships";
@@ -206,6 +208,7 @@ export default async function Home() {
   const habitPlanRaw = (profile?.life_wheel as { habitPlan?: { core?: unknown; days?: Record<string, unknown> } } | null | undefined)?.habitPlan;
   const idList = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
   const habitPlan = { core: idList(habitPlanRaw?.core), today: idList(habitPlanRaw?.days?.[dayKey]) };
+  const ticksSeed = habitTicksSeed((profile?.life_wheel as { habitTicks?: unknown } | null | undefined)?.habitTicks, dayKey);
   const plannedHabits = [...new Set([...habitPlan.core, ...habitPlan.today])];
   // Your videos to listen to (a board named like "Online learning videos"): offered under walk and drive habits.
   const listenBoard = (projectBoards as { id: string; title: string }[]).find((b) => /learning videos|listen/i.test(b.title)) ?? null;
@@ -216,6 +219,7 @@ export default async function Home() {
   // Due within the reach you chose in Due soon (or missed this past week):
   // these go to the very top of Today on their own, whatever list they're in,
   // what's due next first and past due last.
+  const draftCookie = (await cookies()).get(DRAFT_COOKIE)?.value;
   const dueHours = parseDueHours((await cookies()).get(DUE_HOURS_COOKIE)?.value);
   const nowMs = nowMsOutside();
   // Snoozed for a while: off Today until then.
@@ -248,6 +252,7 @@ export default async function Home() {
         energyAt={energyToday !== null ? (lastEnergy?.created_at ?? null) : null}
         checkMetrics={checkMetrics}
         metricsToday={metricsToday}
+        checkInInit={buildCheckInInit(profile?.life_wheel, appDayKey(), draftCookie)}
         notesToday={recentNotes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))}
       />
     </section>
@@ -309,12 +314,16 @@ export default async function Home() {
                   theme={theme}
                   between={
                     habits && rites?.some((r) => "slot" in r) ? (
-                      <DailyHabits listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} planned={plannedHabits} core={habitPlan.core} />
+                      // Daily Habits, then the habits not up today as their own section, like Additional Quests (owner, Nov 18).
+                      <div className="flex flex-col gap-6">
+                        <DailyHabits ticks={ticksSeed} listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} planned={plannedHabits} core={habitPlan.core} />
+                        <DailyHabits additional ticks={ticksSeed} listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} planned={plannedHabits} core={habitPlan.core} />
+                      </div>
                     ) : null
                   }
                   habitsInToday={
                     habits && plannedHabits.length > 0 ? (
-                      <DailyHabits bare listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} planned={plannedHabits} core={habitPlan.core} />
+                      <DailyHabits bare ticks={ticksSeed} listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} planned={plannedHabits} core={habitPlan.core} />
                     ) : null
                   }
                 />

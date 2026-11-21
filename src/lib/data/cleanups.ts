@@ -1,3 +1,4 @@
+import { writeExtra } from "@/lib/data/extras";
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
 
@@ -31,7 +32,7 @@ export async function runCleanups(ownerId: string): Promise<void> {
     const list = Array.isArray(lw.streaks) ? (lw.streaks as { id: string; name: string }[]) : [];
     if (!list.some((x) => /missing my medication/i.test(x.name))) {
       const streaks = [...list, { id: "med-2026-11-10", name: "Missing my medication", word: "missed medication, missed meds, missed my medication", since: "2026-11-09T04:00:00.000Z" }];
-      const { error } = await db.from("profiles").update({ life_wheel: { ...lw, streaks } }).eq("id", ownerId);
+      const { error } = await writeExtra(ownerId, "streaks", streaks);
       if (error) return;
     }
     await markDone(ownerId, [MED_STREAK]);
@@ -89,5 +90,5 @@ async function markDone(ownerId: string, names: string[]): Promise<void> {
   const { data: cur } = await db.from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
   const lw = cur?.life_wheel ?? {};
   const list = Array.isArray(lw.cleanups) ? (lw.cleanups as string[]) : [];
-  await db.from("profiles").update({ life_wheel: { ...lw, cleanups: [...new Set([...list, ...names])] } }).eq("id", ownerId);
+  await writeExtra(ownerId, "cleanups", [...new Set([...list, ...names])]);
 }

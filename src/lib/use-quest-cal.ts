@@ -1,27 +1,56 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { questCalExtrasAction, setCalCardLookAction, setQuestDriveAction, type CalCardLook } from "@/app/actions";
+import { questCalExtrasAction, setCalCardLookAction, setQuestDriveAction, setQuestWindowAction, type CalCardLook, type QuestWindow } from "@/app/actions";
 import { fromStartup } from "@/lib/startup";
 
 // Driving time to a quest's place (minutes each way) and its calendar card's look, kept on the account
 // (`life_wheel.questDrives`, `life_wheel.calCardLooks`), read once per page load (owner, Nov 12).
 let drives: Record<string, number> = {};
 let looks: Record<string, CalCardLook> = {};
+let windows: Record<string, QuestWindow> = {};
 let loading: Promise<void> | null = null;
 const subs = new Set<() => void>();
 const emit = () => subs.forEach((f) => f());
 
-function subscribe(cb: () => void) {
-  subs.add(cb);
+function load() {
   loading ??= fromStartup("questCalExtras", questCalExtrasAction)
     .then((r) => {
       drives = { ...r.drives, ...drives };
       looks = { ...r.looks, ...looks };
+      windows = { ...(r.windows ?? {}), ...windows };
       emit();
     })
     .catch(() => {});
+  return loading;
+}
+
+function subscribe(cb: () => void) {
+  subs.add(cb);
+  load();
   return () => subs.delete(cb);
+}
+
+/** A quest's own time range for the auto-scheduler ("sometime before 2 PM"), kept on the account (`life_wheel.questWindows`). */
+export function useQuestWindow(taskId: string | undefined): QuestWindow | null {
+  return useSyncExternalStore(subscribe, () => (taskId ? (windows[taskId] ?? null) : null), () => null);
+}
+export function useAllQuestWindows(): Record<string, QuestWindow> {
+  return useSyncExternalStore(subscribe, () => windows, () => EMPTY_WINDOWS);
+}
+const EMPTY_WINDOWS: Record<string, QuestWindow> = {};
+/** Every quest's range, once loaded (for code outside React, like the one-quest placer). */
+export async function loadQuestWindows(): Promise<Record<string, QuestWindow>> {
+  await load();
+  return windows;
+}
+export function saveQuestWindow(taskId: string, win: QuestWindow | null) {
+  const next = { ...windows };
+  if (win && (win.from || win.to)) next[taskId] = win;
+  else delete next[taskId];
+  windows = next;
+  emit();
+  return setQuestWindowAction(taskId, win);
 }
 
 /** Minutes of driving each way to the quest's place, or null. A session (`s:`) shares its quest's. */
@@ -52,7 +81,11 @@ export function saveCalCardLook(taskId: string, look: CalCardLook | null) {
   else delete next[taskId];
   looks = next;
   emit();
-  return setCalCardLookAction(taskId, look);
+  return setCalCardLookAction(taskId, look).then((r) => {
+    // One of a repeating event's quests: ask whether the rest should wear it too (owner, Nov 18).
+    window.dispatchEvent(new CustomEvent("series-look-check", { detail: { taskId } }));
+    return r;
+  });
 }
 
 /** "25 min", "1 hr", "1 hr 15". */

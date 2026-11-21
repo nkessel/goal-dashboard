@@ -22,7 +22,8 @@ import { addBackGreeting, checkinLabel, pickFor, readPromptVotes, reflectQuestio
 import { useEscape } from "@/lib/use-escape";
 import { useLongPress } from "@/lib/use-long-press";
 import { coachAction, setTopPriorityAction, welcomePartsXpAction } from "@/app/actions";
-import { Digest, talkToToucan } from "@/components/toucan/ToucanGuide";
+import { Digest } from "@/components/toucan/Digest";
+import { talkToToucan } from "@/components/toucan/talk";
 import { GearIcon } from "@/components/ui/Icons";
 import { ArrangeAbove, ArrangeList, CastleEdit, EditButton, GoldCheck, GreetingOptions } from "./WelcomeArrange";
 import { MistScene } from "./MistScene";

@@ -3,7 +3,7 @@
 import { EventQuestsSwitch } from "./EventQuestsSwitch";
 import { MagicCalendarIcon } from "@/components/ui/Icons";
 import { PaintTodayArt } from "./PaintTodayArt";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent, GoogleCalendarInfo } from "@/lib/google-calendar";
 import { DayView } from "./DayView";
@@ -20,6 +20,8 @@ import type { SchedulerSettings } from "@/lib/auto-schedule";
 import type { TimedHabit } from "@/lib/timed-habits";
 
 export type DailyLayer = { settings: Partial<SchedulerSettings> | null; habits: TimedHabit[] };
+
+import { writeCalUi, type CalUi } from "@/lib/cal-ui";
 
 const KEY = "calendar-layers";
 /** How daily essentials (meal time, wind-down…) and habits with a set time look. */
@@ -62,6 +64,7 @@ function write(next: Layers) {
   try {
     window.localStorage.setItem(KEY, JSON.stringify({ ...next, v: 2 }));
     // The server skips archived calendars (no wasted calls to Google).
+    writeCalUi({ layers: { quests: next.quests, done: next.done, allDay: next.allDay, portraits: next.portraits, essentials: next.essentials, habits: next.habits, card: next.card } });
     document.cookie = `cal-skip=${encodeURIComponent(next.archived.join("|"))}; path=/; max-age=31536000; samesite=lax`;
   } catch {
     /* storage unavailable */
@@ -89,7 +92,10 @@ export function CalendarLayers({
   daily,
   agenda = {},
   interest = [],
+  ui,
 }: {
+  /** What the server read from the `cal-ui` cookie, so the first picture is the final one. */
+  ui?: CalUi;
   /** Calendars of interest: feeds shown in week and month views, and links to open. */
   interest?: InterestCalendar[];
   /** The quests waiting behind each quest on the calendar (its agenda). */
@@ -110,7 +116,8 @@ export function CalendarLayers({
   calendars: GoogleCalendarInfo[];
   theme: "calm" | "adventure";
 }) {
-  const layers = useSyncExternalStore(subscribe, read, () => DEFAULTS);
+  const serverLayers = useMemo<Layers>(() => ({ ...DEFAULTS, ...(ui?.layers ?? {}), card: { ...CARD_SHOW_DEFAULT, ...(ui?.layers?.card ?? {}) } }), [ui]);
+  const layers = useSyncExternalStore(subscribe, read, () => serverLayers);
   const [open, setOpen] = useState<"display" | "calendars" | "interest" | "friends" | null>(null);
   const panel = useRef<HTMLDivElement>(null);
   const isAdventure = theme === "adventure";
@@ -364,8 +371,8 @@ export function CalendarLayers({
         )}
       </div>
 
-      {view === "day" && <DayView dateKey={dayKeys[0]} wideKeys={widen(dayKeys, BUFFER)} buffer={BUFFER} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} card={layers.card} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
-      {(view === "3day" || view === "days" || view === "week" || view === "next7") && <WeekView dayKeys={widen(dayKeys, BUFFER)} visible={dayKeys.length} buffer={BUFFER} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} card={layers.card} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
+      {view === "day" && <DayView dateKey={dayKeys[0]} wideKeys={widen(dayKeys, BUFFER)} buffer={BUFFER} ui={ui} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} card={layers.card} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
+      {(view === "3day" || view === "days" || view === "week" || view === "next7") && <WeekView dayKeys={widen(dayKeys, BUFFER)} visible={dayKeys.length} buffer={BUFFER} ui={ui} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} card={layers.card} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
       {view === "month" && <MonthView monthKey={monthKey} todayKey={todayKey} tasks={shownTasks} events={shownEvents} theme={theme} />}
     </div>
     </AgendaContext.Provider>

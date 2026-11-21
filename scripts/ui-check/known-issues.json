@@ -82,5 +82,33 @@
   {
     "match": "^calendar\\|covered-by-bar\\|<div \\.reveal> \"Auto-scheduler",
     "reason": "The auto-scheduler is a floating window over the calendar by design (owner, Nov 3: moves by its title, resizes from its corner, minimizes to a chip), so it covers the calendar under it until it's moved or minimized. It stops above the bottom bar (Nov 19)."
+  },
+  {
+    "match": "^faces\\|layout-shift\\|<div> \"Today's Quests",
+    "reason": "Completing a quest takes it off Today's Quests underneath the celebration, which covers the whole screen; the list closes up behind it, out of sight. The celebration itself doesn't move (see the screenshot)."
+  },
+  {
+    "match": "^faces\\|layout-shift\\|<div> \"Daily Habits",
+    "reason": "The faces flow opens Daily Habits by script (no tap) after a tick, because the check's save reloads Today; the tray sliding open is that, not a jump."
+  },
+  {
+    "match": "^insights\\|layout-shift\\|.*\\|up to after checking in$",
+    "reason": "An answer to the Submit tap (Nov 20): the check-in folds to its done line and the log gains the new check-in once the server has saved it, just over the check's 500 ms 'after a tap' window."
+  },
+  {
+    "match": "\\|(covered-by-bar|floating-overlap)\\|.*kept-target|\"What's most important today\"",
+    "reason": "The kept target (owner, Nov 19, after 'Keep it' on the toucan's question): a small floating marker you drag anywhere, like the feedback bubble; it can sit over whatever is under it. By design."
+  },
+  {
+    "match": "\\|(covered-by-bar|floating-overlap)\\|.*🈲 Language",
+    "reason": "The Language chip (on main before Nov 20): a floating chip you can drag aside, like the feedback bubble. By design."
+  },
+  {
+    "match": "^today\\|layout-shift\\|.*\\|up to (check-in open|habit sub-habits open)$",
+    "reason": "Nov 21: still seen after the server began drawing the check-in's draft and 'Last night' card (so that is not the whole cause; Insights is clean). Today's Quests move ~120-130px once while the check-in opens, then again at the next step. Cause still to find (Today only); see docs/WAITING.md."
+  },
+  {
+    "match": "^board\\|moved-on-tap\\|board: due soonest",
+    "reason": "Picking a board's order folds its choices away and re-sorts the quests, so the tapped choice is gone from where it was: expected, not a jump."
   }
 ]

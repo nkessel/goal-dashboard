@@ -16,6 +16,9 @@ import { CompletedTaskRow } from "@/components/tasks/CompletedTaskRow";
 import { AddTaskForm } from "@/components/tasks/AddTaskForm";
 
 /** A quest board's quests: open ones as quest cards, finished ones below. */
+
+/** Whether a board offers "Use the mist on this board" (paused with the mist, owner Nov 16). */
+const MIST_CHOICE = false;
 export function BoardQuestList({
   tasks,
   boardId,
@@ -139,8 +142,9 @@ export function BoardQuestList({
           </span>
         </button>
       )}
-      {/* The mist is a choice per board: off for lists you browse (videos, ideas). */}
-      {boardId && open.length > 2 && !!next && (
+      {/* The mist is a choice per board: off for lists you browse (videos, ideas). Paused for now (owner, Nov 16:
+          "turn off the mist feature for now"), so the choice is hidden too. */}
+      {MIST_CHOICE && boardId && open.length > 2 && !!next && (
         <button type="button" onClick={() => setMist(!mistOn)} className="-mt-1.5 self-end text-[12px] underline underline-offset-2" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.6 }}>
           {mistOn ? "No mist on this board" : "🌫 Use the mist on this board"}
         </button>

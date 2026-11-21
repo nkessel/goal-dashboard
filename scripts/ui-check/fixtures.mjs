@@ -57,24 +57,37 @@ export function makeFixtures() {
     task("Book the dentist cleaning", { plan_by: inHours(48), schedule_rank: 1 }),
     task("See Grandma for tea", { plan_by: inHours(24 * 9), schedule_rank: 2, estimate_minutes: 90 }),
     task("Clear out the shed someday", { schedule_rank: 3 }),
-    task("Finished: return library books", { status: "completed", completed_at: inHours(-3), xp_awarded: 20 }),
+    task("Finished: return library books", { status: "completed", completed_at: inHours(-3), xp_awarded: 20, felt: 2 }),
+    // Failed yesterday, and how it felt (owner, Nov 19): a fail on the Insights chart.
+    // Quests done earlier in the month (owner, Nov 19: XP under each day on the Insights chart, and the squished month view).
+    ...[1, 2, 3, 4, 6, 8, 9, 11, 13, 15, 16, 19, 22, 24, 27].map((d, k) =>
+      task(`Done ${d} days ago`, { status: "completed", completed_at: inHours(-24 * d + [1.5, 4, 6.5, 9, 12][k % 5]), xp_value: [15, 20, 30, 25, 40][k % 5], felt: [1, 2, 0, -1, 2][k % 5] }),
+    ),
+    task("Morning run", { status: "completed", completed_at: inHours(-20), failed_at: inHours(-20), felt: -1 }),
   ];
   // The calendar: quests placed on it today and this week, one done, and a mini-quest with a time (Nov 3).
   const at = (h, mins = 60) => ({ is_on_calendar: true, scheduled_start: inHours(h), scheduled_end: inHours(h + mins / 60), estimate_minutes: mins });
   tasks.push(
     task("Goblin paperwork: renew the car registration", at(1.5)),
     task("Draft the facilitation workshop outline", { board_id: course.id, ...at(3.5, 90) }),
-    task("Herb gathering at the farmers market", { status: "completed", completed_at: inHours(-1), xp_awarded: 20, ...at(-1.5, 45) }),
+    task("Herb gathering at the farmers market", { status: "completed", completed_at: inHours(-1), xp_awarded: 20, felt: 1, ...at(-1.5, 45) }),
     task("Scout the old trail with Chester", at(25, 60)),
     // Written in [brackets]: a maybe, drawn as a dashed outline with no fill (owner, Nov 12).
     task("[Stretch and tea on the porch]", at(5.5, 45)),
     task("Rune puzzle: fix the printer", at(-19, 30)),
+    // A quest marked failed (owner, Nov 17: "failed quest shouldn't show as green").
+    task("Call the venue about the deposit", { status: "completed", completed_at: inHours(-20), failed_at: inHours(-20), ...at(-21, 60) }),
     task("Take out the trash", { is_tiny: true, is_manual_priority: true, due_at: inHours(8), estimate_minutes: 15 }),
   );
+  // A repeating calendar event made into quests: two weekly gym sessions in one series (owner, Nov 18).
+  const gym1 = task("Gym with Sam", { ...at(2.5, 60), google_calendar_event_id: "ev-gym-1" });
+  const gym2 = task("Gym with Sam", { ...at(2.5 + 24 * 7, 60), google_calendar_event_id: "ev-gym-2" });
+  tasks.push(gym1, gym2);
   // One quest in two calendar spots (owner, Nov 5): the registration continues tomorrow.
   const goblin = tasks.find((t) => t.title.startsWith("Goblin paperwork"));
   const task_sessions = [{ id: randomUUID(), owner_id: OWNER_ID, task_id: goblin.id, starts_at: inHours(26.5), ends_at: inHours(27.5), google_calendar_event_id: null }];
   const [reading] = tasks;
+  const pickup = tasks.find((t) => t.title === "Pick up medication");
   // A quest waiting behind another (a sequence): hidden until the reading is done.
   tasks.push(task("Post the reflection link in the course chat", { board_id: course.id, locked_by_task_id: reading.id }));
   const steps = ["Skim the chapter", "Highlight three ideas", "Write one page", "Post it in the forum"].map((title, i) => ({
@@ -84,10 +97,13 @@ export function makeFixtures() {
   const rite = (title, slot, extra = {}) => ({ id: randomUUID(), owner_id: OWNER_ID, title, slot, sort_order: sort++, xp_value: 5, ...extra });
   const rites = [
     rite("Gym 🏋️", "day", { kind: "habit", estimate_minutes: 60, due_time: "07:00", window_to: "10:00" }),
+    rite("Read a chapter 📘", "day", { kind: "habit", estimate_minutes: 30, window_to: "14:00" }),
     rite("20 mins of house cleaning", "day", { kind: "habit" }),
     rite("Walk Chester 🐶", "day", { kind: "habit" }),
     rite("Learn a language 🗣", "day", { kind: "habit" }),
     rite("Morning routine ☀️", "day", { kind: "habit", steps: [{ id: "m1", title: "Read the book with Tiffany" }, { id: "m2", title: "Walk Chester" }, { id: "m3", title: "Make breakfast for Tiffany and me" }] }),
+    // Not up today (three weekdays away, so the app's own day never lands on it): Additional habits (Nov 18).
+    rite("Water the garden beds", "day", { kind: "habit", days: [(new Date().getDay() + 3) % 7] }),
     rite("Vitamins before 12pm", "day", { kind: "habit", steps: [{ id: "s1", title: "Vitamins" }, { id: "s2", title: "B12" }, { id: "s3", title: "D3", optional: true, xp: 2 }] }),
     rite("Brush and floss", "evening"),
     rite("Lay out tomorrow's clothes", "evening"),
@@ -114,6 +130,9 @@ export function makeFixtures() {
     { owner_id: OWNER_ID, metric: "Mood", level: 7, created_at: inHours(-26) },
     { owner_id: OWNER_ID, metric: "Sleep quality", level: 6, created_at: inHours(-30) },
     { owner_id: OWNER_ID, metric: "Energy", level: 5, created_at: inHours(-50) },
+    // Today's check-in, for the log under the check-in (owner, Nov 10 and 18).
+    { owner_id: OWNER_ID, metric: "Mood", level: 6.5, created_at: inHours(-1) },
+    { owner_id: OWNER_ID, metric: "Sleep quality", level: 7, created_at: inHours(-1) },
   ].map((r) => ({ id: randomUUID(), ...r }));
 
   const xp_events = [
@@ -134,6 +153,8 @@ export function makeFixtures() {
         streak_count: 4,
         is_admin: true,
         last_check_in_at: inHours(-26),
+        // A month-old account: the walkthrough keeps the feedback button above it for accounts older than a day.
+        created_at: inHours(-24 * 30),
         life_wheel: {
           // The walkthrough is finished for the test account (its own flow, "tour", starts it again).
           tour: { step: "end", done: true, at: 1 },
@@ -145,6 +166,14 @@ export function makeFixtures() {
             ],
           },
           rituals: [{ id: "r1", name: "Couples covenant", done: [day(-12), day(-40)] }],
+          questSeries: { [gym1.id]: "g:ev-gym", [gym2.id]: "g:ev-gym" },
+          eventQuests: { on: false, made: { "ev-gym-1": gym1.id, "ev-gym-2": gym2.id } },
+          // Per-quest extras kept in the catch-all until they move to columns (split plan, S2): a place, a driving time,
+          // a calendar card colour and a "12 of 32 pages" count, on quests that Today, a board and the calendar show.
+          questPlaces: { [reading.id]: "Natick library", [pickup.id]: "CVS on Main Street", [goblin.id]: "Registry of Motor Vehicles" },
+          questDrives: { [goblin.id]: 25, [pickup.id]: 10 },
+          calCardLooks: { [goblin.id]: { color: "#6b8f71" }, [reading.id]: { color: "#b5651d" } },
+          progressUnits: { [reading.id]: { total: 32, unit: "pages", done: 12 }, [pickup.id]: { total: 4, unit: "pills", done: 1 } },
         },
       },
       { id: FRIEND_ID, google_sub: "ui-check-friend", email: "friend@example.com", name: "Sam Friend", theme: "calm" },

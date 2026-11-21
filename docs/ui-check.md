@@ -32,7 +32,7 @@ npm run ui-check -- --no-build --compare ui-check-out/before --only today,create
 
 ## Server time zone
 
-`--server-tz <zone>` runs `next start` in that zone (default: the morning zone). Use `--server-tz UTC` to match Vercel and catch server/browser mismatches: the calendar flow's `first-picture` check fetches the server's HTML for day and week view and flags more day columns than show, or cards drawn before the browser takes over.
+`--server-tz <zone>` runs `next start` in that zone (default: UTC, as on Vercel, while the browser is in the morning or evening zone). It catches server/browser mismatches: the calendar flow's `first-picture` check fetches the server's HTML for day and week view and flags more day columns than show, or cards drawn before the browser takes over.
 
 ## How it works
 

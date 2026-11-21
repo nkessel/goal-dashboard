@@ -3,6 +3,9 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import type { Task } from "./types";
 
 const TZ = process.env.APP_TIMEZONE || "America/New_York";
+
+/** The app's time zone, for client parts that must draw the same days as the server. */
+export const appTimeZone = () => TZ;
 /** The app's day turns over at 5:30am, like the evening routine's clock. */
 const ROLLOVER_MINUTES = 5 * 60 + 30;
 /** A sensible ceiling for one day's plan. */

@@ -12,6 +12,7 @@ import { SchedulingDrawer } from "@/components/calendar/SchedulingList";
 import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 import { CloseIcon } from "@/components/ui/Icons";
+import { useDrawZone } from "@/lib/use-draw-zone";
 
 type Who = "me" | "them";
 type Pair<T> = { me: T; them: T };
@@ -93,6 +94,7 @@ export function PairRitual(props: {
   midweek: boolean;
   calendar: { dayKeys: string[]; tasks: Task[]; events: GoogleCalendarEvent[]; toSchedule: Task[]; folders: { name: string; open: boolean }[] };
 }) {
+  const zone = useDrawZone();
   const router = useRouter();
   const prev = (props.last?.data ?? {}) as Partial<Draft>;
   const [d, setD] = useState<Draft>(() => ({
@@ -266,12 +268,12 @@ export function PairRitual(props: {
               </button>
               {d.walkedAt && !d.walk && (
                 <p className="m-0 rounded-lg px-3 py-2 text-[14px]" style={{ background: "rgba(90,138,58,.12)", color: INK }}>
-                  ✓ Talked through on your walk {new Date(d.walkedAt).toLocaleDateString(undefined, { weekday: "long" })}. Still to do: mind sweep, calendar, and closing.
+                  ✓ Talked through on your walk {new Date(d.walkedAt).toLocaleDateString(undefined, { weekday: "long", timeZone: zone })}. Still to do: mind sweep, calendar, and closing.
                 </p>
               )}
               {props.last && (
                 <p className="m-0 text-[13.5px]" style={{ color: SOFT }}>
-                  Last check-in: {new Date(props.last.completedAt).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}.
+                  Last check-in: {new Date(props.last.completedAt).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric", timeZone: zone })}.
                 </p>
               )}
             </>
@@ -367,7 +369,7 @@ export function PairRitual(props: {
             <>
               {!swapDue && (
                 <p className="m-0 rounded-lg px-3 py-2 text-[14px]" style={{ background: "rgba(42,28,16,.08)", color: INK }}>
-                  Not a swap week: you picked {lastSwap ? new Date(lastSwap).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "recently"}. Keep going with what you chose, or change it anyway.
+                  Not a swap week: you picked {lastSwap ? new Date(lastSwap).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: zone }) : "recently"}. Keep going with what you chose, or change it anyway.
                 </p>
               )}
               <p className="m-0 text-[13.5px]" style={{ color: SOFT }}>

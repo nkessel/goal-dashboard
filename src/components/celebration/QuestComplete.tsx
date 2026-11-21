@@ -1,6 +1,7 @@
 "use client";
 
 import { clearQuestNow, markReopenedNow } from "@/lib/failed-now";
+import { FeltAsk } from "@/components/ui/FeltAsk";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -478,6 +479,12 @@ export function QuestComplete(props: QuestCompleteProps) {
               Continue Your Journey
             </button>
           </div>
+          {/* "How do you feel?" (owner, Nov 19): optional; between Claim / Continue and Undo (owner, Nov 19). A tap saves it: "✓ Saved" with its own Undo. */}
+          {taskId && !preview && (
+            <div className="qc-fade w-full">
+              <FeltAsk target={{ kind: "quest", id: taskId }} light size={28} />
+            </div>
+          )}
           {/* Completed by mistake? Take it back: the quest returns open and its XP and coins come back out. */}
           {taskId && !preview && (
             <button

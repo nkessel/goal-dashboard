@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const ROW = 34;
 
 /** One wheel: turn it up or down (swipe, scroll, or the arrow keys); the middle row is the choice. */
-function Wheel({ items, index, onIndex, label, width }: { items: string[]; index: number; onIndex: (i: number) => void; label: string; width: number }) {
+function Wheel({ items, index, onIndex, label, width, onType }: { items: string[]; index: number; onIndex: (i: number) => void; label: string; width: number; /** Tapping the chosen row: type the time instead. */ onType?: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Put the wheel on its value when it opens or the value changes from outside.
@@ -40,7 +40,7 @@ function Wheel({ items, index, onIndex, label, width }: { items: string[]; index
       {items.map((t, i) => (
         <div
           key={t}
-          onClick={() => onIndex(i)}
+          onClick={() => (i === index && onType ? onType() : onIndex(i))}
           className="font-display flex cursor-pointer select-none items-center justify-center tabular-nums transition-[opacity,font-size] duration-150"
           style={{ height: ROW, scrollSnapAlign: "center", fontSize: i === index ? 21 : 16, opacity: i === index ? 1 : 0.4, color: "#2a1c10" }}
         >
@@ -56,11 +56,28 @@ const HOURS = Array.from({ length: 12 }, (_, i) => String(i === 0 ? 12 : i));
 const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
 const HALVES = ["AM", "PM"];
 
+/** "7:45", "745", "7:45 pm", "19:45", "7pm" → minutes from midnight (null when it isn't a time). */
+export function parseTyped(text: string, pmHint: boolean): number | null {
+  const t = text.trim().toLowerCase().replace(/\s+/g, "");
+  const m = t.match(/^(\d{1,2})(?::?(\d{2}))?(a|am|p|pm)?$/);
+  if (!m) return null;
+  let h = Number(m[1]);
+  const min = m[2] ? Number(m[2]) : 0;
+  if (min > 59 || h > 23) return null;
+  if (m[3]) {
+    if (h > 12 || h === 0) return null;
+    h = (h % 12) + (m[3].startsWith("p") ? 12 : 0);
+  } else if (h <= 12 && pmHint && h !== 12) h += 12;
+  return h * 60 + min;
+}
+
 /**
  * Pick a time on three wheels you turn up and down: hour, minute, AM/PM (owner, Nov 12).
  * `value` is minutes from midnight.
  */
 export function TimeWheels({ value, onChange }: { value: number; onChange: (minutes: number) => void }) {
+  // Tap the chosen time to type it (owner, Nov 17: "type the time on any of these time pickers by clicking on it").
+  const [typing, setTyping] = useState<string | null>(null);
   const h24 = Math.floor(value / 60) % 24;
   const m = value % 60;
   const set = (hour12Index: number, minute: number, half: number) => onChange(((hour12Index % 12) + half * 12) * 60 + minute);
@@ -70,11 +87,32 @@ export function TimeWheels({ value, onChange }: { value: number; onChange: (minu
     <div className="relative inline-flex items-center gap-1 rounded-2xl px-2" style={{ background: "rgba(255,250,238,.7)", border: "1px solid rgba(139,112,64,.45)", boxShadow: "inset 0 2px 6px rgba(60,40,10,.12)" }} data-time-wheels>
       {/* The band the chosen row sits in. */}
       <span aria-hidden className="pointer-events-none absolute inset-x-1.5 rounded-lg" style={{ top: ROW, height: ROW, background: "rgba(233,212,154,.5)", border: "1px solid rgba(168,138,63,.6)" }} />
-      <Wheel items={HOURS} index={hi} onIndex={(i) => set(i, m, half)} label="Hour" width={44} />
+      {typing !== null && (
+        <input
+          autoFocus
+          value={typing}
+          inputMode="text"
+          aria-label="Type a time"
+          onChange={(e) => setTyping(e.target.value.slice(0, 8))}
+          onBlur={() => {
+            const v = parseTyped(typing, half === 1);
+            if (v !== null) onChange(v);
+            setTyping(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+            if (e.key === "Escape") setTyping(null);
+          }}
+          // Typed in place on the chosen row: no box, no focus ring, just a thin gold line under the words (owner, Nov 19).
+          className="bare-input font-display absolute inset-x-1.5 z-[2] rounded-lg text-center text-[21px] tabular-nums outline-none focus:outline-none"
+          style={{ top: ROW, height: ROW, background: "#f2e3b9", border: "none", boxShadow: "inset 0 -1.5px 0 #b58a2c", color: "#2a1c10", outline: "none" }}
+        />
+      )}
+      <Wheel items={HOURS} index={hi} onIndex={(i) => set(i, m, half)} label="Hour" width={44} onType={() => setTyping(`${HOURS[hi]}:${MINUTES[m]} ${HALVES[half].toLowerCase()}`)} />
       <span aria-hidden className="font-display relative text-[20px]" style={{ color: "#2a1c10" }}>
         :
       </span>
-      <Wheel items={MINUTES} index={m} onIndex={(i) => set(hi, i, half)} label="Minute" width={44} />
+      <Wheel items={MINUTES} index={m} onIndex={(i) => set(hi, i, half)} label="Minute" width={44} onType={() => setTyping(`${HOURS[hi]}:${MINUTES[m]} ${HALVES[half].toLowerCase()}`)} />
       <Wheel items={HALVES} index={half} onIndex={(i) => set(hi, m, i)} label="AM or PM" width={48} />
     </div>
   );

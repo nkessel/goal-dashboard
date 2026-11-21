@@ -4,6 +4,7 @@
 // and one list everyone can add to (`app_defaults` key `questdrop.songs`, never shared as a setting).
 // Kept out of actions.ts on purpose (it is being split by area; see docs/ACTIONS-SPLIT-PLAN.md).
 
+import { writeExtra } from "@/lib/data/extras";
 import { auth } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { cleanSong, type DropSong } from "@/lib/quest-drop";
@@ -28,9 +29,8 @@ async function readMine(ownerId: string): Promise<{ extras: Record<string, unkno
 }
 
 async function writeMine(ownerId: string, mine: Mine) {
-  // Re-read just before writing and merge: life_wheel holds many other things.
-  const { extras } = await readMine(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, questDropSongs: mine } }).eq("id", ownerId);
+  // writeExtra saves only this key; life_wheel holds many other things.
+  const { error } = await writeExtra(ownerId, "questDropSongs", mine);
   if (error) throw new Error("Couldn't save your songs.");
 }
 

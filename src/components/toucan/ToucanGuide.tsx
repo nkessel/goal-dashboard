@@ -39,7 +39,6 @@ import {
   toucanPrefsAction,
 } from "@/app/actions";
 import { setRetiredLines } from "@/lib/toucan-lines";
-import { useSyncExternalStore } from "react";
 import { afternoonCheckAt, dueSoonList, dueWhen, neglected, type DeadlineGuess, type GuideTask, type Nudge } from "@/lib/toucan-guide";
 import type { CoachAction, CoachNote, CoachPromise } from "@/lib/coach";
 import { AHEAD_DAYS, catchUpOrder, catchUpPlan, looksLikeCourse, type CourseItem } from "@/lib/catch-up";
@@ -54,10 +53,12 @@ import { dailyBudget, polish, voice, windowOf } from "@/lib/toucan-style";
 import { storeStyle, useToucanStyle } from "@/lib/toucan-style-store";
 import { Fold } from "@/components/ui/Fold";
 import { fromStartup } from "@/lib/startup";
+import { type Mode, type PlanTarget, PLAN_DAY, talkToToucan, useToucanMode } from "./talk";
+import { Digest } from "./Digest";
 
-type PlanTarget = { id: string; title: string; estimate: number | null; dueAt: string | null };
+
 type Msg = { role: "user" | "assistant"; content: string; actions?: (CoachAction & { auto?: boolean })[]; remembered?: CoachNote[] };
-type Mode = "talk" | "catchup";
+
 
 /** An invitation put off with Snooze, and what it offers when it comes back. */
 type SnoozeNote = { text: string; until: number; taskId?: string; plan?: PlanTarget; begin?: string; talk?: string; talkLabel?: string; promiseId?: string; quiz?: boolean };
@@ -103,28 +104,6 @@ function writeCheckins(day: string, v: { count: number; slots: string[] }) {
   } catch {}
 }
 const todayKey = () => new Date().toDateString();
-
-type GuideMode = "simple" | "lite" | "full";
-const readMode = (): GuideMode => {
-  try {
-    const v = window.localStorage.getItem("toucan-mode");
-    return v === "simple" || v === "lite" ? v : "full";
-  } catch {
-    return "full";
-  }
-};
-const subscribeMode = (cb: () => void) => {
-  window.addEventListener("toucan-mode", cb);
-  window.addEventListener("storage", cb);
-  return () => {
-    window.removeEventListener("toucan-mode", cb);
-    window.removeEventListener("storage", cb);
-  };
-};
-/** How much the toucan does: simple, a light guide, or the full guide (Settings › Toucan Spirit). */
-export function useToucanMode(): GuideMode {
-  return useSyncExternalStore(subscribeMode, readMode, () => "full" as const);
-}
 
 /** Opens the toucan's guide sheet (optionally straight to planning one quest, or to the coursework catch-up). */
 /** Runs it now, or once the welcome screen (which has its own toucan) has closed: one toucan at a time. */
@@ -210,9 +189,6 @@ function sharedWatch(opts: { guesses?: boolean } = {}) {
   return p;
 }
 
-export function talkToToucan(plan?: PlanTarget, mode: Mode = "talk", say?: string) {
-  window.dispatchEvent(new CustomEvent("toucan-talk", { detail: { plan, mode, say } }));
-}
 
 /**
  * The toucan as a guide. Once a day it raises the most important quest
@@ -1036,7 +1012,7 @@ function eventWhen(d: Date) {
   return `${d.toLocaleDateString("en-US", { weekday: "long" })} at ${time}`;
 }
 
-export const PLAN_DAY = "Help me plan my day so nothing slips: what's due next first, then what matters most, and anything past due after that. Suggest an order and times that fit around my calendar.";
+
 
 /** "Already done ✓" from his note: the quest is completed, with its celebration. */
 async function completeQuestFromNote(taskId: string) {
@@ -2027,51 +2003,6 @@ function CatchUpPlanner({ onBack, onAsk }: { onBack: () => void; onAsk: (q: stri
   );
 }
 
-/**
- * The toucan's words, easy to take in at a glance: a list becomes bullets
- * (each its own line), quest titles in quotes stand out, and a long paragraph
- * is split at its sentences, one short line each.
- */
-export function Digest({ text }: { text: string }) {
-  const lines = text
-    .split(/\n+/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-  const items: { kind: "p" | "li"; text: string }[] = [];
-  for (const l of lines) {
-    const b = l.match(/^(?:[-•*]|\d+[.)])\s+(.*)$/);
-    if (b) items.push({ kind: "li", text: b[1] });
-    // A long paragraph: its sentences become short lines.
-    else if (l.length > 140) for (const sent of l.match(/[^.!?]+[.!?]+["”’)]?|[^.!?]+$/g) ?? [l]) items.push({ kind: "p", text: sent.trim() });
-    else items.push({ kind: "p", text: l });
-  }
-  const mark = (t: string) =>
-    t.split(/("[^"]+"|“[^”]+”)/g).map((part, i) =>
-      /^["“]/.test(part) ? (
-        <b key={i} className="font-semibold" style={{ color: "#f2d27e" }}>
-          {part.replace(/^["“]|["”]$/g, "")}
-        </b>
-      ) : (
-        part
-      )
-    );
-  return (
-    <span className="flex flex-col gap-1 whitespace-normal">
-      {items.map((it, i) =>
-        it.kind === "li" ? (
-          <span key={i} className="flex gap-1.5">
-            <span aria-hidden style={{ color: "rgba(140,240,220,.85)" }}>
-              ✦
-            </span>
-            <span>{mark(it.text)}</span>
-          </span>
-        ) : (
-          <span key={i}>{mark(it.text)}</span>
-        )
-      )}
-    </span>
-  );
-}
 
 function Pill({ children, onClick, strong = false }: { children: React.ReactNode; onClick: () => void; strong?: boolean }) {
   return (

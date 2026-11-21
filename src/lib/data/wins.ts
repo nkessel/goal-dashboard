@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 
 export type Win = {
   id: string;
-  kind: "quest" | "step" | "rite" | "habit" | "reward" | "journal" | "feedback" | "login";
+  kind: "quest" | "fail" | "step" | "rite" | "habit" | "reward" | "journal" | "feedback" | "login";
   title: string;
   /** When it happened (ISO). */
   at: string;
@@ -14,20 +14,24 @@ export type Win = {
   sub?: string | null;
   /** A quest's or reward's portrait, when it has one. */
   icon?: string | null;
+  /** How it felt, -2 … 2 ("How do you feel?" after a victory, a fail or a habit tick, owner Nov 19). */
+  felt?: number | null;
 };
 
 /** Everything you got done (or wrote down) since `sinceISO`, newest first. */
-export async function listWinsSince(ownerId: string, sinceISO: string, opts: { hidePrivate?: boolean } = {}): Promise<Win[]> {
+export async function listWinsSince(ownerId: string, sinceISO: string, opts: { hidePrivate?: boolean; /** Quests marked as failed too (only the Insights chart wants them). */ fails?: boolean } = {}): Promise<Win[]> {
   const db = supabaseAdmin();
   const sinceDay = sinceISO.slice(0, 10);
-  const [tasks, completions, rewards, journal, logins, steps] = await Promise.all([
-    db.from("tasks").select("id, title, completed_at, xp_value, reward_id, icon_key, icon_source, is_private").eq("owner_id", ownerId).eq("status", "completed").gte("completed_at", sinceISO).order("completed_at", { ascending: false }).limit(300),
-    db.from("rite_completions").select("id, rite_id, day, xp_awarded, completed_at").eq("owner_id", ownerId).gte("day", sinceDay).limit(500),
+  const [tasks, completions, rewards, journal, logins, steps, fails] = await Promise.all([
+    db.from("tasks").select("id, title, completed_at, xp_value, reward_id, icon_key, icon_source, is_private, felt, failed_at").eq("owner_id", ownerId).eq("status", "completed").gte("completed_at", sinceISO).order("completed_at", { ascending: false }).limit(300),
+    db.from("rite_completions").select("id, rite_id, day, xp_awarded, completed_at, felt").eq("owner_id", ownerId).gte("day", sinceDay).limit(500),
     db.from("rewards").select("id, title, claimed_at, icon_key").eq("owner_id", ownerId).in("status", ["claimed", "completed"]).gte("claimed_at", sinceISO).limit(100),
     db.from("journal_entries").select("*").eq("owner_id", ownerId).gte("created_at", sinceISO).order("created_at", { ascending: false }).limit(200),
     db.from("xp_events").select("id, amount, created_at").eq("owner_id", ownerId).eq("kind", "daily_check_in").gte("created_at", sinceISO).limit(60),
     // Steps (sub-quests) ticked off, even while their quest is still open.
     db.from("quest_steps").select("id, title, done_at, xp, task_id").eq("owner_id", ownerId).eq("done", true).gte("done_at", sinceISO).limit(300),
+    // Quests marked as failed (owner, Nov 19: fails sit on the Insights chart too, by how they felt).
+    opts.fails ? db.from("tasks").select("id, title, failed_at, icon_key, icon_source, is_private, felt").eq("owner_id", ownerId).gte("failed_at", sinceISO).limit(200) : Promise.resolve({ data: [] as Record<string, unknown>[] }),
   ]);
   const stepTaskIds = [...new Set((steps.data ?? []).map((s) => s.task_id as string))];
   const stepTasks = new Map<string, { title: string; is_private: boolean | null }>();
@@ -45,7 +49,8 @@ export async function listWinsSince(ownerId: string, sinceISO: string, opts: { h
 
   const wins: Win[] = [
     ...(tasks.data ?? [])
-      .filter((t) => !t.reward_id && !(opts.hidePrivate && t.is_private))
+      // A failed quest is "completed" too; the chart shows it as a fail instead.
+      .filter((t) => !t.reward_id && !(opts.hidePrivate && t.is_private) && !(opts.fails && t.failed_at))
       .map((t) => ({
         id: `q-${t.id}`,
         kind: "quest" as const,
@@ -53,6 +58,18 @@ export async function listWinsSince(ownerId: string, sinceISO: string, opts: { h
         at: t.completed_at as string,
         xp: t.xp_value as number,
         icon: (t.icon_source === "ai" || t.icon_source === "library") && t.icon_key ? (t.icon_key as string) : null,
+        felt: (t.felt as number | null | undefined) ?? null,
+      })),
+    ...(fails.data ?? [])
+      .filter((t) => !(opts.hidePrivate && t.is_private))
+      .map((t) => ({
+        id: `f-${t.id}`,
+        kind: "fail" as const,
+        title: t.title as string,
+        at: t.failed_at as string,
+        xp: 0,
+        icon: (t.icon_source === "ai" || t.icon_source === "library") && t.icon_key ? (t.icon_key as string) : null,
+        felt: (t.felt as number | null | undefined) ?? null,
       })),
     ...(steps.data ?? []).flatMap((st) => {
       const t = stepTasks.get(st.task_id as string);
@@ -62,7 +79,7 @@ export async function listWinsSince(ownerId: string, sinceISO: string, opts: { h
     ...(completions.data ?? []).flatMap((c) => {
       const r = rites.get(c.rite_id as string);
       if (!r) return [];
-      return [{ id: `r-${c.id}`, kind: r.slot === "day" ? ("habit" as const) : ("rite" as const), title: r.title, at: c.completed_at as string, day: c.day as string, xp: c.xp_awarded as number }];
+      return [{ id: `r-${c.id}`, kind: r.slot === "day" ? ("habit" as const) : ("rite" as const), title: r.title, at: c.completed_at as string, day: c.day as string, xp: c.xp_awarded as number, felt: (c.felt as number | null | undefined) ?? null }];
     }),
     ...(logins.data ?? []).map((l) => ({ id: `l-${l.id}`, kind: "login" as const, title: "Answered the call (daily login)", at: l.created_at as string, xp: Number(l.amount) || 0 })),
     ...(rewards.data ?? []).map((r) => ({ id: `w-${r.id}`, kind: "reward" as const, title: r.title as string, at: r.claimed_at as string, icon: typeof r.icon_key === "string" && r.icon_key.startsWith("http") ? (r.icon_key as string) : null })),

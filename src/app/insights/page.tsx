@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { buildCheckInInit, DRAFT_COOKIE } from "@/lib/checkin-init";
 import { requireSession } from "@/lib/session";
 import { listBoardsForOwner } from "@/lib/data/boards";
 import { wheelAreasFrom } from "@/lib/wheel-areas";
@@ -9,7 +11,7 @@ import { ScreenArrange } from "@/components/ui/ScreenArrange";
 import { CheckInHub } from "@/components/insights/CheckInHub";
 import { getProfileById } from "@/lib/data/profiles";
 import { getCheckMetrics, listCheckInsSince, listCheckNotesSince, listEnergySince } from "@/lib/data/energy";
-import { appDayKey } from "@/lib/data/tomorrow";
+import { appDayKey, appTimeZone } from "@/lib/data/tomorrow";
 import { EnergyCheck } from "@/components/xp/EnergyCheck";
 import { EventLog } from "@/components/insights/EventLog";
 import { DEFAULT_WHEEL, LifeWheel } from "@/components/insights/LifeWheel";
@@ -36,7 +38,7 @@ export default async function InsightsPage() {
     listEnergySince(uid, since),
     listCheckInsSince(uid, since),
     getCheckMetrics(uid),
-    listWinsSince(uid, since),
+    listWinsSince(uid, since, { fails: true }),
     listCheckNotesSince(uid, since),
     // Streaks look back a year for slips.
     profileP.then((pr) => (pr?.life_wheel?.streaks?.length ? listCheckNotesSince(uid, yearAgo) : [])),
@@ -80,9 +82,13 @@ export default async function InsightsPage() {
   const wheelLast: Record<string, { level: number; at: string }> = {};
   for (const c of checks) if (c.metric.startsWith(WHEEL)) wheelLast[c.metric.slice(WHEEL.length)] = { level: c.level, at: c.created_at };
   const chartChecks = checks.filter((c) => !c.metric.startsWith(WHEEL));
-  const readings = [...energy.map((e) => ({ metric: "Energy", level: e.level, at: e.created_at })), ...chartChecks.map((c) => ({ metric: c.metric, level: c.level, at: c.created_at }))];
+  const allReadings = [...energy.map((e) => ({ metric: "Energy", level: e.level, at: e.created_at, key: `e:${e.id}` })), ...chartChecks.map((c) => ({ metric: c.metric, level: c.level, at: c.created_at, key: c.id ? `c:${c.id}` : undefined }))];
+  // Check-ins you archived stay saved but leave the log and the chart (owner, Nov 18).
+  const marks = ((profile?.life_wheel as Record<string, unknown> | undefined)?.checkInMarks ?? {}) as { star?: string[]; archived?: string[] };
+  const archived = new Set(marks.archived ?? []);
+  const readings = allReadings.filter((r) => !r.key || !archived.has(r.key));
   const chartWins = [
-    ...wins.filter((w) => w.kind !== "feedback" || (w.xp ?? 0) > 0).map((w) => ({ kind: w.kind, at: w.at, xp: w.xp ?? 0, title: w.title, icon: w.icon ?? null })),
+    ...wins.filter((w) => w.kind !== "feedback" || (w.xp ?? 0) > 0).map((w) => ({ kind: w.kind, at: w.at, xp: w.xp ?? 0, title: w.title, icon: w.icon ?? null, tone: w.felt ?? null })),
     ...notes.map((n) => ({ kind: "note", at: n.created_at, xp: 0, title: n.body, details: n.details ?? null, tone: n.tone ?? null })),
   ];
 
@@ -120,8 +126,8 @@ export default async function InsightsPage() {
                   Check in
                 </h2>
                 {/* A fresh check-in each visit; today's earlier ones are listed under it, with the chart. */}
-                <EnergyCheck full sleepLink={false} today={null} metrics={metrics} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))} />
-                <CheckInHub readings={readings} metrics={["Energy", ...metrics]} wins={chartWins} />
+                <EnergyCheck full sleepLink={false} today={null} init={buildCheckInInit(profile?.life_wheel, appDayKey(), (await cookies()).get(DRAFT_COOKIE)?.value)} metrics={metrics} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))} />
+                <CheckInHub zone={appTimeZone()} readings={readings} metrics={["Energy", ...metrics]} wins={chartWins} starred={marks.star ?? []} nights={cleanWheel((profile?.life_wheel as Record<string, unknown> | null | undefined)?.wheelOfTime).log} />
                 </div>
               </section>
               ),

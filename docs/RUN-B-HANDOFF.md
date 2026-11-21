@@ -21,6 +21,8 @@ The live app is https://goal-dashboard-kappa.vercel.app. Cloud sessions can't si
 
 The Run B list from the dev plan, updated with what has happened since it was written (Nov 18).
 
+**0. Bugs first (owner, Nov 21 7:12 AM: "everything is extra buggy now... long welcome screen comes up but disappears on interaction, can't check in sleep, etc etc"; 7:14: fine if not fixed right away, but it must work by some point in the timeline).** Before any other item, take one of these if it isn't claimed: (a) on the live app, the welcome screen opens (the long version) and vanishes on the first tap, so its sleep check-in can't be done; (b) find the other new bugs: run `npm run ui-check` on all flows against `main`, compare with the last clean report, and walk Today, welcome, check-in, Insights and calendar for errors, regressions from the Nov 20–21 merges (check-in work, faces/feel, sequence, time ranges, additional habits) and the overnight D0/D1/L1 changes. Fix each on `main` as a bug fix (no review needed), log it in `docs/SHIPPED.md`, and say in WAITING what you couldn't reproduce. **Also on `main` (Nov 21 check):** React #418 hydration errors on /quests, /plan, /matrix, /journal and / (tablet) in the UI check since it runs the server in UTC (8ee2cb0): fix them as part of (b). **(a) is fixed (Nov 21, c0d2570): stale copy after deploys; see `docs/SHIPPED.md`. Do (b).** **(b), Nov 21 (Dev loop 2, run 2):** the #418s on /quests, /plan, /matrix, /journal are fixed (`lib/use-draw-zone.ts`; `pages`, `today`, `tour` clean on phone and tablet, morning). Still to do for (b): the other flows (welcome, toucanask, insights, faces, sequence, habiteditor, evening, create, calendar…) and evening runs, a few flows per run (`--only a,b --devices phone,tablet`; ~2 min a flow per device here). Not D0's save path (checked Nov 21: no failed saves in the database, keys match), nor L1's file split (code moved unchanged).
+
 **1. Merge what the owner said OK to (Nov 19, 00:43 UTC: "ok let's do it").** Run A got the OK but stopped on its usage limit before merging most of it. As of this writing:
 
 | Branch | Status | What to do |
@@ -43,18 +45,18 @@ Waiting on the owner's review, **don't merge** without his OK: `review/boards-no
 
 **5. D1:** the new quest columns (`place`, `card_look`, `progress_unit`). Nothing reads them yet.
 
-**6. When 1:** `src/lib/when.ts` and its checks (`docs/plans/2026-11-17-due-and-scheduling-plan.md`, section 6 step 1). Nothing visible. The owner approved one "Complete by" date with Flexible / Fixed and the word "Auto-schedule"; nothing else in that plan is approved.
+**6. When 1 (done Nov 21):** `src/lib/when.ts` and its checks (`docs/plans/2026-11-17-due-and-scheduling-plan.md`, section 6 step 1). Nothing visible. The owner approved one "Complete by" date with Flexible / Fixed and the word "Auto-schedule"; nothing else in that plan is approved.
 
-**7. Cal 1a** (`docs/CALENDAR-PLANNER-DESIGN.md`): partly done. The UI check has `--server-tz <zone>` and a `first-picture` check in the calendar flow. Left: run it in two time zones by default (UTC server, New York browser) and fail on hydration errors.
+**7. Cal 1a: done Nov 21** (server runs in UTC by default in the UI check). Was: partly done. The UI check has `--server-tz <zone>` and a `first-picture` check in the calendar flow. Left: run it in two time zones by default (UTC server, New York browser) and fail on hydration errors.
 
 **8. Calendar fixes, plus the data copy.** Changed since the plan was written:
 - **Cal 1b, 1c: done** (live with the flash fix).
-- **Cal 2a, 2b, 2c, 2d: built** on `review/boards-nov18`, waiting on the owner. Don't build them again.
-- **Left: Cal 1d** (`cal-ui` cookie for span, zoom, early/late and layers; it fixes the calendar opening on the wrong settings, so it ships straight to `main` after the UI check), and **Cal 3** (migration 0090 and the copy of drives and day holds; nothing visible, verify with SELECTs). Cal 1d touches `WeekView.tsx` and `CalendarLayers.tsx`, which `review/boards-nov18` also changes: build it on top of that branch, or wait until it's merged.
+- **Cal 2a, 2b, 2c, 2d: on `main`** (merged Nov 21 with `review/boards-nov18`, owner approved). Don't build them again.
+- **Cal 1d: done Nov 21** (`cal-ui` cookie, `lib/cal-ui.ts`). Was left: (`cal-ui` cookie for span, zoom, early/late and layers; it fixes the calendar opening on the wrong settings, so it ships straight to `main` after the UI check), and **Cal 3** (migration 0090 and the copy of drives and day holds; nothing visible, verify with SELECTs). Cal 1d touches `WeekView.tsx` and `CalendarLayers.tsx`, which `review/boards-nov18` also changes: build it on top of that branch, or wait until it's merged.
 
 **9. Stats on sub-quests** (owner note 4eb6549b, Nov 16: sub-quests "should be a bit more like quests": time, char stat assignment, scheduling). Not designed yet: brainstorm with mockups first. Reuse the quest's stats tray (`tasks/StatSplitEditor.tsx`).
 
-**Then Run C (Haiku 5.5)**, the list in the dev plan. Its Cal 2a, 2b and 2d are already on `review/boards-nov18`.
+**Then Run C (Haiku 5.5)**, the list in the dev plan. Its Cal 2a, 2b and 2d are already on `main` (merged Nov 21).
 
 ## 4. In flight right now: don't collide
 
@@ -62,7 +64,7 @@ Waiting on the owner's review, **don't merge** without his OK: `review/boards-no
 |---|---|---|---|
 | Thread "Fix buggy app loading" (owner's account) | Tutorial dark area blocks taps; new versions switch over only while the app is in the background; Today's server uses the user's time zone (no redraw); one request on open instead of 10 | `tour/Walkthrough.tsx`, `public/sw.js`, `src/app/page.tsx` and the startup data loaders, likely `actions.ts` | **Shipped Nov 19** (see `docs/SHIPPED.md`) |
 | Thread "Design a tray that opens from its pill" (owner's account) | Pointer tray (B) for every `.qe-fact` pill row; the import card gets an Urgency scale beside When, like the quest card | `imports/ImportTriage.tsx`, the quest editor's pill row and panels, the habit editor, `globals.css` | `main` (owner asked to ship it live) |
-| Session claude-2d (Opus, owner's account) | Nov 20: merging `review/insights-timeline` (with `insights-nov19`, `faces-feel`) and `review/subquests-sequence` into `main` via branch `merge-nov20` (owner: "do what you think is best"). Once that's on `main`, L2 is free to start. `review/boards-nov18` stays waiting on his review: don't merge it. | quest editor, Insights, faces, toucan question, CheckInHub | `main`, Nov 20 |
+| Session claude-2d (Opus, owner's account) | **Merged to `main` Nov 20:** `review/insights-timeline` (with `insights-nov19`, `faces-feel`) and `review/subquests-sequence`. L2 is free to start. `review/boards-nov18` stays waiting on his review: don't merge it. | — | done |
 
 `docs/WAITING.md`'s top section is the live list of claimed work: add your own line when you start ("Run B, Sonnet, other account: …"), and remove it when you finish.
 

@@ -8,13 +8,19 @@ Related: `docs/BUILD-PLAN.md` (tasks for lighter models), `docs/REPEAT-ASKS.md`,
 
 ---
 
+**Bugs first (owner, Nov 21):** the live app is buggy after the Nov 20–21 merges (welcome screen opens and vanishes on the first tap, so sleep can't be checked in; more he hasn't listed). Every session takes these before anything else: details in `docs/RUN-B-HANDOFF.md` item 0.
+
 **Lighter-model sessions: work from `docs/BUILD-PLAN.md` (Nov 14), top to bottom.**
 
 ## 0. Start here: top dev priorities (owner, Nov 11: "save our top dev priorities to continue with another account")
 
 Take them in order. Each is the owner's own ask (note id prefix in brackets; read the full note with the section 3 query, `where id::text like 'xxxx%'`).
 
-1. **Bug: adding a quest in "Choose tomorrow's quests" clears the whole list** [2664d546], and the quest creator button there is faulty [234f0d70]. Loses work, so first. (`evening/TomorrowQuests.tsx`: local `ticked`/`rowsLocal` state is likely reset when `queued` changes after the add.)
+0b. **Calendar menus you can rearrange (owner, Nov 16 f562c138; asked again Nov 20 on the boards review page):** the calendar quest and event menus (`calendar/CalendarItemMenu.tsx`) get the app's usual menu arranging: gear → drag rows, eye on the right. The × and the event menu's Delete are done (on `review/boards-nov18`). This is a design change: mockup first, via the quest ⋯ menu's arranging (`ui/ScreenArrange.tsx`, the quest ⋯ menu's gear) as the model.
+
+0. **Check-in drawn by the server (done on Insights Nov 21; Today still shifts once, see WAITING):** the saved draft and the "Last night" card come from the browser after load, so Insights and Today move once. Details in `docs/WAITING.md` top section.
+
+1. ~~Bug: adding a quest in "Choose tomorrow's quests" clears the whole list [2664d546, 234f0d70]~~: shipped Nov 14 (see `docs/SHIPPED.md`).
 2. **Right-click menus open as popup menus, not inline trays** [841971c2] (app-wide; quest card ⋯ / right-click, habits, rites).
 3. **Today's "auto-scheduler"/calendar sheet** [a3fe0686]: movable, the calendars' colours as on the calendar screen, choose which calendars show.
 4. **Sleep check-in**: a sleep-notes field under the faces [d38e5f85]; its Save beside the Sleep quality button, not below [1416c34f].

@@ -42,6 +42,43 @@ export const FLOWS = [
     },
   },
   {
+    // The toucan's question (owner, Nov 19): just the toucan, over a grey mist, asking what's most important.
+    name: "toucanask",
+    timeoutMs: 300_000,
+    async run(h) {
+      await h.goto("/", { name: "toucanask" });
+      await h.page.evaluate(() => {
+        for (const k of ["daily-login", "welcome-pending", "daily-login-open", "welcome-back-at", "toucan-kept"]) localStorage.removeItem(k);
+        localStorage.setItem("evening-prompt-at", "off");
+        const fx = JSON.parse(localStorage.getItem("goalFxSaved") || "{}");
+        localStorage.setItem("goalFxSaved", JSON.stringify({ ...fx, welcomeMode: "toucan" }));
+      });
+      await h.page.reload();
+      await h.page.waitForSelector("[data-toucan-question]", { timeout: 15000 }).catch(() => {});
+      await h.settle(900);
+      if (!(await h.page.locator("[data-toucan-question]").count())) throw new Error("toucanask: the toucan's question didn't open on the day's first visit");
+      await h.check("the toucan's question");
+      await h.typeIn((p) => p.locator("[data-toucan-question] textarea").first(), "toucan's question answer");
+      await h.page.locator("[data-toucan-question] textarea").first().fill("Call Dad about Sunday");
+      await h.check("the toucan's question, answered");
+      await h.tap((p) => p.locator("[data-toucan-question]").getByRole("button", { name: /^keep it$/i }).first(), "keep it", { expectMove: true });
+      await h.settle(1200);
+      await h.check("kept: the floating target");
+      if (await h.tap((p) => p.getByRole("button", { name: /^what's most important today$/i }).first(), "open the kept target", { optional: true, expectMove: true })) {
+        await h.check("kept: open");
+        await h.tap((p) => p.locator("[data-kept-card]").getByRole("button", { name: /^shrink$/i }).first(), "kept: shrink", { optional: true, expectMove: true });
+      }
+      await h.goto("/settings?open=welcome-screen", { name: "toucanask-settings" });
+      await h.page.locator("[data-welcome-mode]").scrollIntoViewIfNeeded().catch(() => {});
+      await h.check("Settings › Welcome Screen: the toucan's question");
+      await h.goto("/settings?open=toucan-spirit", { name: "toucanask-look" });
+      if (await h.tap((p) => p.getByRole("button", { name: /^his look/i }).first(), "his look", { optional: true, expectMove: true })) {
+        await h.page.locator("[data-toucan-ask-bg]").scrollIntoViewIfNeeded().catch(() => {});
+        await h.check("Settings › His look: behind the toucan's question");
+      }
+    },
+  },
+  {
     name: "welcome",
     async run(h) {
       await h.goto("/", { welcome: true, name: "welcome" });
@@ -200,6 +237,9 @@ export const FLOWS = [
       }
       await h.toggle(/additional quests/i, "additional quests");
       await h.toggle(/daily habits/i, "daily habits");
+      // (toggle shows it open, then closes it again): open it to tick one.
+      await h.page.evaluate(() => [...document.querySelectorAll("button[aria-expanded='false']")].find((b) => /Daily Habits/.test(b.textContent || ""))?.click());
+      await h.settle(700);
       // The Check in button folds away as the check-in opens, so it's closed with its ×.
       await h.tap(/^check in/i, "open check-in", { expectMove: true });
       await h.check("check-in open");
@@ -269,6 +309,11 @@ export const FLOWS = [
         // The due pill reads "Due today", "Due Fri · Thu 3pm" or "Due date".
         if (await h.tap((p) => p.locator("[role=dialog] button.qe-fact", { hasText: /^(Due|Plan:)/ }).first(), "editor: due", { optional: true, expectMove: true })) {
           await h.check("quest editor: due panel");
+          // Time of day (owner, Nov 16): a range any quest can have, for the auto-scheduler.
+          if (await h.tap((p) => p.locator("[data-quest-window] button", { hasText: /^Before$/ }).first(), "editor: time of day, before", { optional: true, expectMove: true })) {
+            await h.check("quest editor: sometime before");
+            await h.tap((p) => p.locator("[data-quest-window] button", { hasText: /^Any time$/ }).first(), "editor: time of day, any", { optional: true, expectMove: true });
+          }
           // The month calendar (owner, Nov 7: "the due date picker isn't working"; it opened off screen in the adventure theme).
           if (await h.tap((p) => p.locator('[role=dialog] button[aria-label="Due date"]').first(), "editor: due date calendar", { optional: true, expectMove: true })) {
             await h.check("quest editor: due date calendar");
@@ -559,6 +604,94 @@ export const FLOWS = [
         }
         await esc(h);
       }
+      // Sub-quests and Sequence: two pills side by side, one tap each (owner, Nov 20).
+      await h.goto("/", { name: "sequence" });
+      if (await h.tap("text=Pick up medication", "open quest editor", { optional: true, expectMove: true })) {
+        await h.settle(900);
+        await h.check("sub-quests and sequence pills");
+        if (await h.tap((p) => p.getByRole("group", { name: "Quick details" }).locator("button", { hasText: "Sub-quests" }).first(), "sub-quests pill", { optional: true, expectMove: true })) {
+          await h.settle(500);
+          await h.check("sub-quests: adding one");
+          // Sub-quests as little cards (owner's pick C, Nov 20): type two, then open one's ⋯ and its time and details.
+          await h.page.keyboard.type("Call the pharmacy");
+          await h.page.keyboard.press("Enter");
+          await h.page.keyboard.type("Bring the insurance card");
+          await h.page.keyboard.press("Enter");
+          await h.settle(400);
+          await h.check("sub-quests: two cards");
+          if (await h.tap((p) => p.getByRole("button", { name: /^More for Bring the insurance card$/ }).first(), "a sub-quest's ⋯", { optional: true, expectMove: true })) {
+            await h.settle(300);
+            await h.check("sub-quests: its ⋯ menu");
+            if (await h.tap((p) => p.getByRole("menuitem", { name: /Time, progress/ }).first(), "time, progress & XP share", { optional: true, expectMove: true })) {
+              await h.settle(400);
+              await h.check("sub-quests: its time and details");
+            }
+          }
+        }
+        if (await h.tap((p) => p.getByRole("group", { name: "Quick details" }).locator("button", { hasText: "Sequence" }).first(), "sequence pill", { optional: true, expectMove: true })) {
+          await h.settle(700);
+          await h.check("sequence: its window");
+          await esc(h);
+          await h.settle(400);
+        }
+        // The card's picture background sits at the foot of the portrait picker (owner, Nov 20).
+        if (await h.tap((p) => p.locator("button[title='Change the portrait']").first(), "portrait picker", { optional: true, expectMove: true })) {
+          await h.settle(600);
+          await h.check("portrait picker: its foot");
+          await esc(h);
+          await h.settle(300);
+        }
+        // "+ Color" is last in the + row (owner, Nov 20).
+        if (await h.tap((p) => p.getByRole("group", { name: "More details" }).getByRole("button", { name: /color/i }).first(), "+ color", { optional: true, expectMove: true })) {
+          await h.settle(500);
+          await h.check("+ color: its panel");
+        }
+        await esc(h);
+      }
+    },
+  },
+  {
+    // "How do you feel?" (owner, Nov 19): five one-ink faces after a habit tick, a victory and a fail.
+    name: "faces",
+    async run(h) {
+      await h.goto("/", { name: "faces" });
+      await h.toggle(/daily habits/i, "daily habits");
+      const tick = h.page.getByRole("checkbox", { name: /^Done: Walk Chester/ }).first();
+      if (await tick.count()) {
+        await tick.evaluate((el) => { el.scrollIntoView({ block: "center" }); el.click(); }).catch(() => {});
+        await h.settle(1800);
+        await h.check("habit kept: its card asks how you feel");
+        if (await h.tap((p) => p.locator("[data-felt-ask] [role=radio][aria-label=Good]").first(), "habit felt: good", { optional: true, expectMove: true })) await h.check("habit felt: saved, with undo");
+        await h.tap((p) => p.getByRole("button", { name: /^close$/i }).last(), "close the habit card", { optional: true, expectMove: true });
+        await h.settle(1400);
+      }
+      // A victory: the celebration asks too, above Claim your reward · Continue Your Journey.
+      if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu for complete", { optional: true })) {
+        if (await h.tap((p) => p.getByRole("menuitem", { name: /^✓?\s*complete this/i }).first(), "complete from the menu", { optional: true, expectMove: true })) {
+          await h.settle(3500);
+          await h.check("celebration: how do you feel");
+          if (await h.tap((p) => p.locator("[data-felt-ask] [role=radio][aria-label=Great]").first(), "celebration: great", { optional: true, expectMove: true })) await h.check("celebration: felt kept");
+          await h.tap(/continue your journey/i, "continue your journey", { optional: true, expectMove: true });
+          await h.settle(800);
+        }
+        await esc(h);
+      }
+      // A fail: a wise line, the faces, then Try again · Continue.
+      if (await h.tap((p) => p.locator("li", { hasText: "AR class homework" }).getByRole("button", { name: /^quest actions$/i }).last(), "quest menu for fail")) {
+        if (await h.tap((p) => p.getByRole("menuitem", { name: /^archive/i }).first(), "archive choices (fail)", { optional: true, expectMove: true })) {
+          if (await h.tap((p) => p.getByRole("button", { name: /mark as failed/i }).first(), "fail form", { optional: true, expectMove: true })) {
+            if (await h.tap((p) => p.getByRole("button", { name: /^mark failed$/i }).first(), "mark failed", { optional: true, expectMove: true })) {
+              await h.settle(1200);
+              await h.page.waitForSelector("[data-fail-scene]", { timeout: 6000 }).catch(() => {});
+              await h.settle(600);
+              await h.check("fail: wise line and faces");
+              if (await h.tap((p) => p.locator("[data-fail-scene]").getByRole("button", { name: /^try again$/i }).first(), "fail: try again", { optional: true, expectMove: true })) await h.check("fail: copy or new");
+            }
+          }
+        }
+        await esc(h);
+        await esc(h);
+      }
     },
   },
   {
@@ -567,8 +700,51 @@ export const FLOWS = [
     async run(h) {
       await h.goto("/", { name: "habiteditor" });
       await h.tap(/^daily habits/i, "open daily habits", { optional: true, expectMove: true });
+      // Additional Habits (Nov 18): the habits not up today, as their own section under Daily Habits, like Additional Quests.
+      if (await h.tap(/^additional habits/i, "open additional habits", { optional: true, expectMove: true })) {
+        await h.check("additional habits open");
+        // (Playwright's touch tap times out on habit ticks inside the sortable list, so this one is a click.)
+        if (await h.page.evaluate(() => { const el = document.querySelector('[aria-label="Done: Water the garden beds"]'); el?.click(); return !!el; })) {
+          await h.settle(900);
+          await h.check("additional habit done");
+          // The "Habit kept!" card stays until closed (it asks how it felt): close it, as a person would, before the next step.
+          await h.tap((p) => p.locator(".pc-card").getByRole("button", { name: /^close$/i }).first(), "close habit kept", { optional: true });
+          await h.settle(400);
+        }
+        await h.tap(/^additional habits/i, "close additional habits", { optional: true, expectMove: true });
+      }
       await h.page.getByText("Gym 🏋️").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
       await h.settle(300);
+      // Count every tick (owner, Nov 16): a habit set to it gives another completion, XP and celebration each tick,
+      // the card counts the day's times, the menu undoes the last one, and the XP changes on the celebration.
+      const walk = (p) => p.locator("li", { hasText: "Walk Chester" }).first();
+      await walk(h.page).evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+      await h.settle(300);
+      await h.check("habit cards: listen link inline");
+      if (await h.tap((p) => walk(p).getByRole("button", { name: /more for walk chester/i }), "habit menu", { optional: true, expectMove: true })) {
+        await h.check("habit menu: count every time");
+        await h.tap((p) => p.getByRole("menuitem", { name: /count every time/i }).first(), "count every time", { optional: true, expectMove: true });
+        await h.settle(300);
+        const closeParty = async () => {
+          await h.tap((p) => p.getByRole("button", { name: /^close$/i }).first(), "close celebration", { optional: true });
+          await h.settle(500);
+        };
+        if (await h.tap((p) => walk(p).getByRole("checkbox").first(), "tick: first", { optional: true })) {
+          await h.settle(1400);
+          await h.check("habit tick: celebration with XP to change");
+          await closeParty();
+          await h.tap((p) => walk(p).getByRole("checkbox").first(), "tick: again", { optional: true });
+          await h.settle(1600);
+          await h.check("habit tick: done again");
+          await closeParty();
+          await h.check("habit card: times today");
+          if (await h.tap((p) => walk(p).getByRole("button", { name: /more for walk chester/i }), "habit menu again", { optional: true, expectMove: true })) {
+            await h.check("habit menu: undo the last one");
+            await h.tap((p) => p.getByRole("menuitem", { name: /undo the last one/i }).first(), "undo the last one", { optional: true });
+            await h.settle(600);
+          }
+        }
+      }
       // The habit editor (repeat ask 15): sub-habits in view, dragged to reorder, a dot opens XP/coins/Remove.
       if (await h.tap("text=Gym 🏋️", "habit editor", { optional: true, expectMove: true })) {
         await h.settle(500);
@@ -587,6 +763,11 @@ export const FLOWS = [
           await h.page.keyboard.press("Escape").catch(() => {});
           await h.settle(200);
         }
+        // Escape above may have shut the editor: open it again for the pills.
+        if (!(await h.page.locator("[data-mi=pills]").first().isVisible().catch(() => false))) {
+          await h.tap("text=Gym 🏋️", "habit editor again", { optional: true, expectMove: true });
+          await h.settle(500);
+        }
         // Its details are pills now: open Repeats, then pick Certain days.
         await h.tap((p) => p.locator("[data-mi=pills] button").first(), "repeats pill", { optional: true, expectMove: true });
         await h.check("habit editor: repeats pill");
@@ -598,6 +779,9 @@ export const FLOWS = [
         await h.check("habit editor: xp pill");
         await h.tap((p) => p.locator("[data-mi=pills] button").nth(3), "when pill", { optional: true, expectMove: true });
         await h.check("habit editor: when pill");
+        // When (owner, Nov 16): Any time · At · Before · Between; "Before" needs only an end time.
+        if (await h.tap((p) => p.locator("[data-time-range] button", { hasText: /^Before$/ }).first(), "when: before", { optional: true, expectMove: true })) await h.check("habit editor: sometime before");
+        if (await h.tap((p) => p.locator("[data-time-range] button", { hasText: /^Between$/ }).first(), "when: between", { optional: true, expectMove: true })) await h.check("habit editor: between two times");
         if (await h.tap((p) => p.getByRole("button", { name: /^more$/i }).first(), "habit menu", { optional: true, expectMove: true })) {
           await h.check("habit editor: menu");
         }
@@ -936,6 +1120,13 @@ export const FLOWS = [
     async run(h) {
       await h.goto("/settings", { name: "settings" });
       await h.check("top");
+      // Roller trim (owner, Nov 20): Settings › Boards offers Ornaments · Lines · Plain with a preview.
+      await h.goto("/settings?open=boards-look", { name: "settings roller trim" });
+      await h.check("roller trim: ornaments");
+      if (await h.tap((p) => p.getByRole("radio", { name: "Lines" }), "roller trim: lines", { optional: true })) await h.check("roller trim: lines");
+      if (await h.tap((p) => p.getByRole("radio", { name: "Plain" }), "roller trim: plain", { optional: true })) await h.check("roller trim: plain");
+      await h.tap((p) => p.getByRole("radio", { name: "Ornaments" }), "roller trim: back to ornaments", { optional: true });
+      await h.goto("/settings", { name: "settings" });
       const rows = await h.page.locator("main button[aria-expanded=false]").count();
       for (let i = 0; i < Math.min(rows, 12); i++) {
         const row = h.page.locator("main button[aria-expanded=false]").first();
@@ -986,10 +1177,130 @@ export const FLOWS = [
     async run(h) {
       await h.goto("/insights", { name: "insights" });
       await h.check("top");
+      // The check-in log (owner, Nov 10 and 18): today's by default, a longer range from its drop-down, and each one's
+      // ⋯ with Star, Change and Remove.
+      if (await h.tap((p) => p.locator("[data-checkin-log] button[aria-label='Check-in options']").first(), "check-in ⋯", { optional: true, expectMove: true })) {
+        await h.settle(400);
+        await h.check("check-in log: options");
+        await h.tap((p) => p.locator("[data-checkin-log] [role=menuitem]", { hasText: /^Star$/ }).first(), "star a check-in", { optional: true });
+        await h.settle(400);
+        await h.check("check-in log: starred");
+      } else h.record({ kind: "checkin-log", severity: "error", target: "check-in log", detail: "No check-in in today's log to open (the fixtures have one an hour ago)" });
+      if (await h.tap((p) => p.locator("[data-checkin-log] button[aria-expanded]").first(), "check-in log range", { optional: true, expectMove: true })) {
+        await h.tap((p) => p.locator("[data-checkin-log] [role=radio]", { hasText: "This week" }).first(), "this week", { optional: true, expectMove: true });
+        await h.settle(500);
+        await h.check("check-in log: this week");
+        await h.tap((p) => p.locator("[data-checkin-log] button[aria-expanded]").first(), "check-in log range again", { optional: true, expectMove: true });
+        await h.tap((p) => p.locator("[data-checkin-log] [role=radio]", { hasText: "Today" }).first(), "today", { optional: true, expectMove: true });
+      }
       // The chart waits behind a plain button (owner, Nov 9).
       if (await h.tap(/show insights chart/i, "show the chart", { optional: true })) {
         await h.settle(500);
         await h.check("chart open");
+        // Round 3 (owner, Nov 19): a week, things on the chart by how they felt; then split, with its panels resized.
+        if (await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), "chart gear", { optional: true, expectMove: true })) {
+          await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: /^week$/i }).first(), "chart: a week", { optional: true });
+          await h.page.keyboard.press("Escape");
+          await h.settle(500);
+          await h.check("chart: the week, merged");
+          // A month and three months: the dates squish together (owner, Nov 19).
+          for (const [span, name] of [["month", "a month"], ["3 months", "three months"]]) {
+            await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), `chart gear for ${name}`, { optional: true, expectMove: true });
+            await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: new RegExp(`^${span}$`, "i") }).first(), `chart: ${name}`, { optional: true });
+            await h.page.keyboard.press("Escape");
+            await h.settle(500);
+            await h.check(`chart: ${name}, squished`);
+            // Grid lines: Few · Some · Many (owner, Nov 19), on the month.
+            if (span !== "month") continue;
+            for (const g of ["Few", "Many", "Some"]) {
+              await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), `chart gear, grid ${g}`, { optional: true, expectMove: true });
+              await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: new RegExp(`^${g}$`, "i") }).first(), `grid: ${g}`, { optional: true });
+              await h.page.keyboard.press("Escape");
+              await h.settle(400);
+              if (g !== "Some") await h.check(`chart: a month, ${g.toLowerCase()} grid lines`);
+            }
+            // Lines between days (owner, Nov 19): each choice in the gear, then back to the default.
+            for (const ln of ["Dotted", "Solid", "Weeks only", "None", "Dotted, weeks solid"]) {
+              await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), `chart gear, day lines ${ln}`, { optional: true, expectMove: true });
+              await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: ln, exact: true }).first(), `day lines: ${ln}`, { optional: true });
+              await h.page.keyboard.press("Escape");
+              await h.settle(400);
+              if (ln !== "Dotted, weeks solid") await h.check(`chart: a month, day lines ${ln.toLowerCase()}`);
+            }
+            // XP as coins (owner, Nov 19: off by default, toggled on in the gear).
+            for (const on of [true, false]) {
+              await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), `chart gear, coins ${on}`, { optional: true, expectMove: true });
+              await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByText(/xp as coins/i).first(), `XP as coins ${on ? "on" : "off"}`, { optional: true });
+              await h.page.keyboard.press("Escape");
+              await h.settle(400);
+              if (on) await h.check("chart: a month, XP as coins");
+            }
+          }
+          await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), "chart gear, week again", { optional: true, expectMove: true });
+          await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: /^week$/i }).first(), "chart: week again", { optional: true });
+          await h.page.keyboard.press("Escape");
+          await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), "chart gear again", { optional: true, expectMove: true });
+          await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: /^split$/i }).first(), "chart: split", { optional: true });
+          await h.page.keyboard.press("Escape");
+          await h.settle(500);
+          await h.check("chart: split");
+          const edge = h.page.locator("[role=separator][aria-label='Resize the time-of-day panel']").first();
+          const box = await edge.boundingBox().catch(() => null);
+          if (box) {
+            await h.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+            await h.page.mouse.down();
+            await h.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 60, { steps: 6 });
+            await h.page.mouse.up();
+            await h.settle(400);
+            await h.check("chart: split, the time panel taller");
+          }
+          await h.tap((p) => p.getByRole("button", { name: /^show/i }).first(), "chart: what's shown", { optional: true, expectMove: true });
+          await h.check("chart: the Show list");
+          await h.page.keyboard.press("Escape");
+          await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), "chart gear, back", { optional: true, expectMove: true });
+          await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: /^merged$/i }).first(), "chart: merged", { optional: true });
+          await h.page.keyboard.press("Escape");
+        }
+      }
+      // The check-in's Journal: five faces, words on the card, and Tag / event and Supplement inside it; what you started
+      // is kept if you leave and come back (owner, Nov 18).
+      if (await h.tap((p) => p.locator("section[aria-label='Check in'] button", { hasText: /^✎ Journal$|^Journal$/ }).first(), "check-in journal", { optional: true, expectMove: true })) {
+        await h.settle(500);
+        await h.page.locator("[data-checkin-journal] textarea").first().fill("Slept well, slow start").catch(() => {});
+        await h.check("check-in journal: faces, words, tag and supplement inside");
+        if (!(await h.page.locator("[data-checkin-journal] button", { hasText: /tag \/ event/i }).count())) h.record({ kind: "checkin-journal", severity: "error", target: "check-in journal", detail: "Tag / event isn't inside the journal" });
+        await h.page.reload();
+        await h.settle(1500);
+        const kept = (await h.page.locator("[data-checkin-draft]").count()) > 0;
+        if (!kept) h.record({ kind: "checkin-draft", severity: "error", target: "check-in draft", detail: "A started check-in wasn't kept after leaving and coming back" });
+        await h.check("check-in: kept from earlier");
+        await h.tap((p) => p.locator("[data-checkin-draft] button").first(), "start fresh", { optional: true, expectMove: true });
+      }
+      // Spin the Wheel of Time by hand (owner, Nov 9): past halfway it sticks and asks what turned it.
+      {
+        const wheel = h.page.locator("[data-wheel-spin]").first();
+        if (await wheel.count()) {
+          await wheel.scrollIntoViewIfNeeded().catch(() => {});
+          const b = await wheel.boundingBox();
+          if (b) {
+            const cx = b.x + b.width / 2, cy = b.y + b.height * (207 / 440), r = b.width * 0.36;
+            await h.page.mouse.move(cx + r, cy);
+            await h.page.mouse.down();
+            for (const deg of [3, 6, 9, 12]) await h.page.mouse.move(cx + r * Math.cos((deg * Math.PI) / 180), cy + r * Math.sin((deg * Math.PI) / 180), { steps: 2 });
+            await h.page.mouse.up();
+            const stuck = await h.page.locator("[data-wheel-pulled]").first().waitFor({ timeout: 2500 }).then(() => true).catch(() => false);
+            await h.settle(600);
+            await h.check("wheel: spun by hand, stuck halfway");
+            if (!stuck) h.record({ kind: "wheel-spin", severity: "error", target: "wheel of time", detail: "Dragging the wheel past halfway didn't ask what turned it" });
+            else await h.tap((p) => p.locator("[data-wheel-pulled] button", { hasText: /roll back/i }).first(), "let it roll back", { optional: true, expectMove: true });
+          }
+        }
+      }
+      // Wheel factors move by dragging (owner, Nov 17).
+      if (await h.tap((p) => p.getByRole("button", { name: /edit what's on the wheel/i }).first(), "edit the wheel", { optional: true, expectMove: true })) {
+        await h.settle(500);
+        await h.check("wheel: its lists, dragged to reorder");
+        await h.tap((p) => p.getByRole("button", { name: /^done$/i }).first(), "wheel lists done", { optional: true, expectMove: true });
       }
       await h.toggle(/last night/i, "last night", {});
       await h.tap(/did it/i, "ritual did it", { optional: true });
@@ -998,9 +1309,44 @@ export const FLOWS = [
       if (await h.tap((p) => p.locator("[data-leaf-log]").first(), "leaf button", { optional: true, expectMove: true })) {
         await h.settle(500);
         await h.check("leaf: time wheels");
+        // Tap the chosen hour to type the time (owner, Nov 17).
+        {
+          const hour = await h.page.locator("[data-time-wheels] [role=spinbutton][aria-label=Hour]").first().boundingBox().catch(() => null);
+          if (hour) {
+            await h.page.mouse.click(hour.x + hour.width / 2, hour.y + 34 * 1.5);
+            const typed = await h.page.locator("[data-time-wheels] input[aria-label='Type a time']").first().waitFor({ timeout: 2000 }).then(() => true).catch(() => false);
+            if (!typed) h.record({ kind: "time-type", severity: "error", target: "time wheels", detail: "Tapping the chosen hour didn't open a field to type the time" });
+            else {
+              await h.page.keyboard.press("Control+A");
+              await h.page.keyboard.type("7:05 am");
+              await h.check("time wheels: typing a time");
+              await h.page.keyboard.press("Enter");
+              await h.settle(400);
+            }
+          }
+        }
         await h.tap((p) => p.getByRole("button", { name: /^log it$/i }).first(), "log it", { optional: true, expectMove: true });
         await h.settle(700);
         await h.check("leaf: logged");
+      }
+      // Check in, then: Edit check-in opens the latest to change, and Check in again is a gold button (owner, Nov 18).
+      await h.goto("/insights", { name: "insights" });
+      {
+        const slider = h.page.locator("section[aria-label='Check in'] input[type=range]").first();
+        if (await slider.count()) {
+          await slider.focus().catch(() => {});
+          for (let i = 0; i < 3; i++) await h.page.keyboard.press("ArrowRight");
+          await h.settle(300);
+          if (await h.tap((p) => p.getByRole("button", { name: /^submit check-in$/i }).first(), "submit check-in", { optional: true, expectMove: true })) {
+            await h.settle(1200);
+            await h.check("after checking in");
+            if (await h.tap((p) => p.getByRole("button", { name: /^edit check-in$/i }).first(), "edit check-in", { optional: true, expectMove: true })) {
+              await h.settle(700);
+              await h.check("edit check-in: the latest one to change");
+              await esc(h);
+            }
+          }
+        }
       }
     },
   },
@@ -1077,6 +1423,40 @@ export const FLOWS = [
       await h.check("placed one (with Undo)");
       await h.page.locator("[data-quest-drop] button[aria-label=Close]").click();
       await h.settle(600);
+    },
+  },
+  {
+    // Failing a quest from its calendar menu (owner, Nov 20: "it took away a different item from the calendar
+    // completely", until a reload): every other card must still be there after the fail, and the failed one shows ✕.
+    name: "calfail",
+    async run(h) {
+      await h.goto("/calendar?view=day", { name: "calendar" });
+      await h.settle(1500);
+      const titles = () => h.page.evaluate(() => [...document.querySelectorAll("[data-cal-days] [title^='Edit \"']")].map((n) => n.getAttribute("title").split("\n")[0]).sort());
+      const before = await titles();
+      const chip = h.page.locator("[data-cal-days] [title^='Edit \"Goblin']").first();
+      if (!(await chip.count())) return h.record({ kind: "step-skipped", severity: "info", target: "calfail", detail: "no Goblin card on the day view" });
+      await chip.evaluate((el) => el.scrollIntoView({ block: "center" }));
+      await h.settle(300);
+      await chip.click({ button: "right" });
+      await h.settle(400);
+      await h.tap((p) => p.locator("[data-mi='fail']").first(), "Fail");
+      await h.settle(300);
+      await h.check("calendar fail: reason");
+      await h.tap((p) => p.getByRole("button", { name: /^mark failed$/i }).first(), "Mark failed");
+      await h.settle(2500);
+      await h.check("calendar fail: marked");
+      const after = await titles();
+      const gone = before.filter((t) => !after.includes(t));
+      if (gone.length) h.record({ kind: "card-vanished", severity: "error", target: "calendar fail", detail: `after failing Goblin, gone from the day: ${gone.join("; ")}` });
+      await h.tap((p) => p.getByRole("button", { name: /^(not now|continue)$/i }).first(), "Continue", { optional: true });
+      await h.settle(2500);
+      const after2 = await titles();
+      const gone2 = before.filter((t) => !after2.includes(t));
+      if (gone2.length) h.record({ kind: "card-vanished", severity: "error", target: "calendar fail (menu closed)", detail: `gone: ${gone2.join("; ")}` });
+      const failed = await h.page.locator("[data-cal-days] [title^='Edit \"Goblin'] [aria-label='Failed']").count();
+      if (!failed) h.record({ kind: "not-failed", severity: "error", target: "calendar fail", detail: "Goblin's card doesn't show the red ✕ after Mark failed" });
+      await h.check("calendar fail: closed");
     },
   },
   {
@@ -1188,6 +1568,59 @@ export const FLOWS = [
           } else await esc(h);
         }
       }
+      // A repeating event's quests share a look (owner, Nov 18): raise one gym session's XP, close the editor,
+      // and the card at the foot asks "Just this one · This and later · All".
+      {
+        const card = h.page.locator("[title^='Edit \"Gym with Sam']").first();
+        if (await card.count()) {
+          await card.click({ button: "right" }).catch(() => {});
+          await h.settle(400);
+          await h.check("event menu: failed-safe menu with ×");
+          if (await h.tap((p) => p.getByRole("menuitem", { name: /^edit quest$/i }).first(), "edit the gym quest", { optional: true, expectMove: true })) {
+            await h.settle(1200);
+            await h.tap((p) => p.locator("[data-tour=fact-xp]").first(), "xp pill", { optional: true, expectMove: true });
+            await h.settle(400);
+            await h.tap((p) => p.locator("[data-tour=xp-row] button", { hasText: "+5" }).first(), "+5 XP", { optional: true });
+            await h.settle(900);
+            await h.page.keyboard.press("Escape");
+            const asked = await h.page.locator("[data-series-ask]").first().waitFor({ timeout: 6000 }).then(() => true).catch(() => false);
+            if (!asked) h.record({ kind: "series-ask", severity: "error", target: "series look", detail: "Changing one gym session's XP didn't ask about the other sessions" });
+            else {
+              await h.settle(500);
+              await h.check("series look: asks this one / later / all");
+              await h.tap((p) => p.locator("[data-series-ask] [data-scope=all]").first(), "save for all", { optional: true, expectMove: true });
+              const saved = await h.page.locator("[data-series-ask]", { hasText: "Saved for" }).first().waitFor({ timeout: 4000 }).then(() => true).catch(() => false);
+              if (!saved) h.record({ kind: "series-ask", severity: "error", target: "series look", detail: `After "All" the card never said it saved` });
+              else await h.check("series look: saved for all");
+              await h.settle(2200);
+            }
+          } else await esc(h);
+        } else h.record({ kind: "series-ask", severity: "warning", target: "series look", detail: "The gym quest wasn't on the week view" });
+      }
+      // Shorter than its block (owner, Nov 5): the 90-minute workshop draft set to 30 min asks before shrinking.
+      {
+        const card = h.page.locator("[title^='Edit \"Draft the facilitation']").first();
+        if (await card.count()) {
+          await card.click({ button: "right" }).catch(() => {});
+          await h.settle(400);
+          if (await h.tap((p) => p.getByRole("menuitem", { name: /^edit quest$/i }).first(), "edit the workshop draft", { optional: true, expectMove: true })) {
+            await h.settle(1200);
+            await h.tap((p) => p.locator("[data-tour=fact-time]").first(), "time pill", { optional: true, expectMove: true });
+            await h.settle(400);
+            await h.tap((p) => p.getByRole("button", { name: /^30m$|^30 min$|^30$/ }).first(), "30 minutes", { optional: true });
+            await h.settle(900);
+            await h.page.keyboard.press("Escape");
+            const asked = await h.page.locator("[data-shrink-ask]").first().waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+            if (!asked) h.record({ kind: "shrink-ask", severity: "warning", target: "shorter quest", detail: "Making a 90-minute calendar quest 30 minutes didn't ask about its block" });
+            else {
+              await h.check("shorter quest: asks before shrinking its block");
+              await h.tap((p) => p.locator("[data-shrink-ask] [data-shrink=yes]").first(), "shorten it", { optional: true, expectMove: true });
+              await h.settle(1500);
+              await h.check("shorter quest: block shrunk");
+            }
+          } else await esc(h);
+        }
+      }
       // Seamless days (repeat ask 12): scroll sideways part of a day; it stays where it's left.
       await h.page.evaluate(() => document.querySelector(".cal-days-scroll")?.scrollBy({ left: 130 })).catch(() => {});
       await h.settle(900);
@@ -1199,7 +1632,7 @@ export const FLOWS = [
         if (await zoom.count()) {
           await zoom.evaluate((el) => {
             const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
-            set.call(el, String(Math.round((Math.log(2.5) / Math.log(14)) * 1000)));
+            set.call(el, String(1000 - Math.round((Math.log(2.5) / Math.log(14)) * 1000)));
             el.dispatchEvent(new Event("input", { bubbles: true }));
           });
           await h.settle(1800);
@@ -1215,7 +1648,7 @@ export const FLOWS = [
           // Back to the week for the steps that follow.
           await zoom.evaluate((el) => {
             const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
-            set.call(el, String(Math.round((Math.log(7) / Math.log(14)) * 1000)));
+            set.call(el, String(1000 - Math.round((Math.log(7) / Math.log(14)) * 1000)));
             el.dispatchEvent(new Event("input", { bubbles: true }));
           });
           await h.settle(1500);
@@ -1684,16 +2117,40 @@ export const FLOWS = [
         await h.settle(900);
         await h.check("feed: conversation");
       }
-      // A board scroll (owner, Nov 9): "Show N more quests" lists the rest in place; tapping the title rolls it up.
+      // A board scroll (owner, Nov 12–13): pull its bottom roller down to unroll more quests; the top roller rolls it up;
+      // its title opens the board.
       await h.goto("/boards");
-      if (await h.tap((p) => p.getByRole("button", { name: /^and \d+ more/i }).first(), "boards: show more quests", { optional: true })) {
-        await h.settle(450);
-        await h.check("boards: more quests");
+      {
+        const pull = h.page.locator("main [data-scroll-pull]").first();
+        if (await pull.count()) {
+          await pull.scrollIntoViewIfNeeded().catch(() => {});
+          const box = await pull.boundingBox();
+          if (box) {
+            await h.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+            await h.page.mouse.down();
+            await h.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 40, { steps: 4 });
+            await h.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 90, { steps: 4 });
+            await h.page.mouse.up();
+            await h.settle(500);
+            await h.check("boards: pulled the scroll open");
+          }
+        } else h.record({ kind: "scroll-pull", severity: "warning", target: "board scroll", detail: "No scroll had a roller to pull (no board with more than one quest?)" });
       }
-      if (await h.tap((p) => p.locator("main .board-card button[aria-expanded=true]").first(), "boards: roll up a scroll", { optional: true })) {
+      if (await h.tap((p) => p.locator("main .board-card .scroll-rod-tap.top").first(), "boards: roll up a scroll", { optional: true })) {
         await h.settle(450);
         await h.check("boards: rolled up");
-        await h.tap((p) => p.locator("main .board-card button[aria-expanded=false]").first(), "boards: unroll it", { optional: true });
+        await h.tap((p) => p.locator("main .board-card .scroll-rod-tap.top").first(), "boards: unroll it", { optional: true });
+      }
+      // All Quests › List, by due date: each row says its due day, and past-due ones can be hidden (owner, Nov 13).
+      await h.goto("/quests");
+      if (await h.tap((p) => p.getByRole("radio", { name: /due soonest/i }).first(), "list: due soonest", { optional: true })) {
+        await h.settle(400);
+        await h.check("list: due soonest, past-due choices");
+        await h.tap((p) => p.getByRole("radio", { name: /hide past due/i }).first(), "list: hide past due", { optional: true });
+        await h.settle(400);
+        await h.check("list: past due hidden");
+        await h.tap((p) => p.getByRole("radio", { name: /all past due/i }).first(), "list: all past due", { optional: true });
+        await h.tap((p) => p.getByRole("radio", { name: /newest/i }).first(), "list: newest", { optional: true });
       }
       // Find a quest from the boards list.
       await h.goto("/boards");
@@ -1708,9 +2165,13 @@ export const FLOWS = [
         await h.tap((p) => p.locator('[data-fb-name="Sub-board: Seeds to order"]').first(), "open a folder inside it", { optional: true, expectMove: true });
         await h.settle(900);
         await h.check("boards: folder in a folder");
-        // "See board ›" opens the board as the popup, and the page behind doesn't run down to its bottom (owner, Nov 6).
+        // Hold or right-click a sub-board: "Open the board ›" opens it as the popup, and the page behind doesn't run
+        // down to its bottom (owner, Nov 6 and 12).
         const before = await h.page.evaluate(() => window.scrollY);
-        if (await h.tap((p) => p.locator("main a", { hasText: /see board/i }).first(), "see board", { optional: true, expectMove: true })) {
+        await h.page.locator('[data-fb-name="Sub-board: Garden beds"]').first().click({ button: "right" }).catch(() => {});
+        await h.settle(400);
+        await h.check("boards: sub-board menu");
+        if (await h.tap((p) => p.locator("[data-menu=sub-board] a", { hasText: /open the board/i }).first(), "open the board", { optional: true, expectMove: true })) {
           await h.settle(1500);
           const y = await h.page.evaluate(() => window.scrollY);
           if (y - before > 120) h.record({ kind: "page-jumped", severity: "error", target: "board popup", detail: `the page behind the board popup scrolled from ${before}px to ${y}px` });
@@ -1719,7 +2180,7 @@ export const FLOWS = [
       }
       // The first board.
       await h.goto("/boards");
-      if (await h.tap((p) => p.locator("main a[href^='/boards/']").first(), "open a board", { optional: true, expectMove: true })) {
+      if (await h.tap((p) => p.locator("main a[data-board-title][href^='/boards/'], main a[href^='/boards/']").first(), "open a board", { optional: true, expectMove: true })) {
         h.screen = "board";
         await h.settle(1500);
         await h.check("board");
@@ -1732,6 +2193,36 @@ export const FLOWS = [
           await h.check("board: by due date");
         }
       }
+    },
+  },
+  {
+    // Per-quest extras (split plan, S2): the fixtures give two quests a place, a drive time, a card colour and a
+    // "12 of 32 pages" count; these shots are the before/after for moving them to columns.
+    name: "questextras",
+    async run(h) {
+      await h.goto("/", { name: "questextras", reset: true });
+      await h.settle(1500);
+      if (await h.tap("text=Pick up medication", "open the quest", { expectMove: true })) {
+        await h.settle(600);
+        await h.check("quest editor: place on its pill");
+        if (await h.tap((p) => p.getByRole("button", { name: /^location: cvs on main street/i }).first(), "place pill", { optional: true, expectMove: true })) {
+          await h.check("quest editor: place panel");
+        }
+        // Progress counted in pills ("1 of 4 pills") and the card's colour, from the pills under the divider.
+        if (await h.tap((p) => p.getByRole("button", { name: /^progress$/i }).first(), "progress pill", { optional: true, expectMove: true })) {
+          await h.settle(500);
+          await h.check("quest editor: 1 of 4 pills");
+        } else h.record({ kind: "step-skipped", severity: "info", target: "questextras", detail: "no Progress pill in the editor" });
+        if (await h.tap((p) => p.getByRole("button", { name: /^color$/i }).first(), "color pill", { optional: true, expectMove: true })) {
+          await h.settle(500);
+          await h.check("quest editor: card colour");
+        }
+      }
+      await h.goto("/calendar?view=day", { name: "questextras-calendar" });
+      await h.settle(1500);
+      await h.page.locator("[title^='Edit \"Goblin']").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+      await h.settle(300);
+      await h.check("calendar: card colour and place");
     },
   },
 ];

@@ -133,6 +133,10 @@ export type PlanItem = {
   /** 0–5: how much it takes out of you (hard quests go early in the day). */
   effort?: number | null;
   dueAt?: string | null;
+  /** Its own time range, minutes after midnight (owner, Nov 16: "the time range can be something any item can have"):
+   * either end alone works ("sometime before 2 PM"). It replaces the time-of-day preference. */
+  from?: number | null;
+  to?: number | null;
 };
 
 export type Busy = { start: number; end: number; cal?: string };
@@ -163,6 +167,27 @@ function windowFor(pref: TimeOfDay, s: SchedulerSettings): [number, number] {
   if (pref === "afternoon") return [Math.max(s.dayStart, noon), Math.min(s.dayEnd, five)];
   if (pref === "evening") return [Math.max(s.dayStart, five), s.dayEnd];
   return [s.dayStart, s.dayEnd];
+}
+
+/** An item's own range as [from, to] minutes: a missing end falls back to the day's hours, widened so it still has room. */
+function itemWindow(item: Pick<PlanItem, "from" | "to">, minutes: number, w0: number, w1: number): [number, number] {
+  const to = item.to ?? Math.max(w1, (item.from ?? 0) + minutes);
+  const from = item.from ?? Math.min(w0, Math.max(0, to - minutes - 120));
+  return [Math.max(0, from), Math.min(24 * 60, to)];
+}
+
+/** "before 2 PM", "after 9 AM", "between 9 AM and 2 PM" from minutes after midnight. */
+export function rangeWords(from?: number | null, to?: number | null) {
+  if (from != null && to != null) return `between ${clockOf(from)} and ${clockOf(to)}`;
+  if (to != null) return `before ${clockOf(to)}`;
+  if (from != null) return `after ${clockOf(from)}`;
+  return "any time";
+}
+
+/** "14:30" to minutes after midnight, or null. */
+export function minutesOf(hhmm?: string | null): number | null {
+  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm ?? "");
+  return m ? Math.min(24 * 60, Number(m[1]) * 60 + Number(m[2])) : null;
 }
 
 const at = (day: Date, minutes: number) => {
@@ -212,16 +237,19 @@ export function planSchedule(items: PlanItem[], busyIn: Busy[], settings: Schedu
   for (const item of ordered) {
     const want = Math.max(STEP, Math.ceil((item.minutes ?? 30) / STEP) * STEP);
     const minutes = Math.min(want, MAX_SITTING);
-    const pref = s.prefs[item.id] ?? "any";
+    const ranged = item.from != null || item.to != null;
+    const pref = ranged ? "any" : (s.prefs[item.id] ?? "any");
     // Hard quests, with no preference, look in the morning first.
-    const tries: TimeOfDay[] = pref === "any" && (item.effort ?? 0) >= 4 ? ["morning", "any"] : [pref];
+    const tries: TimeOfDay[] = !ranged && pref === "any" && (item.effort ?? 0) >= 4 ? ["morning", "any"] : [pref];
     const dl = deadline(item);
     const due = dl ? new Date(dl).getTime() : null;
     const notHere = avoid[item.id] ?? [];
 
     const search = (beforeDue: boolean, capped = true): Placement | null => {
       for (const p of tries) {
-        const [w0, w1] = windowFor(p, s);
+        let [w0, w1] = windowFor(p, s);
+        // Its own range wins over the day's usual hours ("before 8 AM" still gets room before the day starts).
+        if (ranged) [w0, w1] = itemWindow(item, minutes, w0, w1);
         for (let d = 0; d < s.horizon; d++) {
           const day = new Date(now);
           day.setDate(day.getDate() + d);
@@ -250,7 +278,7 @@ export function planSchedule(items: PlanItem[], busyIn: Busy[], settings: Schedu
       if (spot) spot.late = true;
     }
     if (!spot) {
-      unplaced.push({ id: item.id, title: item.title, why: s.horizon === 1 ? (pref === "any" ? "No room left that day" : `No free ${pref} that day`) : pref === "any" ? `No free time in the next ${s.horizon} days` : `No free ${pref} in the next ${s.horizon} days` });
+      unplaced.push({ id: item.id, title: item.title, why: ranged ? (s.horizon === 1 ? `No room ${rangeWords(item.from, item.to)} that day` : `No room ${rangeWords(item.from, item.to)} in the next ${s.horizon} days`) : s.horizon === 1 ? (pref === "any" ? "No room left that day" : `No free ${pref} that day`) : pref === "any" ? `No free time in the next ${s.horizon} days` : `No free ${pref} in the next ${s.horizon} days` });
       continue;
     }
     placed.push(spot);

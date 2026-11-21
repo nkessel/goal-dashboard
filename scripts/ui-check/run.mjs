@@ -22,7 +22,8 @@
 // with the problems boxed in red (errors) and orange (warnings).
 // Exit code 1 when there are errors not listed in known-issues.json.
 //
-// --server-tz UTC runs the server in another zone than the browser, as on Vercel (the server's clock is UTC there).
+// The server runs in UTC by default (as on Vercel) while the browser is in the morning/evening zone, so server/browser
+// mismatches (hydration errors, the calendar's first-picture check) show up. --server-tz <zone> overrides it.
 //
 // Before/after compare (S1, for splits and other changes that shouldn't change any screen):
 //   npm run ui-check -- --snapshot ui-check-out/before            save each step's page (normalized HTML + a clean screenshot)
@@ -134,7 +135,7 @@ async function startServer(tz) {
   } catch (e) {
     if (e.message.startsWith("port")) throw e;
   }
-  const p = spawn("npx", ["next", "start", "-p", String(APP_PORT)], { cwd: ROOT, env: { ...env, ...serverEnv, APP_TIMEZONE: tz, TZ: opt("server-tz", tz) }, stdio: "pipe", detached: true });
+  const p = spawn("npx", ["next", "start", "-p", String(APP_PORT)], { cwd: ROOT, env: { ...env, ...serverEnv, APP_TIMEZONE: tz, TZ: opt("server-tz", "UTC") }, stdio: "pipe", detached: true });
   const stop = () => {
     try {
       process.kill(-p.pid, "SIGTERM");
@@ -185,7 +186,7 @@ async function walk({ browser, device, time, tz, cookie }) {
 
   const record = (issue) => {
     const key = `${screen}|${issue.kind}|${issue.target}`;
-    const isKnown = known.some((k) => (k.key ? key.includes(k.key) : false) || (k.match && new RegExp(k.match).test(`${key}|${issue.detail}`)));
+    const isKnown = known.some((k) => (k.key ? key.includes(k.key) : false) || (k.match && new RegExp(k.match).test(`${key}|${issue.detail}|${issue.step ?? ""}`)));
     results.push({ device, time, screen, ...issue, key, known: isKnown, keyboard: kb > 0 });
   };
 

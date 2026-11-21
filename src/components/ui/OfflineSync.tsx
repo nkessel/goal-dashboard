@@ -91,10 +91,34 @@ function reloadOnStaleCode(): () => void {
   const onRej = (e: PromiseRejectionEvent) => (stale(e.reason?.name) || stale(e.reason?.message ?? e.reason)) && go();
   window.addEventListener("error", onErr);
   window.addEventListener("unhandledrejection", onRej);
+  // A save from this copy that the new version doesn't know (owner, Nov 21: after five overnight deploys
+  // "long welcome screen comes up but disappears on interaction, can't check in sleep"): the server answers
+  // `x-nextjs-action-not-found: 1`, and the app's saves catch that quietly, so nothing is saved. Swap to the
+  // new copy at once instead (the welcome screen comes back from its pending mark).
+  const f = window.fetch;
+  const watched = (async (...args: Parameters<typeof fetch>) => {
+    const res = await f(...args);
+    try {
+      if (res.headers.get("x-nextjs-action-not-found") === "1") reopenStale();
+    } catch {}
+    return res;
+  }) as typeof fetch;
+  window.fetch = watched;
   return () => {
     window.removeEventListener("error", onErr);
     window.removeEventListener("unhandledrejection", onRej);
+    if (window.fetch === watched) window.fetch = f;
   };
+}
+
+/** Opened again from the new version (a reload goes past the kept copy to the network), once a minute at most. */
+function reopenStale() {
+  try {
+    const last = Number(sessionStorage.getItem("stale-action-reopen")) || 0;
+    if (Date.now() - last < 60_000) return;
+    sessionStorage.setItem("stale-action-reopen", String(Date.now()));
+  } catch {}
+  window.location.reload();
 }
 
 /**

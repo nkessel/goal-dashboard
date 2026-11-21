@@ -236,7 +236,7 @@ type Audio = { ctx: AudioContext; grind: GainNode; rumble: GainNode };
  * something enormously heavy: it is slow to start, builds momentum, rolls a
  * little past and settles back. Presses in a row add up their momentum.
  */
-export function StoneWheel({ angle, sound = true }: { angle: number; sound?: boolean }) {
+export function StoneWheel({ angle, sound = true, onPull, held = false }: { angle: number; sound?: boolean; /** Dragged at least half a turn (+1 forward, -1 back): it sticks there until a press finishes the turn. */ onPull?: (dir: 1 | -1) => void; /** Stuck halfway after a pull; when this goes false it rolls back (or on, after a press). */ held?: boolean }) {
   const uid = useId().replace(/:/g, "");
   const faceRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -324,6 +324,65 @@ export function StoneWheel({ angle, sound = true }: { angle: number; sound?: boo
     }
   }, [angle]);
 
+  // Let go of a pull without pressing anything: it rolls back to where it rests.
+  useEffect(() => {
+    const s = sim.current;
+    if (held || s.target === angle) return;
+    s.target = angle;
+    s.push = 0.4;
+    if (!s.raf) {
+      s.last = performance.now();
+      s.raf = requestAnimationFrame(tickRef.current);
+    }
+  }, [held, angle]);
+
+  // Spin it by hand (owner, Nov 9: "allow the user to spin the wheel themselves by dragging the wheel"): it moves with
+  // the finger up to half a turn, and sticks there when let go past halfway.
+  const drag = useRef<{ a0: number; base: number; d: number } | null>(null);
+  const pointerAngle = (e: React.PointerEvent) => {
+    const r = frameRef.current!.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height * (207 / 440);
+    return (Math.atan2(e.clientY - cy, e.clientX - cx) * 180) / Math.PI;
+  };
+  const onDown = (e: React.PointerEvent) => {
+    if (!onPull || held) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const s = sim.current;
+    cancelAnimationFrame(s.raf);
+    s.raf = 0;
+    drag.current = { a0: pointerAngle(e), base: s.theta, d: 0 };
+  };
+  const onMove = (e: React.PointerEvent) => {
+    const g = drag.current;
+    if (!g) return;
+    let d = pointerAngle(e) - g.a0;
+    if (d > 180) d -= 360;
+    if (d < -180) d += 360;
+    g.d = Math.max(-WHEEL_STEP * 0.75, Math.min(WHEEL_STEP * 0.75, d));
+    const s = sim.current;
+    s.theta = g.base + g.d;
+    s.omega = 0;
+    if (faceRef.current) faceRef.current.style.transform = `rotate(${s.theta.toFixed(3)}deg)`;
+  };
+  const onUp = () => {
+    const g = drag.current;
+    drag.current = null;
+    if (!g) return;
+    const s = sim.current;
+    const dir: 1 | -1 = g.d >= 0 ? 1 : -1;
+    s.target = Math.abs(g.d) >= WHEEL_STEP / 2 ? angle + dir * (WHEEL_STEP / 2) : angle;
+    s.push = 0.6;
+    if (!s.raf) {
+      s.last = performance.now();
+      s.raf = requestAnimationFrame(tickRef.current);
+    }
+    if (Math.abs(g.d) >= WHEEL_STEP / 2) {
+      thud(audio.current, soundOn.current);
+      onPull?.(dir);
+    }
+  };
+
   useEffect(() => {
     const s = sim.current;
     return () => {
@@ -336,7 +395,16 @@ export function StoneWheel({ angle, sound = true }: { angle: number; sound?: boo
 
   const id = (s: string) => `${uid}-${s}`;
   return (
-    <div ref={frameRef} className="relative mx-auto w-full max-w-[380px] select-none" style={{ aspectRatio: "400 / 440" }}>
+    <div
+      ref={frameRef}
+      className="relative mx-auto w-full max-w-[380px] select-none"
+      style={{ aspectRatio: "400 / 440", touchAction: onPull ? "none" : undefined, cursor: onPull && !held ? "grab" : undefined }}
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onPointerCancel={onUp}
+      data-wheel-spin={onPull ? "" : undefined}
+    >
       <style>{`@keyframes wot-dust{0%{opacity:0;transform:translate(0,0) scale(.6)}15%{opacity:.75}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(1.6)}}`}</style>
       {/* Behind: the plinth, the wheel's thickness and its shadow. */}
       <svg viewBox="0 0 400 440" className="absolute inset-0 h-full w-full" aria-hidden>

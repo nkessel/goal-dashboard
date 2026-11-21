@@ -18,6 +18,7 @@ import { QuestEditorDialog } from "@/components/tasks/LazyQuestEditorDialog";
 import { BoardMatrixDialog } from "./BoardMatrixDialog";
 import { AddToMatrixSheet } from "./AddToMatrixSheet";
 import { CloseIcon } from "@/components/ui/Icons";
+import { useDrawZone } from "@/lib/use-draw-zone";
 
 type Mode = "priority" | "impact";
 type Lot = "map" | "unplotted" | "later";
@@ -968,11 +969,12 @@ function Portrait({ item, size, ring = false, warn = false }: { item: Item; size
 }
 
 function Facts({ item, theme }: { item: Item; theme: "calm" | "adventure" }) {
+  const zone = useDrawZone();
   const t = item.task;
   const facts: string[] = [];
   if (item.kind === "board") facts.push(item.next ? `Next step · ${item.boardTitle} (${item.openQuests ?? 0} open)` : `Board · ${item.openQuests ?? 0} open quests`);
   else if (item.boardTitle) facts.push(item.boardTitle);
-  if (t?.due_at) facts.push(`Due ${new Date(t.due_at).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}`);
+  if (t?.due_at) facts.push(`Due ${new Date(t.due_at).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", timeZone: zone })}`);
   if (t?.estimate_minutes != null) facts.push(`⏱ ${t.estimate_minutes < 60 ? `${t.estimate_minutes}m` : `${Math.round((t.estimate_minutes / 60) * 10) / 10}h`}`);
   if (t?.steps_total) facts.push(`${t.steps_done ?? 0}/${t.steps_total} steps`);
   if (t && t.xp_value > 0) facts.push(`${t.xp_value} ${theme === "adventure" ? "XP" : "pts"}`);

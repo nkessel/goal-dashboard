@@ -1,5 +1,7 @@
 "use server";
 
+import { writeExtra } from "@/lib/data/extras";
+import { cleanHabitTicks, habitTicksSeed, type HabitTicks, type HabitTicksSeed } from "@/lib/habit-ticks";
 import { isTentativeTitle } from "@/lib/tentative";
 import { revalidatePath } from "next/cache";
 import { auth, signIn, CALENDAR_AUTH_PARAMS } from "@/auth";
@@ -144,7 +146,7 @@ export async function setBoardDreamAction(boardId: string, isDream: boolean) {
   else ids.delete(boardId);
   const live = new Set(boards.map((b) => b.id));
   const dreamBoards = [...ids].filter((id) => live.has(id));
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, dreamBoards } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "dreamBoards", dreamBoards);
   if (error) throw new Error(`Couldn't move the board: ${error.message}`);
   revalidatePath("/boards");
   revalidatePath(`/boards/${boardId}`);
@@ -563,6 +565,18 @@ export async function updateTaskAction(
     earlyBonusPerDay: input.earlyBonusPerDay,
     isTiny: input.isTiny,
   });
+  // A longer quest grows its block on the calendar (owner, Nov 5 and 15: "changed the time from 60 to 90
+  // minutes, the quest didn't update in the calendar view"). A shorter one keeps its block for now.
+  const est = input.estimateMinutes;
+  if (before && before.status === "open" && before.is_on_calendar && before.scheduled_start && before.scheduled_end && est && est > 0 && est !== before.estimate_minutes) {
+    const start = new Date(before.scheduled_start);
+    const len = Math.round((new Date(before.scheduled_end).getTime() - start.getTime()) / 60_000);
+    if (est > len) {
+      const { accessToken } = await requireSessionMaybeGoogle();
+      await attachCalendarEvent(accessToken ?? null, ownerId, before, start, new Date(start.getTime() + est * 60_000), false).catch(() => {});
+      revalidatePath("/calendar");
+    }
+  }
   revalidatePath("/");
   revalidatePath("/matrix");
   revalidatePath("/power-ups");
@@ -666,7 +680,7 @@ export async function saveQuestStepsAction(taskId: string, steps: stepsData.Step
   revalidatePath("/");
   revalidatePath("/boards", "layout");
   return {
-    steps: saved.map((s) => ({ id: s.id, title: s.title, done: s.done, sort_order: s.sort_order, xp: s.xp ?? 0, coins: s.coins ?? 0, weight: s.weight ?? null, progress: s.progress ?? (s.done ? 100 : 0), state: s.state ?? null, parent_id: s.parent_id ?? null })),
+    steps: saved.map((s) => ({ id: s.id, title: s.title, done: s.done, sort_order: s.sort_order, xp: s.xp ?? 0, coins: s.coins ?? 0, minutes: s.minutes ?? null, weight: s.weight ?? null, progress: s.progress ?? (s.done ? 100 : 0), state: s.state ?? null, parent_id: s.parent_id ?? null })),
     xpEarned: delta,
     coinsEarned,
   };
@@ -705,7 +719,7 @@ export async function archiveTaskAction(taskId: string) {
   const { data: steps } = await db.from("quest_steps").select("*").eq("owner_id", ownerId).eq("task_id", taskId);
   const extras = await readExtras(ownerId);
   const list = [{ at: new Date().toISOString(), task: row, steps: (steps ?? []) as Record<string, unknown>[] }, ...archivedOf(extras).filter((a) => a.task.id !== taskId)].slice(0, 60);
-  const { error } = await db.from("profiles").update({ life_wheel: { ...extras, archivedQuests: list } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "archivedQuests", list);
   if (error) throw new Error(`Couldn't archive it: ${error.message}`);
   await deleteTaskAction(taskId);
 }
@@ -728,7 +742,7 @@ export async function restoreArchivedQuestAction(taskId: string) {
   const { error } = await db.from("tasks").insert(task);
   if (error) throw new Error(`Couldn't bring it back: ${error.message}`);
   if (hit.steps.length) await db.from("quest_steps").insert(hit.steps.map((st) => ({ ...st, owner_id: ownerId }))).then(() => {}, () => {});
-  await db.from("profiles").update({ life_wheel: { ...extras, archivedQuests: all.filter((a) => a.task.id !== taskId) } }).eq("id", ownerId);
+  await writeExtra(ownerId, "archivedQuests", all.filter((a) => a.task.id !== taskId));
   revalidatePath("/");
   revalidatePath("/boards", "layout");
   return { title: String(hit.task.title ?? "") };
@@ -826,17 +840,20 @@ async function attachCalendarEvent(
     await tasksData.rescheduleTask(task.id, profileId, start.toISOString(), end.toISOString(), eventId, countAsReschedule);
     return;
   }
+  // The app's time first, Google after: a Google refusal (someone else's event, a deleted one, an expired
+  // permission) never stops the quest from moving (calendar planner step 2b).
+  await tasksData.rescheduleTask(task.id, profileId, start.toISOString(), end.toISOString(), eventId, countAsReschedule);
   if (eventId) {
-    await updateCalendarEvent(accessToken, eventId, { start, end });
+    await updateCalendarEvent(accessToken, eventId, { start, end }).catch((e) => console.warn("Google didn't take the move:", e instanceof Error ? e.message : e));
   } else {
-    eventId = await createCalendarEvent(accessToken, {
+    const made = await createCalendarEvent(accessToken, {
       title: task.title,
       description: task.description ?? undefined,
       start,
       end,
-    });
+    }).catch(() => null);
+    if (made) await supabaseAdmin().from("tasks").update({ google_calendar_event_id: made }).eq("id", task.id).eq("owner_id", profileId).is("google_calendar_event_id", null);
   }
-  await tasksData.rescheduleTask(task.id, profileId, start.toISOString(), end.toISOString(), eventId, countAsReschedule);
 }
 
 /**
@@ -862,7 +879,9 @@ export async function scheduleTaskAction(
   const task = await tasksData.getTask(taskId, profileId);
   if (!task) throw new Error("Task not found");
 
-  await attachCalendarEvent(accessToken, profileId, task, new Date(startISO), new Date(endISO));
+  // Same start, new length (a resize, or shortening it to its time): not a reschedule.
+  const sameStart = !!task.scheduled_start && new Date(task.scheduled_start).getTime() === new Date(startISO).getTime();
+  await attachCalendarEvent(accessToken, profileId, task, new Date(startISO), new Date(endISO), !sameStart);
   revalidatePath("/");
   revalidatePath("/calendar");
 }
@@ -2047,7 +2066,7 @@ export async function rateForDayAction(day: "today" | "tomorrow", taskId: string
   if (rating && rating >= 1 && rating <= 5) mine[taskId] = Math.round(rating);
   // Keep only the last few days.
   const kept = Object.fromEntries(Object.entries({ ...all, [key]: mine }).sort(([a], [b]) => b.localeCompare(a)).slice(0, 4));
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, dayRatings: kept } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "dayRatings", kept);
   if (error) throw new Error(`Couldn't save that: ${error.message}`);
   // Rated first (highest first), then the rest in their current order.
   const order = (ids: string[]) => {
@@ -2079,7 +2098,7 @@ export async function unrateForDayAction(day: "today" | "tomorrow", taskId: stri
   const all = (extras.dayRatings as Record<string, Record<string, number>> | undefined) ?? {};
   const mine = { ...(all[key] ?? {}) };
   delete mine[taskId];
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, dayRatings: { ...all, [key]: mine } } }).eq("id", ownerId);
+  await writeExtra(ownerId, "dayRatings", { ...all, [key]: mine });
   if (!wasOn) {
     if (day === "today") await tasksData.setManualPriority(taskId, ownerId, false);
     else {
@@ -2102,10 +2121,9 @@ function cleanHabitPlan(raw: unknown): HabitPlan {
   return { core: ids(r.core), days };
 }
 async function saveHabitPlan(ownerId: string, plan: HabitPlan) {
-  const extras = await readExtras(ownerId);
   // Keep only the last few days.
   const days = Object.fromEntries(Object.entries(plan.days).sort(([a], [b]) => b.localeCompare(a)).slice(0, 5));
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, habitPlan: { core: plan.core, days } } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "habitPlan", { core: plan.core, days });
   if (error) throw new Error(`Couldn't save that: ${error.message}`);
 }
 const planDayKey = (day: "today" | "tomorrow") => (day === "today" ? tomorrowData.appDayKey() : tomorrowData.nextDayKey(tomorrowData.appDayKey()));
@@ -2525,7 +2543,7 @@ export async function saveNightAction(input: { bed: string | null; wake: string 
   const log = { ...wheel.log };
   if (night) log[day] = night;
   else delete log[day];
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, wheelOfTime: { ...wheel, log } } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "wheelOfTime", { ...wheel, log });
   if (error) throw new Error(`Couldn't save last night: ${error.message}`);
   revalidatePath("/insights");
   return { day, night };
@@ -2538,7 +2556,7 @@ export async function setWheelOfTimeAction(input: { effort?: string[]; hindrance
   const extras = await readExtras(ownerId);
   const wheel = cleanWheel(extras.wheelOfTime);
   const next = cleanWheel({ ...wheel, ...(input.effort ? { effort: input.effort } : {}), ...(input.hindrances ? { hindrances: input.hindrances } : {}), ...("target" in input ? { target: input.target } : {}), ...(input.weights ? { weights: input.weights } : {}) });
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, wheelOfTime: next } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "wheelOfTime", next);
   if (error) throw new Error(`Couldn't save that: ${error.message}`);
   revalidatePath("/insights");
   return { effort: next.effort, hindrances: next.hindrances, target: next.target, weights: next.weights };
@@ -2623,7 +2641,7 @@ export async function setTopPriorityAction(text: string, othersIn: string[] = []
   const extras = await readExtras(ownerId);
   const day = tomorrowData.appDayKey();
   const priorities = [{ text: t, others, day, at: new Date().toISOString() }, ...cleanPriorities(extras.priorities).filter((p) => p.day !== day)].slice(0, 120);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, priorities } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "priorities", priorities);
   if (error) throw new Error(`Couldn't save that: ${error.message}`);
   return { text: t, others, day };
 }
@@ -2878,8 +2896,7 @@ export async function setShareSettingsAction(patch: Record<string, boolean>) {
 export async function saveSupportNoteAction(text: string) {
   const ownerId = await requireProfileId();
   const clean = text.replace(/\r/g, "").replace(/\n{3,}/g, "\n\n").trim().slice(0, 600);
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, support: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "support", clean);
   if (error) throw new Error("Couldn't save that.");
   revalidatePath("/friends", "layout");
   return clean;
@@ -3116,9 +3133,7 @@ const WHEEL_PREFIX = "◎ ";
 export async function setLifeWheelTopicsAction(topics: string[]) {
   const ownerId = await requireProfileId();
   const clean = [...new Set(topics.map((t) => t.replace(/\s+/g, " ").trim().slice(0, 20)).filter(Boolean))].slice(0, 12);
-  const { supabaseAdmin } = await import("@/lib/supabase/server");
-  const { data: cur } = await supabaseAdmin().from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...(cur?.life_wheel ?? {}), topics: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "topics", clean);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath("/insights");
   return clean;
@@ -3305,8 +3320,22 @@ export async function schedulerContextAction(fromISO: string, toISO: string, hid
   const riteRows = (await ritesData.listRites(profileId).catch(() => null)) ?? [];
   const habits = timedHabitsFrom(riteRows, cleanRepeat);
   // Habits without a set time but with a length (20 mins of cleaning): the day planner keeps room for them.
-  const flex = riteRows.filter((r) => r.slot === "day" && !r.due_time && (r.estimate_minutes ?? 0) > 0 && r.kind !== "ritual");
-  const doneIds = dayKey && /^\d{4}-\d{2}-\d{2}$/.test(dayKey) && flex.length ? new Set((await ritesData.listCompletionsFor(profileId, flex.map((r) => r.id), dayKey).catch(() => [])).filter((c) => c.day === dayKey).map((c) => c.rite_id)) : new Set<string>();
+  const dayOk = !!dayKey && /^\d{4}-\d{2}-\d{2}$/.test(dayKey);
+  // With habits chosen for that day (or core ones), room is kept only for those (owner, Nov 14).
+  const habitPlan = dayOk ? cleanHabitPlan((await readExtras(profileId).catch(() => ({}) as Record<string, unknown>)).habitPlan) : null;
+  const chosen = new Set(habitPlan ? [...habitPlan.core, ...(habitPlan.days[dayKey!] ?? [])] : []);
+  const flex = riteRows.filter((r) => r.slot === "day" && !r.due_time && !r.window_to && (r.estimate_minutes ?? 0) > 0 && r.kind !== "ritual" && (!chosen.size || chosen.has(r.id)));
+  const doneIds = dayOk && flex.length
+    ? new Set(
+        [
+          ...(await ritesData.listCompletionsFor(profileId, flex.map((r) => r.id), dayKey!).catch(() => [])),
+          // Resting today counts as off the plan.
+          ...((await ritesData.listHabitSkips(profileId, dayKey!).catch(() => [])) ?? []),
+        ]
+          .filter((c) => c.day === dayKey)
+          .map((c) => c.rite_id)
+      )
+    : new Set<string>();
   const flexHabits = flex.filter((r) => !doneIds.has(r.id)).map((r) => ({ id: r.id, title: r.title, days: r.days ?? null, minutes: r.estimate_minutes ?? 15, repeat: cleanRepeat(r.repeat) }));
   // Events written in [brackets] on your calendar are optional: they don't hold time until you keep them.
   const optional: { id: string; calendarId: string; title: string; start: number; end: number }[] = [];
@@ -3375,7 +3404,7 @@ export async function planDayTasksAction(dayEndISO: string) {
 }
 
 /** A daily habit as the auto-scheduler lists it. */
-export type SchedHabit = { id: string; title: string; minutes: number; due_time: string | null; window_to: string | null; icon_key: string | null; days: number[] | null; repeat: unknown };
+export type SchedHabit = { id: string; title: string; minutes: number; due_time: string | null; window_to: string | null; icon_key: string | null; days: number[] | null; repeat: unknown; core?: boolean };
 
 /**
  * The auto-scheduler's sections on top (owner, Nov 6): Today's quests, Additional quests and today's
@@ -3399,10 +3428,15 @@ export async function autoSchedulerSectionsAction(dayKey: string) {
   const ids = dayHabits.map((r) => r.id);
   const [done, skips] = await Promise.all([ritesData.listCompletionsFor(ownerId, ids, day).catch(() => []), ritesData.listHabitSkips(ownerId, day).catch(() => [])]);
   const off = new Set([...done, ...(skips ?? [])].filter((c) => c.day === day).map((c) => c.rite_id));
+  // With habits chosen for the day (or core ones), only those are lined up, core first (owner, Nov 14).
+  const plan = cleanHabitPlan((await readExtras(ownerId).catch(() => ({}) as Record<string, unknown>)).habitPlan);
+  const chosen = new Set([...plan.core, ...(plan.days[day] ?? [])]);
+  const coreIds = new Set(plan.core);
   const habits: SchedHabit[] = dayHabits
-    .filter((r) => !off.has(r.id))
-    .map((r) => ({ id: r.id, title: r.title, minutes: r.estimate_minutes ?? (r.due_time ? 60 : 30), due_time: r.due_time ?? null, window_to: r.window_to ?? null, icon_key: r.icon_source ? (r.icon_key ?? null) : null, days: r.days ?? null, repeat: cleanRepeat(r.repeat) }));
-  return { today, additional, habits, settings: profileRes.error ? null : (profileRes.data?.scheduler ?? null) };
+    .filter((r) => !off.has(r.id) && (!chosen.size || chosen.has(r.id)))
+    .sort((a, b) => Number(coreIds.has(b.id)) - Number(coreIds.has(a.id)))
+    .map((r) => ({ id: r.id, title: r.title, minutes: r.estimate_minutes ?? (r.due_time || r.window_to ? 60 : 30), due_time: r.due_time ?? null, window_to: r.window_to ?? null, icon_key: r.icon_source ? (r.icon_key ?? null) : null, days: r.days ?? null, repeat: cleanRepeat(r.repeat), core: coreIds.has(r.id) }));
+  return { today, additional, habits, habitsChosen: chosen.size > 0, settings: profileRes.error ? null : (profileRes.data?.scheduler ?? null) };
 }
 
 /** Put a quest on the list to schedule in a group (owner, Nov 6): its plan-by (undefined keeps it) and the list's whole new order. */
@@ -3450,7 +3484,10 @@ export async function moveOffSchedulingAction(taskId: string, toToday: boolean) 
 export async function saveSchedulerSettingsAction(settings: Record<string, unknown>) {
   const ownerId = await requireProfileId();
   const clean = JSON.parse(JSON.stringify(settings ?? {}));
-  const { error } = await supabaseAdmin().from("profiles").update({ scheduler: clean }).eq("id", ownerId);
+  // Merged onto what's saved (planner step 2d): a copy from another tab or an older screen that lacks a part
+  // no longer wipes it ("Keep it here on lunch made it disappear").
+  const { data: cur } = await supabaseAdmin().from("profiles").select("scheduler").eq("id", ownerId).maybeSingle<{ scheduler: Record<string, unknown> | null }>();
+  const { error } = await supabaseAdmin().from("profiles").update({ scheduler: { ...(cur?.scheduler ?? {}), ...clean } }).eq("id", ownerId);
   if (error) throw new Error(/scheduler/.test(error.message) ? "Saved on this device (your account needs a quick database update to keep it everywhere)." : `Couldn't save: ${error.message}`);
 }
 
@@ -3495,8 +3532,7 @@ export async function saveStreaksAction(list: { id: string; name: string; word: 
     word: s.word.split(",").map((w) => w.replace(/^\s*#/, "").trim().toLowerCase()).filter(Boolean).join(", ").slice(0, 60),
     since: new Date(Date.parse(s.since) || Date.now()).toISOString(),
   }));
-  const { data: cur } = await supabaseAdmin().from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...(cur?.life_wheel ?? {}), streaks: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "streaks", clean);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath("/insights");
   return clean;
@@ -3507,8 +3543,7 @@ export async function saveRitualsAction(list: import("@/lib/rituals").Ritual[]) 
   const ownerId = await requireProfileId();
   const { cleanRituals } = await import("@/lib/rituals");
   const clean = cleanRituals(list);
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, rituals: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "rituals", clean);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath("/insights");
   return clean;
@@ -3521,7 +3556,7 @@ async function addRitual(ownerId: string, title: string, note: string | null) {
   const same = list.find((r) => r.title.toLowerCase() === title.toLowerCase());
   if (same) return same.id;
   const id = `r${Math.random().toString(36).slice(2, 10)}`;
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, rituals: [...list, { id, title, note, log: [] }] } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "rituals", [...list, { id, title, note, log: [] }]);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath("/insights");
   return id;
@@ -3549,7 +3584,7 @@ export async function saveInventoryAction(inventory: unknown) {
   // Packing lists are saved by their own window (below); the backpack never writes over them.
   const stored = ((cur?.life_wheel ?? {}) as { inventory?: { packing?: unknown } }).inventory?.packing;
   if (stored !== undefined) (clean as { packing: unknown }).packing = stored;
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...(cur?.life_wheel ?? {}), inventory: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "inventory", clean);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath("/settings");
   return clean;
@@ -3571,7 +3606,7 @@ export async function savePackingListsAction(lists: unknown) {
   const { data: cur } = await supabaseAdmin().from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
   const lw = cur?.life_wheel ?? {};
   const inventory = { ...((lw as { inventory?: Record<string, unknown> }).inventory ?? {}), packing: clean };
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...lw, inventory } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "inventory", inventory);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return clean;
 }
@@ -3584,8 +3619,7 @@ export async function saveCleaningAction(cleaning: unknown) {
   const { normalizeCleaning } = await import("@/lib/cleaning");
   const clean = normalizeCleaning(cleaning);
   if (!clean) throw new Error("Nothing to save.");
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, cleaning: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "cleaning", clean);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return clean;
 }
@@ -3616,7 +3650,7 @@ export async function fightMessAction(input: { day: string; spaceId: string; bef
     spaces: c.spaces.map((s) => (s.id === space.id ? { ...s, level: levelOfTen(after), mess: after, ratedOn: day } : s)),
     battles: [...(c.battles ?? []), { on: day, spaceId: space.id, before, after, minutes, took: n(input.took, 5), gave: n(input.gave, 5), xp: xpEarned }],
   })!;
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, cleaning: next } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "cleaning", next);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   const award = xpEarned > 0 ? await xp.awardXp(ownerId, xpEarned, "mess_battle") : null;
   revalidatePath("/");
@@ -3705,8 +3739,7 @@ export async function saveWeatherPlaceAction(place: { lat: number; lon: number; 
   const lat = Math.round(Number(place.lat) * 100) / 100;
   const lon = Math.round(Number(place.lon) * 100) / 100;
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error("That place doesn't look right.");
-  const { data: cur } = await supabaseAdmin().from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...(cur?.life_wheel ?? {}), weather: { lat, lon, name: place.name?.slice(0, 60) ?? null } } }).eq("id", ownerId);
+  await writeExtra(ownerId, "weather", { lat, lon, name: place.name?.slice(0, 60) ?? null });
 }
 
 // ---------------------------------------------------------------------------
@@ -3734,7 +3767,7 @@ export async function setProgressUnitAction(taskId: string, unit: import("@/lib/
   const u = unit ? cleanUnit(unit) : null;
   if (u) all[taskId] = u;
   else delete all[taskId];
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, progressUnits: all } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "progressUnits", all);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return u;
 }
@@ -3756,7 +3789,7 @@ export async function setQuestPlaceAction(taskId: string, place: string | null) 
   const p = place?.replace(/\s+/g, " ").trim().slice(0, 80) || null;
   if (p) all[taskId] = p;
   else delete all[taskId];
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, questPlaces: all } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "questPlaces", all);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return p;
 }
@@ -3773,7 +3806,32 @@ function cleanLook(v: unknown): CalCardLook | null {
 }
 
 /** Driving time to each quest's place (minutes each way) and each quest's calendar card look, by quest id. */
-export async function questCalExtrasAction(): Promise<{ drives: Record<string, number>; looks: Record<string, CalCardLook> }> {
+/** A quest's own time range ("09:00"–"14:00"; either end alone works), for the auto-scheduler. */
+export type QuestWindow = { from?: string; to?: string };
+const HHMM = /^[0-2][0-9]:[0-5][0-9]$/;
+function cleanWindow(v: unknown): QuestWindow | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const from = typeof o.from === "string" && HHMM.test(o.from) ? o.from : undefined;
+  const to = typeof o.to === "string" && HHMM.test(o.to) ? o.to : undefined;
+  if (from && to && from >= to) return { from };
+  return from || to ? { ...(from ? { from } : {}), ...(to ? { to } : {}) } : null;
+}
+
+export async function setQuestWindowAction(taskId: string, win: QuestWindow | null) {
+  const ownerId = await requireProfileId();
+  if (!QUEST_ID.test(taskId)) throw new Error("Unknown quest.");
+  const extras = await readExtras(ownerId);
+  const all = { ...((extras.questWindows as Record<string, QuestWindow> | undefined) ?? {}) };
+  const w = cleanWindow(win);
+  if (w) all[taskId] = w;
+  else delete all[taskId];
+  const { error } = await writeExtra(ownerId, "questWindows", all);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  return w;
+}
+
+export async function questCalExtrasAction(): Promise<{ drives: Record<string, number>; looks: Record<string, CalCardLook>; windows: Record<string, QuestWindow> }> {
   const ownerId = await requireProfileId();
   const extras = await readExtras(ownerId);
   const drives: Record<string, number> = {};
@@ -3783,7 +3841,12 @@ export async function questCalExtrasAction(): Promise<{ drives: Record<string, n
     const l = QUEST_ID.test(k) ? cleanLook(v) : null;
     if (l) looks[k] = l;
   }
-  return { drives, looks };
+  const windows: Record<string, QuestWindow> = {};
+  for (const [k, v] of Object.entries((extras.questWindows as Record<string, unknown> | undefined) ?? {})) {
+    const w = QUEST_ID.test(k) ? cleanWindow(v) : null;
+    if (w) windows[k] = w;
+  }
+  return { drives, looks, windows };
 }
 
 export async function setQuestDriveAction(taskId: string, minutes: number | null) {
@@ -3794,7 +3857,7 @@ export async function setQuestDriveAction(taskId: string, minutes: number | null
   const m = minutes && minutes > 0 ? Math.min(600, Math.round(minutes)) : null;
   if (m) all[taskId] = m;
   else delete all[taskId];
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, questDrives: all } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "questDrives", all);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath("/calendar");
   return m;
@@ -3808,13 +3871,13 @@ export async function setCalCardLookAction(taskId: string, look: CalCardLook | n
   const l = cleanLook(look);
   if (l) all[taskId] = l;
   else delete all[taskId];
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, calCardLooks: all } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "calCardLooks", all);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return l;
 }
 
 // ---------------------------------------------------------------------------
-// Calendar events as quests (owner, Nov 18; XP by the event's length, Nov 19)
+// Calendar events as quests (owner, Nov 18; XP by the event's length, Nov 19), and one look for a repeating event's quests (owner, Nov 18)
 
 /** Whether upcoming calendar events become quests by themselves. */
 export async function eventQuestsSettingAction(): Promise<{ on: boolean }> {
@@ -3828,23 +3891,110 @@ export async function setEventQuestsAction(on: boolean) {
   const cur = readEventQuestSettingsOf(extras);
   // Turning it on starts from now: events already past stay as they are.
   const next = { ...cur, on, ...(on && !cur.on ? { since: new Date().toISOString() } : {}) };
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, eventQuests: next } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "eventQuests", next);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath("/calendar");
   revalidatePath("/");
   return { on };
 }
 
-/** "Make it a quest" on an event: remember it, so it's never made again and its event stays on removal. */
-export async function recordEventQuestAction(taskId: string, eventId: string) {
+/** "Make it a quest" on an event: remember it (never made again, its event kept on removal) and its series. */
+export async function recordEventQuestAction(taskId: string, eventId: string, recurringEventId?: string | null) {
   const ownerId = await requireProfileId();
   if (!QUEST_ID.test(taskId) || !eventId || eventId.length > 300) return;
   const extras = await readExtras(ownerId);
   const cur = readEventQuestSettingsOf(extras);
-  await supabaseAdmin()
-    .from("profiles")
-    .update({ life_wheel: { ...extras, eventQuests: { ...cur, made: { ...(cur.made ?? {}), [eventId]: taskId } } } })
-    .eq("id", ownerId);
+  const series = { ...((extras.questSeries as Record<string, string> | undefined) ?? {}) };
+  if (recurringEventId && recurringEventId.length < 300) series[taskId] = `g:${recurringEventId}`;
+  await writeExtra(ownerId, "eventQuests", { ...cur, made: { ...(cur.made ?? {}), [eventId]: taskId } });
+  if (recurringEventId) await writeExtra(ownerId, "questSeries", series);
+}
+
+type LookTask = Pick<Task, "id" | "title" | "icon_key" | "icon_source" | "xp_value" | "coin_value" | "board_id" | "color" | "scheduled_start" | "status">;
+function lookOf(t: LookTask, card: CalCardLook | null): import("@/lib/series-look").SeriesLook {
+  return { iconKey: t.icon_key, iconSource: t.icon_source, xp: t.xp_value, coins: t.coin_value ?? null, boardId: t.board_id, color: t.color, card };
+}
+const dayKeyOf = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/New_York" }) : "");
+
+/**
+ * After a quest of a repeating event is edited: does its look differ from the series' (so it's worth
+ * asking "Just this one · This and later · All")? Null when it isn't part of a series or nothing differs.
+ */
+export async function seriesAskAction(taskId: string): Promise<{ title: string; others: number } | null> {
+  const ownerId = await requireProfileId();
+  if (!QUEST_ID.test(taskId)) return null;
+  const extras = await readExtras(ownerId);
+  const key = (extras.questSeries as Record<string, string> | undefined)?.[taskId];
+  if (!key) return null;
+  const { lookFor, sameLook } = await import("@/lib/series-look");
+  const db = supabaseAdmin();
+  const { data: t } = await db.from("tasks").select("id, title, icon_key, icon_source, xp_value, coin_value, board_id, color, scheduled_start, status").eq("id", taskId).eq("owner_id", ownerId).maybeSingle<LookTask>();
+  if (!t) return null;
+  const card = cleanLook((extras.calCardLooks as Record<string, unknown> | undefined)?.[taskId]);
+  const mine = lookOf(t, card);
+  // Kept as it is for this one only: don't ask again until it changes once more.
+  const kept = (extras.seriesKept as Record<string, string> | undefined)?.[taskId];
+  if (kept && kept === JSON.stringify(mine)) return null;
+  const siblings = Object.entries((extras.questSeries as Record<string, string>) ?? {}).filter(([id, k]) => k === key && id !== taskId).map(([id]) => id);
+  if (!siblings.length) return null;
+  const saved = lookFor((extras.seriesLooks as Record<string, import("@/lib/series-look").SeriesEntry[]> | undefined)?.[key], dayKeyOf(t.scheduled_start));
+  if (saved) return sameLook(saved, mine) ? null : { title: t.title, others: siblings.length };
+  // No look saved yet: ask when this one differs from another of the series.
+  const { data: other } = await db.from("tasks").select("id, title, icon_key, icon_source, xp_value, coin_value, board_id, color, scheduled_start, status").eq("owner_id", ownerId).in("id", siblings.slice(0, 50)).limit(1).maybeSingle<LookTask>();
+  if (!other) return null;
+  const otherCard = cleanLook((extras.calCardLooks as Record<string, unknown> | undefined)?.[other.id]);
+  return sameLook(lookOf(other, otherCard), mine) ? null : { title: t.title, others: siblings.length };
+}
+
+/** Save a quest's look for its whole series ("all"), from its day on ("following"), or keep it to itself ("one"). */
+export async function applySeriesLookAction(taskId: string, scope: import("@/lib/series-look").SeriesScope) {
+  const ownerId = await requireProfileId();
+  if (!QUEST_ID.test(taskId)) throw new Error("Unknown quest.");
+  const extras = await readExtras(ownerId);
+  const key = (extras.questSeries as Record<string, string> | undefined)?.[taskId];
+  if (!key) throw new Error("That quest isn't part of a repeating event.");
+  const { withLook } = await import("@/lib/series-look");
+  const db = supabaseAdmin();
+  const { data: t } = await db.from("tasks").select("id, title, icon_key, icon_source, xp_value, coin_value, board_id, color, scheduled_start, status").eq("id", taskId).eq("owner_id", ownerId).maybeSingle<LookTask>();
+  if (!t) throw new Error("Unknown quest.");
+  const card = cleanLook((extras.calCardLooks as Record<string, unknown> | undefined)?.[taskId]);
+  const look = lookOf(t, card);
+  if (scope === "one") {
+    const kept = { ...((extras.seriesKept as Record<string, string> | undefined) ?? {}), [taskId]: JSON.stringify(look) };
+    await writeExtra(ownerId, "seriesKept", kept);
+    return { changed: 0 };
+  }
+  const day = dayKeyOf(t.scheduled_start);
+  const siblings = Object.entries((extras.questSeries as Record<string, string>) ?? {}).filter(([id, k]) => k === key && id !== taskId).map(([id]) => id);
+  let targets: LookTask[] = [];
+  if (siblings.length) {
+    const { data } = await db.from("tasks").select("id, title, icon_key, icon_source, xp_value, coin_value, board_id, color, scheduled_start, status").eq("owner_id", ownerId).in("id", siblings);
+    targets = ((data ?? []) as LookTask[]).filter((x) => scope === "all" || (x.scheduled_start && dayKeyOf(x.scheduled_start) >= day));
+  }
+  // The picture and colours go on every one; XP, coins and board only on ones not finished yet (what a
+  // finished quest paid stays as it was).
+  const open = targets.filter((x) => x.status === "open").map((x) => x.id);
+  const all = targets.map((x) => x.id);
+  if (all.length) {
+    await db.from("tasks").update({ icon_key: look.iconKey ?? null, icon_source: look.iconSource ?? "library", color: look.color ?? null }).eq("owner_id", ownerId).in("id", all);
+  }
+  if (open.length) {
+    await db.from("tasks").update({ xp_value: look.xp ?? 15, coin_value: look.coins ?? null, board_id: look.boardId ?? null }).eq("owner_id", ownerId).in("id", open);
+  }
+  const cards = { ...((extras.calCardLooks as Record<string, CalCardLook> | undefined) ?? {}) };
+  for (const id of all) {
+    if (card) cards[id] = card;
+    else delete cards[id];
+  }
+  const looks = { ...((extras.seriesLooks as Record<string, import("@/lib/series-look").SeriesEntry[]> | undefined) ?? {}) };
+  looks[key] = withLook(looks[key], look, scope, day);
+  const { error } = await writeExtra(ownerId, "seriesLooks", looks);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  const { error: cardErr } = await writeExtra(ownerId, "calCardLooks", cards);
+  if (cardErr) throw new Error(`Couldn't save: ${cardErr.message}`);
+  revalidatePath("/calendar");
+  revalidatePath("/");
+  return { changed: all.length };
 }
 
 /** The gem each reward wears on its tag (a diamond unless chosen), kept on the account by reward id. */
@@ -3865,7 +4015,7 @@ export async function setRewardGemAction(rewardId: string, kind: string) {
   const all = { ...((extras.rewardGems as Record<string, string> | undefined) ?? {}) };
   if (kind === "diamond") delete all[rewardId];
   else all[rewardId] = kind;
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, rewardGems: all } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "rewardGems", all);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
 }
 
@@ -3876,7 +4026,7 @@ export async function setBoardMistAction(boardId: string, mist: boolean) {
   const extras = await readExtras(ownerId);
   const list = (Array.isArray(extras.clearBoards) ? (extras.clearBoards as unknown[]) : []).filter((x): x is string => typeof x === "string" && x !== boardId);
   const next = mist ? list : [...list, boardId].slice(-200);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, clearBoards: next } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "clearBoards", next);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath(`/boards/${boardId}`);
 }
@@ -3892,7 +4042,7 @@ export async function saveBoardOrderAction(boardId: string, order: { by: string;
   // Keep the newest 200 boards' choices.
   const keys = Object.keys(next);
   if (keys.length > 200) for (const k of keys.slice(0, keys.length - 200)) delete next[k];
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, boardOrders: next } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "boardOrders", next);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
 }
 
@@ -3911,7 +4061,7 @@ export async function saveQuestTemplateAction(tpl: unknown) {
   const extras = await readExtras(ownerId);
   const list = normalizeTemplates(extras.templates).filter((t) => t.id !== clean.id);
   const next = [...list, clean].sort((a, b) => a.name.localeCompare(b.name));
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, templates: next } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "templates", next);
   if (error) throw new Error(`Couldn't save the template: ${error.message}`);
   return next;
 }
@@ -3921,7 +4071,7 @@ export async function deleteQuestTemplateAction(id: string) {
   const { normalizeTemplates } = await import("@/lib/quest-templates");
   const extras = await readExtras(ownerId);
   const next = normalizeTemplates(extras.templates).filter((t) => t.id !== id);
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, templates: next } }).eq("id", ownerId);
+  await writeExtra(ownerId, "templates", next);
   return next;
 }
 
@@ -4001,7 +4151,7 @@ export async function answerDeadlineGuessAction(taskId: string, dueAt: string | 
   const asked = { ...((extras.toucanDueAsked as Record<string, string> | undefined) ?? {}), [taskId.slice(0, 40)]: new Date().toISOString() };
   // Keep the record small: the most recent 200 answers.
   const kept = Object.fromEntries(Object.entries(asked).sort((a, b) => b[1].localeCompare(a[1])).slice(0, 200));
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, toucanDueAsked: kept } }).eq("id", ownerId);
+  await writeExtra(ownerId, "toucanDueAsked", kept);
   revalidatePath("/");
 }
 
@@ -4012,7 +4162,7 @@ export async function snoozeToucanAction(taskId: string, days = 1) {
   const now = Date.now();
   const kept = Object.fromEntries(Object.entries((extras.toucanSnooze as Record<string, string> | undefined) ?? {}).filter(([, until]) => Date.parse(until) > now));
   kept[taskId.slice(0, 40)] = new Date(now + Math.max(0.01, Math.min(30, days)) * 86_400_000).toISOString();
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, toucanSnooze: kept } }).eq("id", ownerId);
+  await writeExtra(ownerId, "toucanSnooze", kept);
 }
 
 /** Save how long a quest will take (the first rung: estimate, schedule, do). */
@@ -4032,7 +4182,7 @@ async function readCoach(ownerId: string) {
   return { extras, coach: cleanCoach(extras.coach) };
 }
 async function writeCoach(ownerId: string, extras: Record<string, unknown>, coach: import("@/lib/coach").CoachState) {
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, coach } }).eq("id", ownerId);
+  await writeExtra(ownerId, "coach", coach);
 }
 
 /** The conversation so far (recent part), what it remembers and your promises. */
@@ -4239,6 +4389,52 @@ export async function saveFeedbackRunTokenAction(token: string) {
   revalidatePath("/feedback-review");
 }
 
+/** Star a check-in (owner, Nov 9: "I want to thumbs up the check in"; Nov 18: "star an entry"), by its readings' keys. */
+export async function starCheckInAction(keys: string[], on: boolean) {
+  const ownerId = await requireProfileId();
+  const extras = await readExtras(ownerId);
+  const marks = { ...((extras.checkInMarks as { star?: string[]; archived?: string[] } | undefined) ?? {}) };
+  const clean = keys.filter((k) => /^[ec]:[0-9a-f-]{36}$/i.test(k)).slice(0, 12);
+  const star = new Set(marks.star ?? []);
+  for (const k of clean) {
+    if (on) star.add(k);
+    else star.delete(k);
+  }
+  marks.star = [...star].slice(-500);
+  await writeExtra(ownerId, "checkInMarks", marks);
+  revalidatePath("/insights");
+}
+
+/** Take a check-in out of the log and the chart: archived (kept, can come back) or deleted for good. */
+export async function removeCheckInAction(keys: string[], how: "archive" | "delete") {
+  const ownerId = await requireProfileId();
+  const clean = keys.filter((k) => /^[ec]:[0-9a-f-]{36}$/i.test(k)).slice(0, 12);
+  if (how === "delete") {
+    await energyData.deleteReadings(ownerId, clean.filter((k) => k.startsWith("e:")).map((k) => k.slice(2)), clean.filter((k) => k.startsWith("c:")).map((k) => k.slice(2)));
+  } else {
+    const extras = await readExtras(ownerId);
+    const marks = { ...((extras.checkInMarks as { star?: string[]; archived?: string[] } | undefined) ?? {}) };
+    marks.archived = [...new Set([...(marks.archived ?? []), ...clean])].slice(-2000);
+    await writeExtra(ownerId, "checkInMarks", marks);
+  }
+  revalidatePath("/insights");
+  revalidatePath("/");
+}
+
+/** Change a check-in: its readings are replaced by the new ones, at the time given. */
+export async function replaceCheckInAction(keys: string[], energy: number | null, metrics: { metric: string; level: number }[], atISO: string) {
+  const ownerId = await requireProfileId();
+  const at = new Date(atISO);
+  if (Number.isNaN(at.getTime()) || at.getTime() > Date.now() + 60_000) throw new Error("Pick a time that has already happened.");
+  if (energy === null && !metrics.length) throw new Error("Keep at least one reading, or delete the check-in.");
+  const clean = keys.filter((k) => /^[ec]:[0-9a-f-]{36}$/i.test(k)).slice(0, 12);
+  await energyData.deleteReadings(ownerId, clean.filter((k) => k.startsWith("e:")).map((k) => k.slice(2)), clean.filter((k) => k.startsWith("c:")).map((k) => k.slice(2)));
+  if (energy !== null) await energyData.logEnergy(ownerId, energy, at.toISOString());
+  if (metrics.length) await energyData.logCheckIns(ownerId, metrics, at.toISOString());
+  revalidatePath("/insights");
+  revalidatePath("/");
+}
+
 /** A check-in the toucan logged; returns what it saved so it can be undone. */
 export async function coachCheckInAction(energy: number | null, metrics: { metric: string; level: number }[]) {
   const ownerId = await requireProfileId();
@@ -4317,8 +4513,7 @@ export async function applyCatchUpAction(boardIds: string[], orderedIds: string[
   );
   const current = (await schedulingData.listSchedulingList(ownerId)).map((t) => t.id).filter((id) => !ids.includes(id));
   await schedulingData.setSchedulingOrder(ownerId, [...ids, ...current]);
-  const extras = await readExtras(ownerId);
-  await db.from("profiles").update({ life_wheel: { ...extras, catchUp: { boards: boardIds.slice(0, 20), at: new Date().toISOString() } } }).eq("id", ownerId);
+  await writeExtra(ownerId, "catchUp", { boards: boardIds.slice(0, 20), at: new Date().toISOString() });
   revalidatePath("/", "layout");
 }
 
@@ -4331,7 +4526,7 @@ export async function saveToucanPrefsAction(patch: { mode?: "simple" | "lite" | 
     mode: patch.mode && ["simple", "lite", "full"].includes(patch.mode) ? patch.mode : (prev.mode ?? "full"),
     retired: Array.isArray(patch.retired) ? patch.retired.filter((x) => typeof x === "string").map((x) => x.slice(0, 200)).slice(0, 200) : (prev.retired ?? []),
   };
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, toucanPrefs: next } }).eq("id", ownerId);
+  await writeExtra(ownerId, "toucanPrefs", next);
 }
 
 export async function toucanPrefsAction() {
@@ -4347,8 +4542,7 @@ export async function saveToucanStyleAction(style: unknown) {
   const ownerId = await requireProfileId();
   const { cleanStyle } = await import("@/lib/toucan-style");
   const clean = cleanStyle(style);
-  const extras = await readExtras(ownerId);
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, toucanStyle: clean } }).eq("id", ownerId);
+  await writeExtra(ownerId, "toucanStyle", clean);
   revalidatePath("/", "layout");
   return clean;
 }
@@ -4358,8 +4552,7 @@ export async function savePaletteAction(palette: string) {
   const ownerId = await requireProfileId();
   const { isPalette } = await import("@/lib/palettes");
   if (!isPalette(palette)) throw new Error("That isn't one of the colour themes.");
-  const extras = await readExtras(ownerId);
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, palette } }).eq("id", ownerId);
+  await writeExtra(ownerId, "palette", palette);
   revalidatePath("/", "layout");
 }
 
@@ -4367,7 +4560,7 @@ export async function saveMapPrefsAction(boardId: string, prefs: Record<string, 
   const ownerId = await requireProfileId();
   const extras = await readExtras(ownerId);
   const all = { ...((extras.mapPrefs as Record<string, unknown>) ?? {}), [boardId.slice(0, 40)]: JSON.parse(JSON.stringify(prefs ?? {})) };
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, mapPrefs: all } }).eq("id", ownerId);
+  await writeExtra(ownerId, "mapPrefs", all);
 }
 
 /* ── Quest sequences ─────────────────────────────────────────────────── */
@@ -4592,7 +4785,7 @@ export async function saveBossPlanAction(bossId: string, text: string) {
   const t = text.slice(0, 4000);
   if (t.trim()) plans[bossId] = t;
   else delete plans[bossId];
-  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, bossPlans: plans } }).eq("id", ownerId);
+  await writeExtra(ownerId, "bossPlans", plans);
 }
 
 // ---- App-wide defaults for settings kept on each device.
@@ -4831,20 +5024,19 @@ export async function saveOwnWordsAction(words: OwnWords) {
     at: Date.now(),
   };
   const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, words: { ...((extras.words as object) ?? {}), ...clean } } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "words", { ...((extras.words as object) ?? {}), ...clean });
   if (error) throw new Error(error.message);
 }
 
 
 /** The welcome screen's layout (order, hidden parts, its buttons), kept on the account so every device shows the same screen. */
 export type WelcomeLayout = Record<string, unknown> & { at?: number };
-const WELCOME_LAYOUT_KEYS = ["welcomeOrder", "welcomeHide", "welcomeArchived", "welcomeDawnOn", "welcomeHabitsOn", "welcomeButtons", "welcomeSleep", "welcomeMetrics", "welcomeLine", "welcomeStreak", "welcomeBar", "journalPrompts", "journalPromptsV", "journalAllPrompts", "journalPick"] as const;
+const WELCOME_LAYOUT_KEYS = ["welcomeMode", "toucanAskBg", "toucanAskMist", "toucanKeptQuote", "welcomeOrder", "welcomeHide", "welcomeArchived", "welcomeDawnOn", "welcomeHabitsOn", "welcomeButtons", "welcomeSleep", "welcomeMetrics", "welcomeLine", "welcomeStreak", "welcomeBar", "journalPrompts", "journalPromptsV", "journalAllPrompts", "journalPick"] as const;
 /** The bottom bar's tab order (hold and drag a tab). */
 export async function saveNavOrderAction(order: string[]) {
   const ownerId = await requireProfileId();
   const { normalizeNavOrder } = await import("@/lib/nav-order");
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, navOrder: normalizeNavOrder(order) } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "navOrder", normalizeNavOrder(order));
   if (error) throw new Error(`Couldn't save: ${error.message}`);
 }
 
@@ -4858,8 +5050,7 @@ export async function saveWelcomeLayoutAction(layout: WelcomeLayout) {
   const clean: WelcomeLayout = { at: Date.now() };
   for (const k of WELCOME_LAYOUT_KEYS) if (layout[k] !== undefined) clean[k] = layout[k];
   if (JSON.stringify(clean).length > 8000) throw new Error("Too much to keep.");
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, welcomeLayout: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "welcomeLayout", clean);
   if (error) throw new Error(error.message);
 }
 
@@ -4928,8 +5119,7 @@ export async function saveInterestCalendarsAction(list: import("@/lib/interest-c
   const ownerId = await requireProfileId();
   const { normalizeInterest } = await import("@/lib/interest-calendars");
   const clean = normalizeInterest(list) ?? [];
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, interestCalendars: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "interestCalendars", clean);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath("/calendar");
   return clean;
@@ -4958,8 +5148,7 @@ export async function saveKeepInTouchAction(list: import("@/lib/keep-in-touch").
   const ownerId = await requireProfileId();
   const { normalizeFriends } = await import("@/lib/keep-in-touch");
   const clean = normalizeFriends(list);
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, keepInTouch: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "keepInTouch", clean);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return clean;
 }
@@ -5006,10 +5195,7 @@ export async function welcomePartsXpAction(partsIn: { key: string; xp: number }[
   const fresh = parts.filter((p) => !paid.includes(p.key) && p.xp > 0);
   if (!fresh.length) return { xp: 0, totalXp: null as number | null };
   const amount = fresh.reduce((a, p) => a + p.xp, 0);
-  const { error } = await supabaseAdmin()
-    .from("profiles")
-    .update({ life_wheel: { ...extras, welcomeXp: { day, paid: [...paid, ...fresh.map((p) => p.key)] } } })
-    .eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "welcomeXp", { day, paid: [...paid, ...fresh.map((p) => p.key)] });
   if (error) throw new Error(`Couldn't record that: ${error.message}`);
   const res = await xp.awardXp(ownerId, amount, "daily_check_in");
   return { xp: amount, totalXp: res.totalXp as number | null };
@@ -5033,8 +5219,7 @@ export async function trackedEventsAction(): Promise<string[]> {
 export async function saveTrackedEventsAction(list: string[]): Promise<string[]> {
   const ownerId = await requireProfileId();
   const clean = cleanTracked(list);
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, trackedEvents: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "trackedEvents", clean);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return clean;
 }
@@ -5048,8 +5233,7 @@ export async function focusQuestionsAction(): Promise<string[]> {
 export async function saveFocusQuestionsAction(list: string[]): Promise<string[]> {
   const ownerId = await requireProfileId();
   const clean = (Array.isArray(list) ? list : []).map((q) => String(q ?? "").trim().replace(/\s+/g, " ").slice(0, 160)).filter(Boolean).slice(0, 40);
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, focusQuestions: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "focusQuestions", clean);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return clean;
 }
@@ -5057,8 +5241,7 @@ export async function saveFocusQuestionsAction(list: string[]): Promise<string[]
 /* ── Dawn & dusk: the morning routine planned the night before (owner, Nov 9) ─────────── */
 
 async function saveDawn(ownerId: string, dawn: import("@/lib/dawn").Dawn) {
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, dawn } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "dawn", dawn);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
 }
 
@@ -5215,8 +5398,7 @@ export async function saveTourAction(state: TourState) {
     exploreId: state.exploreId && /^[0-9a-f-]{36}$/i.test(state.exploreId) ? state.exploreId : null,
     createId: state.createId && /^[0-9a-f-]{36}$/i.test(state.createId) ? state.createId : null,
   };
-  const extras = await readExtras(ownerId);
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, tour: clean } }).eq("id", ownerId);
+  const { error } = await writeExtra(ownerId, "tour", clean);
   if (error) throw new Error(error.message);
   return clean;
 }
@@ -5290,4 +5472,105 @@ export async function tourCompletePracticeAction(taskId: string) {
   const res = await finishTask(ownerId, taskId);
   revalidatePath("/");
   return { title: t.title, xp: t.xp_value, totalXp: (res as { totalXp?: number | null } | null)?.totalXp ?? null, coins: t.coin_value ?? 1 };
+}
+
+// ---------------------------------------------------------------------------
+// Habits done more than once a day (owner, Nov 16: "every tick of the checkbox gives another
+// completion/victory/xp gain… the card keeps track of how many times per day it's been done")
+
+async function saveHabitTicks(ownerId: string, extras: Record<string, unknown>, ticks: HabitTicks) {
+  // The last 14 days are enough for an undo.
+  const days = Object.fromEntries(Object.entries(ticks.days).sort(([a], [b]) => b.localeCompare(a)).slice(0, 14));
+  const { error } = await writeExtra(ownerId, "habitTicks", { many: ticks.many, days });
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+}
+
+/** Which habits count every tick, and today's ticks after the first. */
+export async function habitTicksAction(day: string): Promise<HabitTicksSeed> {
+  const ownerId = await requireProfileId();
+  return habitTicksSeed((await readExtras(ownerId)).habitTicks, day);
+}
+
+/** A habit counts every tick (many times a day), or goes back to once a day. */
+export async function setHabitManyAction(riteId: string, on: boolean) {
+  const ownerId = await requireProfileId();
+  if (!QUEST_ID.test(riteId)) throw new Error("Unknown habit.");
+  const extras = await readExtras(ownerId);
+  const ticks = cleanHabitTicks(extras.habitTicks);
+  ticks.many = on ? [...new Set([...ticks.many, riteId])] : ticks.many.filter((id) => id !== riteId);
+  await saveHabitTicks(ownerId, extras, ticks);
+}
+
+/** Done again today: pays the habit's XP and coins once more and counts it. */
+export async function tickHabitAgainAction(riteId: string, day: string) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  const rite = await ritesData.getRite(riteId, ownerId);
+  if (!rite) throw new Error("That habit is gone.");
+  const extras = await readExtras(ownerId);
+  const ticks = cleanHabitTicks(extras.habitTicks);
+  const earned = Math.max(0, rite.xp_value);
+  const coinAdjust = rite.coin_value == null ? 0 : Math.max(0, rite.coin_value) - coinsForXp(rite.xp_value);
+  const list = [...(ticks.days[day]?.[riteId] ?? []), [earned, coinAdjust] as [number, number]];
+  ticks.days[day] = { ...(ticks.days[day] ?? {}), [riteId]: list };
+  await saveHabitTicks(ownerId, extras, ticks);
+  let coinsEarned = 0;
+  if (earned > 0) coinsEarned = (await xp.awardXp(ownerId, earned, "task_completed")).coinsEarned;
+  if (coinAdjust !== 0) {
+    await rewardsData.addCoins(ownerId, coinAdjust);
+    coinsEarned += coinAdjust;
+  }
+  revalidatePath("/");
+  return { xp: earned, coinsEarned, extra: list.length };
+}
+
+/** Take back the last extra tick of the day (what it paid). False when there was none: undo the habit itself. */
+export async function undoHabitTickAction(riteId: string, day: string) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  if (!QUEST_ID.test(riteId)) throw new Error("Unknown habit.");
+  const extras = await readExtras(ownerId);
+  const ticks = cleanHabitTicks(extras.habitTicks);
+  const list = [...(ticks.days[day]?.[riteId] ?? [])];
+  const last = list.pop();
+  if (!last) return { undone: false, extra: 0 };
+  ticks.days[day] = { ...(ticks.days[day] ?? {}), [riteId]: list };
+  await saveHabitTicks(ownerId, extras, cleanHabitTicks(ticks));
+  if (last[0] > 0) await xp.awardXp(ownerId, -last[0], "task_completed").catch(() => {});
+  if (last[1] !== 0) await rewardsData.addCoins(ownerId, -last[1]).catch(() => {});
+  revalidatePath("/");
+  return { undone: true, extra: list.length };
+}
+
+/** The XP changed on the celebration (owner, Nov 16): the habit pays that from now on, and the tick just made is paid the difference. */
+export async function setHabitXpNowAction(riteId: string, day: string, xpValue: number) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  const rite = await ritesData.getRite(riteId, ownerId);
+  if (!rite) throw new Error("That habit is gone.");
+  const next = Math.max(0, Math.min(500, Math.round(Number(xpValue) || 0)));
+  const db = supabaseAdmin();
+  const { error } = await db.from("rites").update({ xp_value: next }).eq("owner_id", ownerId).eq("id", riteId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  const extras = await readExtras(ownerId);
+  const ticks = cleanHabitTicks(extras.habitTicks);
+  const list = [...(ticks.days[day]?.[riteId] ?? [])];
+  let delta = 0;
+  if (list.length) {
+    // The latest tick was an extra one.
+    delta = next - list[list.length - 1][0];
+    list[list.length - 1] = [next, list[list.length - 1][1]];
+    ticks.days[day] = { ...(ticks.days[day] ?? {}), [riteId]: list };
+    await saveHabitTicks(ownerId, extras, ticks);
+  } else {
+    // It was the day's first: the completion itself.
+    const { data } = await db.from("rite_completions").select("xp_awarded").eq("owner_id", ownerId).eq("rite_id", riteId).eq("day", day).maybeSingle<{ xp_awarded: number }>();
+    if (data) {
+      delta = next - data.xp_awarded;
+      await db.from("rite_completions").update({ xp_awarded: next }).eq("owner_id", ownerId).eq("rite_id", riteId).eq("day", day);
+    }
+  }
+  if (delta !== 0) await xp.awardXp(ownerId, delta, "task_completed").catch(() => {});
+  revalidatePath("/");
+  return { xp: next };
 }

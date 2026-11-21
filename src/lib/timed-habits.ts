@@ -15,35 +15,39 @@ export function habitOnDay(h: Pick<TimedHabit, "days" | "repeat">, day: Date): b
 
 /** Each timed habit's block on this day: start and end in ms. A habit with a window
  * (Gym 7–10) takes the first free stretch inside it, around `busy`; else its start. */
-export function habitBlocksOn(habits: TimedHabit[], day: Date, busy: { start: number; end: number }[] = [], /** That day's changes by hand ("h:<id>"): kept at a time, or off. */ holds: Record<string, DayHold> = {}): { habit: TimedHabit; start: number; end: number; crowded?: boolean; kept?: boolean }[] {
+export function habitBlocksOn(habits: TimedHabit[], day: Date, busy: { start: number; end: number }[] = [], /** That day's changes by hand ("h:<id>"): kept at a time, or off. */ holds: Record<string, DayHold> = {}, /** Where a day starts for a habit with only an end time (minutes). */ dayStart: number = 7 * 60): { habit: TimedHabit; start: number; end: number; crowded?: boolean; kept?: boolean }[] {
   type Block = { habit: TimedHabit; start: number; end: number; crowded?: boolean; kept?: boolean };
+  // Floating habits make room for each other too: each one placed counts as busy for the next.
+  const taken = [...busy];
   return habits.flatMap((h): Block[] => {
     const m = /^(\d{1,2}):(\d{2})/.exec(h.due_time);
+    const w = h.window_to ? /^(\d{1,2}):(\d{2})/.exec(h.window_to) : null;
     const o = holds[`h:${h.id}`];
     if (o?.off) return [];
-    // A habit without a set time shows only where you placed it that day (from the auto-scheduler, Nov 6).
-    if (!m && o?.at == null) return [];
-    if (m && !habitOnDay(h, day)) return [];
+    // A habit with no time at all shows only where you placed it that day (from the auto-scheduler, Nov 6).
+    if (!m && !w && o?.at == null) return [];
+    if ((m || w) && !habitOnDay(h, day)) return [];
     const need = Math.max(15, o?.minutes ?? h.minutes) * 60_000;
     if (o?.at != null) {
       const k = new Date(day);
       k.setHours(0, o.at, 0, 0);
       return [{ habit: h, start: k.getTime(), end: k.getTime() + need, kept: true }];
     }
-    if (!m) return [];
     const s = new Date(day);
-    s.setHours(Number(m[1]), Number(m[2]), 0, 0);
+    // "Sometime before 2 PM" (only an end): it floats from the start of the day until then (owner, Nov 16).
+    if (m) s.setHours(Number(m[1]), Number(m[2]), 0, 0);
+    else s.setHours(0, Math.min(dayStart, Math.max(0, Number(w![1]) * 60 + Number(w![2]) - need / 60_000 - 60)), 0, 0);
     let start = s.getTime();
     let crowded = false;
-    const w = h.window_to ? /^(\d{1,2}):(\d{2})/.exec(h.window_to) : null;
     if (w) {
       const e = new Date(day);
       e.setHours(Number(w[1]), Number(w[2]), 0, 0);
-      const free = freeStretch(s.getTime(), e.getTime(), need / 60_000, busy);
+      const free = freeStretch(s.getTime(), e.getTime(), need / 60_000, taken);
       // No room left in its window: it stays at its start, marked crowded (shown in a muted red).
       crowded = free === null;
-      start = free ?? start;
+      start = free ?? Math.max(s.getTime(), m ? s.getTime() : e.getTime() - need);
     }
+    if (w && !crowded) taken.push({ start, end: start + need });
     return [{ habit: h, start, end: start + need, crowded }];
   });
 }
@@ -53,5 +57,5 @@ export function habitBlocksOn(habits: TimedHabit[], day: Date, busy: { start: nu
 export function timedHabitsFrom(rows: { id: string; title: string; slot?: string | null; days?: number[] | null; due_time?: string | null; window_to?: string | null; estimate_minutes?: number | null; repeat?: unknown; icon_key?: string | null; icon_source?: string | null }[], clean: (r: unknown) => Repeat | null): TimedHabit[] {
   return rows
     .filter((r) => r.slot === "day" && (r as { kind?: string | null }).kind !== "ritual")
-    .map((r) => ({ id: r.id, title: r.title, days: r.days ?? null, due_time: r.due_time ?? "", window_to: r.window_to ?? null, minutes: r.estimate_minutes ?? (r.due_time ? 60 : 30), repeat: clean(r.repeat), icon_key: r.icon_source ? r.icon_key : null }));
+    .map((r) => ({ id: r.id, title: r.title, days: r.days ?? null, due_time: r.due_time ?? "", window_to: r.window_to ?? null, minutes: r.estimate_minutes ?? (r.due_time || r.window_to ? 60 : 30), repeat: clean(r.repeat), icon_key: r.icon_source ? r.icon_key : null }));
 }

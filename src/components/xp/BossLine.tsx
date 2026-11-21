@@ -8,7 +8,7 @@ import { bossPlanAction, saveBossPlanAction, bossProgressAction, completeTaskAct
 import { celebrateProgress, celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { useEscape } from "@/lib/use-escape";
-import { talkToToucan } from "@/components/toucan/ToucanGuide";
+import { talkToToucan } from "@/components/toucan/talk";
 import { CloseIcon } from "@/components/ui/Icons";
 
 export type BossView = { id: string; level: number; title: string; target: number; progress: number };
