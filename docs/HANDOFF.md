@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file is the map: the standing rules, how to ship, and where everything else lives. It is loaded into every session, so **keep it short** (see "Keeping this file current"). If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-11-21 (review branches merged; stat XP under the XP slider shipped; calendar events as quests live, XP by length; calendar quest completion fix; stat XP: new-stat field ring fixed, cleanup mockups sent; opening the app steadier: walkthrough taps, no reload after deploys, Today hydration, one startup request; Run B handoff in `docs/RUN-B-HANDOFF.md`; import card: one When pill, Flexible · Fixed; Quest Drop shipped; latest shipped work is the top entry of `docs/SHIPPED.md`). `main` @ see `git log`.
+- **Last updated:** 2026-11-21 (D1 quest columns added; review branches merged; stat XP under the XP slider shipped; calendar events as quests live, XP by length; calendar quest completion fix; stat XP: new-stat field ring fixed, cleanup mockups sent; opening the app steadier: walkthrough taps, no reload after deploys, Today hydration, one startup request; Run B handoff in `docs/RUN-B-HANDOFF.md`; import card: one When pill, Flexible · Fixed; Quest Drop shipped; latest shipped work is the top entry of `docs/SHIPPED.md`). `main` @ see `git log`.
 - **Live app:** https://goal-dashboard-kappa.vercel.app (the owner does NOT have tinyquest.win; never send links on it)
 - **Pending in-app feedback:** the database is the full list (query in section 3; by screen in `docs/FEEDBACK-BY-SCREEN.md`). 316 open on Nov 12; many are already built but were never marked: check the code and `docs/SHIPPED.md` before building one again, and mark it. If the Supabase connector is missing, ask the owner to connect it (claude.ai Settings › Connectors).
 
@@ -64,7 +64,7 @@ Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Rea
 - Data layer: `src/lib/data/*.ts` (all `server-only`).
 - Pure logic: `src/lib/*.ts`.
 - UI: `src/components/<area>/`.
-- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0091_felt.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
+- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0094_quest_extras_columns.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
 - `profiles.life_wheel` (jsonb) is a catch-all for per-profile extras, read through `readExtras()` in `actions.ts`. **Write it only through `writeExtra(ownerId, key, value)` (`lib/data/extras.ts`, one key per call); never write the whole object.** A trigger keeps top-level keys a write leaves out and logs them in `life_wheel_drops` (check it if settings vanish).
 - `app_defaults` table holds "default for all accounts" settings plus server-only `secret.*` keys (never shown as settings).
 
