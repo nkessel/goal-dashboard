@@ -8,7 +8,6 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 - **Dev loop 2 (run 5, Opus, Nov 21 20:00 UTC):** RUN-B-HANDOFF item 0 (b), the flows run 4 didn't claim: calendar, calfail, todaycal, questdrop, settings, import, inventory, feedback, language, offline, savekeys, cleaning, navorder, welcomeoff, questextras (phone, tablet). Files: whatever those flows turn up; I'll name them here.
 - **Session claude-2d (Opus, owner's account):** Nov 20, merged the four review branches above to `main`; nothing in progress. `review/boards-nov18` still waits on the owner.
 
-- **Waiting on the owner's design review**: `review/complete-earlier-more` (quest editor › Complete › Earlier…: Today · Yesterday · More…, which opens the five days before yesterday and a date field for any day; owner note Nov 21) · https://claude.ai/artifact/2caq35AXp8XRge4dkQqPN6 · Nov 21.
 
 **Shipped Nov 20 (merged to `main` from `merge-nov20`, owner: "do what you think is best"):** `review/faces-feel`, `review/insights-nov19`, `review/insights-timeline`, `review/subquests-sequence`. See `docs/SHIPPED.md`. Review pages: https://claude.ai/artifact/DgobEgqytFM6qsSuC2bZeJ and https://claude.ai/artifact/69UKiWJeE7BgPnJLRU8q6E
 
