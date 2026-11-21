@@ -1149,7 +1149,7 @@ function DoneEarlierDialog({ title, isAdventure, askNow = false, onNow, onPick, 
     onPick(when);
   }
   return createPortal(
-    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[60] flex items-center justify-center p-4`} style={{ background: "var(--t-overlay)" }} onClick={onClose}>
+    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[60] flex ${askNow ? "items-start pt-[16vh]" : "items-center"} justify-center p-4`} style={{ background: "var(--t-overlay)" }} onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"

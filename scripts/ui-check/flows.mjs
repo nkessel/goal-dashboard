@@ -260,11 +260,11 @@ export const FLOWS = [
           await h.tap((p) => p.locator("[data-complete-when]").getByRole("button", { name: /earlier/i }).first(), "editor: complete earlier", { optional: true, expectMove: true });
           await h.settle(400);
           await h.check("editor: when did you finish");
-          // Any earlier day behind More… (owner, Nov 21).
-          if (await h.tap((p) => p.locator("[data-complete-when]").getByRole("button", { name: /^more…$/i }).first(), "editor: earlier, more days", { optional: true, expectMove: true })) {
+          // Any earlier day: More… opens the calendar straight away (owner, Nov 21).
+          if (await h.tap((p) => p.locator("[data-complete-when]").getByRole("button", { name: /^another day$/i }).first(), "editor: earlier, more", { optional: true, expectMove: true })) {
             await h.settle(400);
-            await h.check("editor: earlier, more days");
-            await h.tap((p) => p.locator("[data-complete-when]").getByRole("button", { pressed: false }).filter({ hasText: /\d/ }).first(), "editor: earlier, pick a day", { optional: true, expectMove: true });
+            await h.check("editor: earlier, the calendar");
+            await h.tap((p) => p.getByRole("dialog", { name: /^another day$/i }).getByRole("button", { name: /^\d{1,2}$/ }).first(), "editor: earlier, pick a day", { optional: true, expectMove: true });
             await h.check("editor: earlier, a day picked");
           }
           await h.tap((p) => p.locator("[data-complete-when]").getByRole("button", { name: /not yet/i }).first(), "editor: not yet", { optional: true });
