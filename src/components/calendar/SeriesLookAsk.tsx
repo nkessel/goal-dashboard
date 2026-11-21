@@ -73,7 +73,7 @@ export function SeriesLookAsk() {
   if (shrink && !ask && typeof document !== "undefined") {
     const words = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} hr${m % 60 ? ` ${m % 60} min` : ""}` : `${m} min`);
     return createPortal(
-      <div role="dialog" aria-label="Shorten it on the calendar?" data-shrink-ask className="card-pop-in parchment fixed left-1/2 z-[95] w-[min(360px,calc(100vw-24px))] -translate-x-1/2 rounded-2xl px-4 pb-3 pt-3" style={{ bottom: "calc(96px + env(safe-area-inset-bottom, 0px))", border: "1px solid #b39a6a", boxShadow: "0 14px 34px rgba(0,0,0,.38)" }}>
+      <div role="dialog" aria-label="Shorten it on the calendar?" data-shrink-ask className="card-pop-in parchment fixed left-1/2 z-[131] w-[min(360px,calc(100vw-24px))] -translate-x-1/2 rounded-2xl px-4 pb-3 pt-3" style={{ bottom: "calc(96px + env(safe-area-inset-bottom, 0px))", border: "1px solid #b39a6a", boxShadow: "0 14px 34px rgba(0,0,0,.38)" }}>
         <p className="m-0 pr-6 font-display text-[16px] leading-snug" style={{ color: "var(--t-ink)" }}>
           Shorten “{shrink.title}” on the calendar to {words(shrink.minutes)}?
         </p>
@@ -112,7 +112,7 @@ export function SeriesLookAsk() {
       role="dialog"
       aria-label="Apply these settings to all future repeats?"
       data-series-ask
-      className={`parchment fixed left-1/2 z-[95] w-[min(360px,calc(100vw-24px))] -translate-x-1/2 rounded-2xl px-4 pb-3 pt-3 ${leaving ? "pop-leave" : "card-pop-in"}`}
+      className={`parchment fixed left-1/2 z-[131] w-[min(360px,calc(100vw-24px))] -translate-x-1/2 rounded-2xl px-4 pb-3 pt-3 ${leaving ? "pop-leave" : "card-pop-in"}`}
       style={{ bottom: "calc(96px + env(safe-area-inset-bottom, 0px))", border: "1px solid #b39a6a", boxShadow: "0 14px 34px rgba(0,0,0,.38)" }}
     >
       <button type="button" aria-label="Not now" onClick={close} className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
