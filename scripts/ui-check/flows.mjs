@@ -675,6 +675,14 @@ export const FLOWS = [
       // A victory: the celebration asks too, above Claim your reward · Continue Your Journey.
       if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu for complete", { optional: true })) {
         if (await h.tap((p) => p.getByRole("menuitem", { name: /^✓?\s*complete this/i }).first(), "complete from the menu", { optional: true, expectMove: true })) {
+          // Completing from a card asks when first (owner, Nov 21): Just now, or Other… for a day and time.
+          await h.settle(500);
+          await h.check("complete: when did you finish");
+          if (await h.tap((p) => p.getByRole("button", { name: /^other…$/i }).first(), "complete: other", { optional: true, expectMove: true })) {
+            await h.check("complete: other day and time");
+            await h.tap((p) => p.getByRole("button", { name: /^other…$/i }).first(), "complete: other closed", { optional: true });
+          }
+          await h.tap((p) => p.getByRole("button", { name: /^just now$/i }).first(), "complete: just now", { expectMove: true });
           await h.settle(3500);
           await h.check("celebration: how do you feel");
           if (await h.tap((p) => p.locator("[data-felt-ask] [role=radio][aria-label=Great]").first(), "celebration: great", { optional: true, expectMove: true })) await h.check("celebration: felt kept");
