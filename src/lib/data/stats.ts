@@ -43,11 +43,12 @@ export async function setTaskStatSplit(ownerId: string, taskId: string, split: S
  * rest is what fills the main level meter. Stat XP is logged and added to
  * the profile's stat totals here; the caller applies the remainder.
  */
-export async function splitTaskXp(ownerId: string, taskId: string, amount: number): Promise<number> {
+export async function splitTaskXp(ownerId: string, taskId: string, amount: number, override?: StatSplit | null): Promise<number> {
   if (!amount) return amount;
   const db = supabaseAdmin();
   const { data: task } = await db.from("tasks").select("stat_split").eq("id", taskId).eq("owner_id", ownerId).maybeSingle<{ stat_split: StatSplit | null }>();
-  const split = normalizeSplit(task?.stat_split ?? {});
+  // A sub-quest with its own split (override) uses it; otherwise the quest's split applies.
+  const split = normalizeSplit(override && Object.keys(override).length ? override : (task?.stat_split ?? {}));
   const parts = Object.entries(split)
     .map(([stat, pct]) => ({ stat, amount: Math.trunc((amount * pct) / 100) }))
     .filter((p) => p.amount !== 0);

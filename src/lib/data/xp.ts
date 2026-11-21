@@ -73,14 +73,16 @@ export async function awardXp(
   ownerId: string,
   amount: number,
   kind: "task_completed" | "daily_check_in" | "streak_bonus" | "planning_ritual" | "early_bird" | "mess_battle",
-  taskId?: string
+  taskId?: string,
+  /** A sub-quest's own stat split, used instead of its quest's. */
+  statSplit?: Record<string, number> | null
 ): Promise<XpAwardResult> {
   const db = supabaseAdmin();
   // Coins follow the whole award; a quest may send part of its XP to
   // character stats instead of the main meter.
   const fullAmount = amount;
   if (taskId && kind === "task_completed" && amount !== 0) {
-    amount = await statsData.splitTaskXp(ownerId, taskId, amount).catch(() => amount);
+    amount = await statsData.splitTaskXp(ownerId, taskId, amount, statSplit).catch(() => amount);
   }
   // Quests restore a little HP.
   if (taskId && kind === "task_completed" && fullAmount > 0) await hpData.heal(ownerId).catch(() => {});

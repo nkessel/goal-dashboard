@@ -659,6 +659,8 @@ export async function saveQuestStepsAction(taskId: string, steps: stepsData.Step
   const saved = await stepsData.replaceSteps(taskId, ownerId, steps.slice(0, 50));
   let delta = 0;
   let coinDelta = 0;
+  // A sub-quest with its own stat split pays its XP through that split, apart from the rest.
+  const ownSplit: { amount: number; split: Record<string, number> }[] = [];
   for (const st of saved) {
     const owed = st.done ? (st.xp ?? 0) : 0;
     const paid = st.xp_paid ?? 0;
@@ -666,13 +668,18 @@ export async function saveQuestStepsAction(taskId: string, steps: stepsData.Step
     const owedC = st.done ? (st.coins ?? 0) : 0;
     const paidC = st.coins_paid ?? 0;
     if (owed !== paid || owedC !== paidC) {
-      delta += owed - paid;
+      if (st.stat_split && Object.keys(st.stat_split).length && owed !== paid) ownSplit.push({ amount: owed - paid, split: st.stat_split });
+      else delta += owed - paid;
       coinDelta += owedC - paidC;
       await stepsData.setStepPaid(st.id, ownerId, owed, owedC !== paidC ? owedC : undefined);
     }
   }
   let coinsEarned = 0;
   if (delta !== 0) coinsEarned = (await xp.awardXp(ownerId, delta, "task_completed", taskId)).coinsEarned;
+  for (const o of ownSplit) {
+    coinsEarned += (await xp.awardXp(ownerId, o.amount, "task_completed", taskId, o.split)).coinsEarned;
+    delta += o.amount;
+  }
   if (coinDelta !== 0) {
     await rewardsData.addCoins(ownerId, coinDelta).catch(() => {});
     coinsEarned += coinDelta;
@@ -680,7 +687,7 @@ export async function saveQuestStepsAction(taskId: string, steps: stepsData.Step
   revalidatePath("/");
   revalidatePath("/boards", "layout");
   return {
-    steps: saved.map((s) => ({ id: s.id, title: s.title, done: s.done, sort_order: s.sort_order, xp: s.xp ?? 0, coins: s.coins ?? 0, minutes: s.minutes ?? null, weight: s.weight ?? null, progress: s.progress ?? (s.done ? 100 : 0), state: s.state ?? null, parent_id: s.parent_id ?? null })),
+    steps: saved.map((s) => ({ id: s.id, title: s.title, done: s.done, sort_order: s.sort_order, xp: s.xp ?? 0, coins: s.coins ?? 0, minutes: s.minutes ?? null, stat_split: s.stat_split ?? null, weight: s.weight ?? null, progress: s.progress ?? (s.done ? 100 : 0), state: s.state ?? null, parent_id: s.parent_id ?? null })),
     xpEarned: delta,
     coinsEarned,
   };

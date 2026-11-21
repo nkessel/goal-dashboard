@@ -1,6 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import type { Task } from "./types";
+import { normalizeSplit, type StatSplit } from "@/lib/stats";
 
 export type QuestStep = {
   id: string;
@@ -22,6 +23,8 @@ export type QuestStep = {
   xp_paid?: number;
   /** Its time estimate in minutes, or null (migration 0092). */
   minutes?: number | null;
+  /** Its own stat split (migration 0095); null/absent = it follows its quest's split. */
+  stat_split?: StatSplit | null;
   /** Coins paid when the step is done (0 = none; migration 0088). */
   coins?: number;
   /** Coins this step has paid so far. */
@@ -36,7 +39,7 @@ export type StepInput = {
   key?: string;
   /** The step this one sits inside (its key or id), or null at the top. */
   parentKey?: string | null;
-  title: string; done: boolean; xp?: number; coins?: number; minutes?: number | null; weight?: number | null; progress?: number; seconds?: number; state?: "skipped" | "failed" | null };
+  title: string; done: boolean; xp?: number; coins?: number; minutes?: number | null; statSplit?: StatSplit | null; weight?: number | null; progress?: number; seconds?: number; state?: "skipped" | "failed" | null };
 
 /** True when the error just means the quest_steps table hasn't been created yet. */
 function missingTable(error: { code?: string; message: string } | null) {
@@ -114,6 +117,7 @@ export async function replaceSteps(
       ...(s.xp !== undefined ? { xp: Math.max(0, Math.min(1000, Math.round(s.xp))) } : {}),
       ...(s.coins !== undefined ? { coins: Math.max(0, Math.min(100, Math.round(s.coins))) } : {}),
       ...(s.minutes !== undefined ? { minutes: s.minutes === null ? null : Math.max(1, Math.min(1440, Math.round(s.minutes))) } : {}),
+      ...(s.statSplit !== undefined ? { stat_split: s.statSplit && Object.keys(s.statSplit).length ? normalizeSplit(s.statSplit) : null } : {}),
       ...(s.weight !== undefined ? { weight: s.weight === null ? null : Math.max(1, Math.min(100, Math.round(s.weight))) } : {}),
       ...(s.progress !== undefined || s.done ? { progress: s.done ? 100 : Math.max(0, Math.min(99, Math.round(s.progress ?? 0))) } : {}),
       ...(s.seconds !== undefined ? { seconds_spent: Math.max(0, Math.round(s.seconds)) } : {}),
@@ -128,6 +132,7 @@ export async function replaceSteps(
         (extra.coins === undefined || extra.coins === (prev.coins ?? 0)) &&
         (extra.weight === undefined || extra.weight === (prev.weight ?? null)) &&
         (extra.minutes === undefined || extra.minutes === (prev.minutes ?? null)) &&
+        (extra.stat_split === undefined || JSON.stringify(extra.stat_split) === JSON.stringify(prev.stat_split ?? null)) &&
         (extra.progress === undefined || extra.progress === (prev.progress ?? 0)) &&
         (extra.seconds_spent === undefined || extra.seconds_spent === (prev.seconds_spent ?? 0)) &&
         (extra.state === undefined || extra.state === (prev.state ?? null)) &&
