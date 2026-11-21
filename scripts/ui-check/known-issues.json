@@ -110,5 +110,9 @@
   {
     "match": "^board\\|moved-on-tap\\|board: due soonest",
     "reason": "Picking a board's order folds its choices away and re-sorts the quests, so the tapped choice is gone from where it was: expected, not a jump."
+  },
+  {
+    "match": "^today\\|popup-behind\\|.*When did you finish it\\?.*editor: earlier, the calendar",
+    "reason": "Nov 21: More… opens the app's month calendar (DateField) over the 'When did you finish it?' card on purpose; the card is under the calendar while it's open."
   }
 ]
