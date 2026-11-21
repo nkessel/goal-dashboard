@@ -12,6 +12,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 - **Waiting on the owner's design review**: `review/calendar-menu-arrange` (the calendar's quest and event menus: gear → drag, eye, rename; owner Nov 16 f562c138, PRIORITIES 0b) · https://claude.ai/artifact/VUvzmyZuGJPHfK2AC817dc · Nov 21.
 
+- **Waiting on the owner's pick**: sub-quests more like quests (RUN-B item 9, note 4eb6549b): mockups A (two more detail rows) / B (pills on each sub-quest, my pick) / C (a small editor inside the card), plus 2 (a scheduled sub-quest gets its own calendar block) and 3 (its stats split its own XP) · https://claude.ai/artifact/UNnUfviwEbN72jS6Gb6BL7 · Nov 21. Build his pick on `review/subquest-details`.
+
 **Shipped Nov 20 (merged to `main` from `merge-nov20`, owner: "do what you think is best"):** `review/faces-feel`, `review/insights-nov19`, `review/insights-timeline`, `review/subquests-sequence`. See `docs/SHIPPED.md`. Review pages: https://claude.ai/artifact/DgobEgqytFM6qsSuC2bZeJ and https://claude.ai/artifact/69UKiWJeE7BgPnJLRU8q6E
 
 
