@@ -6,6 +6,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 - **Run B (Sonnet 5.5, this account, Nov 20):** step 1 (the three merges) and D0 are on `main`; now on S2/S3 (order in `docs/RUN-B-HANDOFF.md`). Other sessions: leave those to it.
 - **Dev loop 2 (run 4, Opus, Nov 21 19:00 UTC):** RUN-B-HANDOFF item 0 (b) continued: UI check on welcome, toucanask, insights, faces, sequence, habiteditor, evening, create (phone, tablet). Files: whatever those flows turn up; I'll name them here.
+- **Dev loop 2 (run 5, Opus, Nov 21 20:00 UTC):** RUN-B-HANDOFF item 0 (b), the flows run 4 didn't claim: calendar, calfail, todaycal, questdrop, settings, import, inventory, feedback, language, offline, savekeys, cleaning, navorder, welcomeoff, questextras (phone, tablet). Files: whatever those flows turn up; I'll name them here.
 - **Run B (Sonnet 5.5, scheduled, Nov 21 19:30 UTC):** the follow-up below: Today's Quests move when the check-in opens (`today` flow, layout-shift). Files: `today` check-in / Daily Habits components.
 - **Session claude-2d (Opus, owner's account):** Nov 20, merged the four review branches above to `main`; nothing in progress. `review/boards-nov18` still waits on the owner.
 
