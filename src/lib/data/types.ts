@@ -136,6 +136,8 @@ export type Task = {
   challenge?: number | null;
   /** 0–5: how much energy finishing it gives back (0 = unrated). */
   energy_gain?: number | null;
+  /** On the Listening list: what the row holds (migration 0095, lib/listen.ts). */
+  listen?: unknown;
   /** The first step still to do (when loaded). */
   next_step?: string | null;
   /** Can be worked on in chunks of this many minutes (filler time). */

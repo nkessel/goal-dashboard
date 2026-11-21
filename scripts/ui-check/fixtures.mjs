@@ -6,10 +6,40 @@ import { newId as randomUUID } from "./ids.mjs";
 
 export const OWNER_ID = "00000000-0000-4000-8000-0000000000a1";
 export const FRIEND_ID = "00000000-0000-4000-8000-0000000000b2";
+/** The Listening list board (fixed, so the listen flow can open it). */
+export const LISTEN_BOARD_ID = "00000000-0000-4000-8000-00000000115e";
 
 const iso = (d) => d.toISOString();
 const inHours = (h) => iso(new Date(Date.now() + h * 3600e3));
 const day = (offset = 0) => new Date(Date.now() + offset * 86400e3).toISOString().slice(0, 10);
+
+const dec22 = () => {
+  // About a month out, so the band always counts down.
+  const d = new Date(Date.now() + 31 * 86400e3);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23)).toISOString();
+};
+const li = (title, extra = {}) => ({ id: Math.abs([...title].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7)).toString(36), title, ...extra });
+
+/** The Listening list's rows, and the course board's weeks. */
+function listenRows(boardId, mfsId, task) {
+  const due = dec22();
+  const weeks = ["Setting the Stage", "Core Concepts", "Inner Work", "The Steps of Facilitation", "Holding the Group", "Creating Clear Containers"];
+  return [
+    ...weeks.map((w, i) => task(`Week ${String(i + 1).padStart(2, "0")} · ${w}`, { board_id: mfsId, in_additional: false, xp_value: 15, ...(i === 5 ? { status: "completed", completed_at: new Date(Date.now() - 5 * 86400e3).toISOString() } : {}) })),
+    task("Mastering Facilitation Skills", { board_id: boardId, due_at: due, in_additional: false, listen: { kind: "course", source: "Authentic Revolution", lessonsBoard: mfsId } }),
+    task("Podcasts", { board_id: boardId, in_additional: false, listen: { kind: "app", app: "podcasts", source: "Apple Podcasts", items: [li("Planetary Roar", { url: "https://podcasts.apple.com/us/podcast/planetary-roar/id1" }), li("Building Love That Lasts: Study Group (1-100)")] } }),
+    task("The Authentic Life Course", { board_id: boardId, due_at: due, in_additional: false, listen: { kind: "course", source: "Authentic Revolution", items: [li("Week 01 · The Authentic You", { done: true }), li("Week 02 · Personal Values"), li("Week 03 · Get Feedback")] } }),
+    task("Stop Being So Nice (webinar replay)", { board_id: boardId, due_at: due, in_additional: false, xp_value: 20, listen: { kind: "item", source: "Authentic Revolution" } }),
+    task("YouTube", { board_id: boardId, in_additional: false, listen: { kind: "app", app: "youtube", source: "YouTube", items: [li("My learning playlist"), li("RLA: The Role of Conflict in Community", { url: "https://www.youtube.com/watch?v=yRQ8zJ-uo2Y" }), li("RLA: How to Build Community", { url: "https://www.youtube.com/watch?v=GIP_5bHaVEE" })] } }),
+    task("Community storytelling nights", { board_id: boardId, in_additional: false, listen: { kind: "set", items: [li("Story night, October"), li("Story night, September")] } }),
+    task("School of the Great Turning course", { board_id: boardId, in_additional: false, listen: { kind: "course", items: [li("Module 2"), li("Module 3"), li("Module 6")] } }),
+    task("Watch: Facing Fragility", { board_id: boardId, in_additional: false, description: "https://spiraljourneyworkthatreconnects.org/facing-fragility/", listen: { kind: "item", url: "https://spiraljourneyworkthatreconnects.org/facing-fragility/" } }),
+    task("Saar course", { board_id: boardId, in_additional: false, is_aspiration: true, listen: { kind: "course" } }),
+    task("Kobi videos", { board_id: boardId, in_additional: false, is_aspiration: true, listen: { kind: "set" } }),
+    task("Shalini course videos", { board_id: boardId, in_additional: false, is_aspiration: true, listen: { kind: "course" } }),
+    task("Some People Just Can't (webinar replay)", { board_id: boardId, due_at: due, in_additional: false, status: "completed", completed_at: new Date(Date.now() - 2 * 86400e3).toISOString(), listen: { kind: "item", source: "Authentic Revolution" } }),
+  ];
+}
 
 export function makeFixtures() {
   const board = (title, sort, extra = {}) => ({ id: randomUUID(), owner_id: OWNER_ID, title, sort_order: sort, ...extra });
@@ -17,13 +47,16 @@ export function makeFixtures() {
     board("Relational Leadership Academy", 0, { description: "Course work and readings" }),
     board("Errands", 1),
     board("Home & garden", 2),
-    board("Online learning videos", 3),
+    board("Listening list", 3, { id: LISTEN_BOARD_ID }),
   ];
   const [course, errands, home, videos] = boards;
   // Boards inside Home & garden (one with its own board inside), so a board card's sub-boards open like folders (Nov 6).
   const beds = board("Garden beds", 0, { parent_board_id: home.id });
   const seeds = board("Seeds to order", 0, { parent_board_id: beds.id });
   boards.push(beds, seeds, board("Kitchen", 1, { parent_board_id: home.id }));
+  // A course whose lessons are its own board's quests (Mastering Facilitation Skills on the Listening list, Nov 21).
+  const mfs = board("Mastering Facilitation Skills Course", 4, { parent_board_id: course.id });
+  boards.push(mfs);
 
   let sort = 0;
   const task = (title, extra = {}) => ({
@@ -46,7 +79,8 @@ export function makeFixtures() {
     task("AR class homework", { board_id: course.id, due_at: inHours(60), is_manual_priority: true }),
     task("Call the insurance company about the claim that has been waiting since September", { due_at: inHours(-20), importance: 4 }),
     task("Repot the fiddle-leaf fig", { board_id: home.id, due_at: inHours(100) }),
-    task("Watch: Facing Fragility", { board_id: videos.id, description: "https://spiraljourneyworkthatreconnects.org/facing-fragility/" }),
+    // The Listening list (owner, Nov 20-21): ranked rows; courses, apps and sets fold open to their own lists.
+    ...listenRows(videos.id, mfs.id, task),
     task("Supercalifragilisticexpialidocious-unbroken-long-word-to-test-wrapping", { board_id: home.id }),
     task("Sort the garage shelves", { board_id: home.id, in_additional: true }),
     task("Turn the compost and top up the raised beds", { board_id: beds.id }),

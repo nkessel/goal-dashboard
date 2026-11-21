@@ -2,7 +2,7 @@
 
 Owner's ask: reshape the "Online learning videos" board (id ef1193ff-f30e-402e-bda0-758b7bc1859a, opened by the headphone icon via `listenBoardAction`) into a Listening list he can add to, prioritise and reflect on. Top priority: the Authentic Revolution curriculum (Mastering Facilitation Skills, The Authentic Life Course, the Authentic Living library, webinar replays), all done by January. Also Apple Podcasts (starting with Planetary Roar) and his YouTube playlists.
 
-Status: mockup only, waiting on his design review. Nothing built.
+Status (Nov 21): all picks made; built on this branch, waiting on his OK of the screenshots. Production data for the list is applied at merge (steps in the project folder, listening/seed-at-merge.md); the import-card sort below is already done.
 Review page: https://claude.ai/artifact/VLoHfSQ9m9MsJztAo4vbjb (decisions at #d1 to #d6).
 
 Decided: #d1 countdown to Tue Dec 22, 2026 (owner, Nov 20: last live session; access ends at course end). Decisions asked: #d2 ordering (A ranked list, B Now/Next/Someday, C by source); #d3 courses as one row with lessons folded (A) or every lesson a row (B); #d4 podcasts/playlists as one row per show (A) or per episode (B); #d5 which of 9 import cards come over (5 pre-ticked: men's grief video, community story night recording, School of the Great Turning course, songleading video, Saar course; unticked: Kobi videos, FoE video, Connection Institute lessons, Course videos on my commute habit); #d6 reflect: one-line takeaway (A), plus "Worth it?" scale (B), or none (C).
@@ -18,3 +18,10 @@ Waves once he picks: 1 (Sonnet) data: rename board, seed items, import cards, li
 - Still open: #d3 (courses).
 - #d6 more (owner, Nov 20 23:04): add a Save button (× closes without saving); add a Rating pill (1–5 stars, picked inline); no checkbox beside the title on the reflect screen (it read as tickable), just "Finished · XP earned".
 - #d6 more (owner, Nov 20 23:05): Learning quotes = wise quotes about learning that the app shows at the top of the reflect screen (built-in set, attributions checked, add/remove from the gear). Plus a "To remember from this lesson" input: short lines he types, gathered in Journal (owner corrected, Nov 20 23:06). Rate pill stays closed until tapped, then 1–5 stars open in place.
+- #d3 (owner, Nov 21): one row per course, "but the insides should be editable/draggable": lessons drag by a handle, ✎ renames or relinks, + Add a lesson, tick. MFS's lessons are its own board's quests (same quests, same order).
+- Data done Nov 21 (his Nov 20 picks): new board Songleading under Professional Development with the "Songleading homework" quest; "Finish the Connection Institute lessons" quest on Professional Development; those two cards imported. FoE video, Course videos on my commute and the men's grief video cards skipped (Import can bring them back).
+
+## Built (Nov 21)
+- `tasks.listen` jsonb (migration 0095, `lib/listen.ts`): kind course/app/set/item, source, url, lessonsBoard, items (his order), reflections. One day = `is_aspiration`.
+- `components/listen/ListeningList.tsx`: Dec 22 band (nearest due date among rows, lessons counted, pace a week), Up next (top 3) then the rest, drag rows (board order), fold-open inner lists, paste a link or type a name (YouTube/podcast links join their app row; YouTube titles from oEmbed), One day fold, Finished fold, ⋯ (Edit, Move to One day, Mark it all finished, Reflect).
+- `components/listen/ListenReflect.tsx`: learning quote (built-in set in `lib/listen.ts`, his own added/removed), What stayed with you?, To remember from this lesson, Worth a replay, Rate pill (stars on tap), Add notes, Save, ×. Gear: when it opens, drag, ✎ rename, eye hide; kept in `life_wheel.listenReflect`. Saves go on the row and into Journal (kind "listening").

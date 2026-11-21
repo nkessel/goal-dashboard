@@ -7,6 +7,26 @@ import { BoardGrid } from "./BoardGrid";
 import { BoardQuestList } from "./BoardQuestList";
 import { BoardSeal } from "./BoardSeal";
 import { ScreenArrange } from "@/components/ui/ScreenArrange";
+import { ListeningList } from "@/components/listen/ListeningList";
+import { isListenBoardTitle, readListen } from "@/lib/listen";
+import { supabaseAdmin } from "@/lib/supabase/server";
+import type { Task } from "@/lib/data/types";
+import type { ListenReflectConfig } from "@/app/listen-actions";
+
+/** What the Listening list needs beyond the board (owner, Nov 21): each course's lessons board, its order, the reflect settings. */
+async function loadListenExtras(ownerId: string, tasks: Task[]) {
+  const ids = [...new Set(tasks.map((t) => readListen((t as Task & { listen?: unknown }).listen).lessonsBoard).filter((x): x is string => !!x))];
+  const [lessonLists, profile] = await Promise.all([
+    Promise.all(ids.map((id) => listTasksForBoard(id, ownerId).catch(() => [] as Task[]))),
+    supabaseAdmin().from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>(),
+  ]);
+  const lw = profile.data?.life_wheel ?? {};
+  const orders = (lw.boardOrders ?? {}) as Record<string, unknown>;
+  return {
+    lessons: Object.fromEntries(ids.map((id, i) => [id, { tasks: lessonLists[i].filter((t) => t.board_id === id), order: orders[id] ?? null }])),
+    reflect: (lw.listenReflect ?? {}) as ListenReflectConfig,
+  };
+}
 
 export type BoardHead = { title: string; ancestors: { id: string; title: string }[] };
 
@@ -23,11 +43,13 @@ export async function loadBoard(boardId: string, ownerId: string) {
     getBoardAncestors(boardId, ownerId),
     listBoardsWithStatsForOwner(ownerId, boardId),
   ]);
+  const listen = isListenBoardTitle(board.title) ? await loadListenExtras(ownerId, allTasks) : null;
   return {
     kind: "board" as const,
     board,
     allTasks,
     subBoards,
+    listen,
     head: { title: board.title, ancestors: ancestors.map((a) => ({ id: a.id, title: a.title })) } satisfies BoardHead,
   };
 }
@@ -99,7 +121,9 @@ export function BoardBody({
           </section>
         ) : null,
     },
-    { key: "quests", label: "Quests", hint: "The board's quests", keep: true, node: <BoardQuestList tasks={allTasks} boardId={board.id} boardTitle={board.title} nextTaskId={board.next_task_id ?? null} theme={theme} mist={mist} order={order} /> },
+    data.listen
+      ? { key: "quests", label: "Listening list", hint: "What to listen to, in your order", keep: true, node: <ListeningList boardId={board.id} tasks={allTasks} order={order} lessons={data.listen.lessons} reflect={data.listen.reflect} theme={theme} /> }
+      : { key: "quests", label: "Quests", hint: "The board's quests", keep: true, node: <BoardQuestList tasks={allTasks} boardId={board.id} boardTitle={board.title} nextTaskId={board.next_task_id ?? null} theme={theme} mist={mist} order={order} /> },
   ];
 
   return (

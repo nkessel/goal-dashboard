@@ -12,6 +12,7 @@
 // Taps marked optional are skipped quietly when the thing isn't there.
 
 import { fakeKeyboard } from "./audit.mjs";
+import { LISTEN_BOARD_ID } from "./fixtures.mjs";
 
 const esc = async (h) => {
   await h.page.keyboard.press("Escape");
@@ -2223,6 +2224,55 @@ export const FLOWS = [
       await h.page.locator("[title^='Edit \"Goblin']").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
       await h.settle(300);
       await h.check("calendar: card colour and place");
+    },
+  },
+  {
+    // The Listening list (owner, Nov 20-21; review page https://claude.ai/artifact/VLoHfSQ9m9MsJztAo4vbjb):
+    // the band, Up next, a course folded open with its lessons, an app row's links, editing a link,
+    // paste-a-link, One day, finishing an item and its reflect screen, and the reflect screen's gear.
+    name: "listen",
+    run: async (h) => {
+      h.screen = "listen";
+      await h.goto(`/boards/${LISTEN_BOARD_ID}`, { name: "listen" });
+      await h.settle(1200);
+      await h.check("listen: list");
+      const row = (title) => (p) => p.locator("[data-listen-row]", { hasText: title }).first();
+      if (await h.tap((p) => row("Mastering Facilitation Skills")(p).getByRole("button", { name: /^open/i }), "listen: open a course", { optional: true, expectMove: true })) {
+        await h.settle(500);
+        await h.check("listen: course lessons");
+      }
+      if (await h.tap((p) => row("Podcasts")(p).getByRole("button", { name: /^open/i }), "listen: open podcasts", { optional: true, expectMove: true })) {
+        await h.settle(500);
+        await h.check("listen: podcasts row");
+        if (await h.tap((p) => row("Podcasts")(p).getByRole("button", { name: /^edit planetary roar/i }), "listen: edit a link", { optional: true, expectMove: true })) {
+          await h.settle(400);
+          await h.check("listen: editing a link");
+          await h.tap((p) => row("Podcasts")(p).getByRole("button", { name: /^cancel$/i }), "listen: cancel edit", { optional: true });
+        }
+      }
+      await h.typeIn((p) => p.getByRole("textbox", { name: /paste a link or type a name/i }).first(), "listen: paste a link");
+      await esc(h);
+      if (await h.tap(/^one day/i, "listen: one day", { optional: true, expectMove: true })) {
+        await h.settle(500);
+        await h.check("listen: one day");
+      }
+      // Finish a single item: its reflect screen opens under it.
+      if (await h.tap((p) => p.getByRole("checkbox", { name: /mark stop being so nice/i }).first(), "listen: finish an item", { optional: true, expectMove: true })) {
+        await h.settle(1500);
+        await h.check("listen: reflect");
+        if (await h.tap((p) => p.locator("[data-listen-reflect]").getByRole("button", { name: /rate/i }).first(), "listen: rate pill", { optional: true })) {
+          await h.settle(300);
+          await h.check("listen: rate open");
+        }
+        if (await h.tap((p) => p.locator("[data-listen-reflect]").getByRole("button", { name: /edit this screen/i }).first(), "listen: reflect gear", { optional: true, expectMove: true })) {
+          await h.settle(400);
+          await h.check("listen: reflect editing");
+          if (await h.tap((p) => p.locator("[data-listen-reflect-edit]").getByRole("button", { name: /rename learning quote/i }).first(), "listen: quotes", { optional: true, expectMove: true })) {
+            await h.settle(400);
+            await h.check("listen: quote set");
+          }
+        }
+      }
     },
   },
 ];
