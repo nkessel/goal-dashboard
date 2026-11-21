@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import type { Task } from "@/lib/data/types";
+import { useDrawZone } from "@/lib/use-draw-zone";
 
 type Sort = "made" | "changed" | "due" | "xp" | "az";
 const SORTS: { key: Sort; label: string }[] = [
@@ -38,10 +39,10 @@ function agoWords(iso: string | null | undefined) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function dueWords(iso: string | null | undefined) {
+function dueWords(iso: string | null | undefined, zone?: string) {
   if (!iso) return null;
   const d = new Date(iso);
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: zone });
 }
 
 /**
@@ -50,6 +51,7 @@ function dueWords(iso: string | null | undefined) {
  */
 export function QuestList({ tasks, boards, isAdventure }: { tasks: Task[]; boards: Record<string, string>; isAdventure: boolean }) {
   const [sort, setSort] = useState<Sort>("made");
+  const zone = useDrawZone();
   const [editing, setEditing] = useState<Task | null>(null);
   const [pastDays, setPastDays] = useState(-1);
   const router = useRouter();
@@ -136,7 +138,7 @@ export function QuestList({ tasks, boards, isAdventure }: { tasks: Task[]; board
           {shown.map((t) => {
             const img = (t.icon_source === "ai" || t.icon_source === "library") && t.icon_key ? t.icon_key : null;
             const board = t.board_id ? boards[t.board_id] : null;
-            const due = dueWords(t.due_at);
+            const due = dueWords(t.due_at, zone);
             // The measure it's sorted by, on every row (owner, Nov 13: "display the metric quests are being sorted by").
             const metric =
               sort === "made" ? `Made ${agoWords(t.created_at) ?? ""}` : sort === "changed" ? `Changed ${agoWords(t.updated_at) ?? ""}` : sort === "due" ? (due ? `Due ${due}` : "No due date") : null;

@@ -87,7 +87,7 @@ export async function AppShell({
       {profileId && <OwnWordsSync />}
       {profileId && <WelcomeLayoutSync />}
       {profileId && <OfflineSync profileId={profileId} />}
-      {profileId && <Walkthrough />}
+      {profileId && <Walkthrough since={profile?.created_at ?? null} />}
       {profileId && <SeriesLookAsk />}
       {profileId && (
         <Suspense fallback={null}>

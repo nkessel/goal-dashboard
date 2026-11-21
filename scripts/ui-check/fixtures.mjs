@@ -153,6 +153,8 @@ export function makeFixtures() {
         streak_count: 4,
         is_admin: true,
         last_check_in_at: inHours(-26),
+        // A month-old account: the walkthrough keeps the feedback button above it for accounts older than a day.
+        created_at: inHours(-24 * 30),
         life_wheel: {
           // The walkthrough is finished for the test account (its own flow, "tour", starts it again).
           tour: { step: "end", done: true, at: 1 },

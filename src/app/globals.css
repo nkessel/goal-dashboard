@@ -3522,6 +3522,8 @@ html[data-tour-open] [data-perched-owl] { visibility: hidden; }
 .tour-tip-tri[data-up="true"] { bottom: auto; top: -7px; box-shadow: -1.5px -1.5px 0 0 #c9a24a; }
 /* His welcome: the world behind goes nearly dark, so his first words are all there is. */
 .tour-spot[data-dark="true"] { box-shadow: 0 0 0 200vmax rgba(3, 7, 6, .9); }
+/* Existing accounts: the feedback button and its box stay above the walkthrough (set by tour/Walkthrough.tsx). */
+html[data-tour-feedback] [data-feedback-root].fixed { z-index: 138; }
 @keyframes tour-step-in { from { opacity: 0; translate: 0 4px; } to { opacity: 1; translate: 0 0; } }
 .tour-step-in { animation: tour-step-in .32s ease both; }
 @media (prefers-reduced-motion: reduce) { .tour-tip, .tour-step-in { animation: none; } }

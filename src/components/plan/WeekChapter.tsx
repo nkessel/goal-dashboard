@@ -6,14 +6,16 @@ import type { Task } from "@/lib/data/types";
 import type { WeekChapter as Chapter } from "@/lib/data/planning";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
+import { useDrawZone } from "@/lib/use-draw-zone";
 
-const when = (iso: string) => new Date(iso).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+const when = (iso: string, zone?: string) => new Date(iso).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: zone });
 
 /**
  * This week as a chapter of your story: the three big rocks are its beats,
  * each lit up in gold once it's written (done). Name the chapter if you like.
  */
 export function WeekChapter({ chapter, theme }: { chapter: Chapter; theme: "calm" | "adventure" }) {
+  const zone = useDrawZone();
   const isAdventure = theme === "adventure";
   const [title, setTitle] = useState(chapter.title ?? "");
   const [editingTitle, setEditingTitle] = useState(false);
@@ -117,7 +119,7 @@ export function WeekChapter({ chapter, theme }: { chapter: Chapter; theme: "calm
                 {b.title}
               </span>
               <span className="text-[11.5px] leading-tight" style={{ color: b.done ? "#3f6a2c" : soft }}>
-                {b.done ? "Written ✓" : b.scheduledAt ? when(b.scheduledAt) : b.dueAt ? `Due ${new Date(b.dueAt).toLocaleDateString(undefined, { weekday: "short" })}` : "Needs a time"}
+                {b.done ? "Written ✓" : b.scheduledAt ? when(b.scheduledAt, zone) : b.dueAt ? `Due ${new Date(b.dueAt).toLocaleDateString(undefined, { weekday: "short", timeZone: zone })}` : "Needs a time"}
               </span>
             </button>
           </li>
