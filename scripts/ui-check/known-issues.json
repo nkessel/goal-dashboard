@@ -104,10 +104,6 @@
     "reason": "The Language chip (on main before Nov 20): a floating chip you can drag aside, like the feedback bubble. By design."
   },
   {
-    "match": "^today\\|layout-shift\\|.*\\|up to (check-in open|habit sub-habits open)$",
-    "reason": "Nov 21: still seen after the server began drawing the check-in's draft and 'Last night' card (so that is not the whole cause; Insights is clean). Today's Quests move ~120-130px once while the check-in opens, then again at the next step. Cause still to find (Today only); see docs/WAITING.md."
-  },
-  {
     "match": "^board\\|moved-on-tap\\|board: due soonest",
     "reason": "Picking a board's order folds its choices away and re-sorts the quests, so the tapped choice is gone from where it was: expected, not a jump."
   }

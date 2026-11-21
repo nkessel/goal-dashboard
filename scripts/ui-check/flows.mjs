@@ -238,7 +238,9 @@ export const FLOWS = [
       await h.toggle(/additional quests/i, "additional quests");
       await h.toggle(/daily habits/i, "daily habits");
       // (toggle shows it open, then closes it again): open it to tick one.
-      await h.page.evaluate(() => [...document.querySelectorAll("button[aria-expanded='false']")].find((b) => /Daily Habits/.test(b.textContent || ""))?.click());
+      // A real click (not el.click() from a script): the browser then counts the tray sliding open as an answer to
+      // input, so Today's Quests moving down under it is not reported as a jump (it was, Nov 21: "up to check-in open").
+      await h.page.locator("button[aria-expanded='false']", { hasText: /Daily Habits/ }).first().click({ timeout: 3000 }).catch(() => {});
       await h.settle(700);
       // The Check in button folds away as the check-in opens, so it's closed with its ×.
       await h.tap(/^check in/i, "open check-in", { expectMove: true });
@@ -343,7 +345,9 @@ export const FLOWS = [
       // (Daily Habits is open from the toggle above.) Clicked from the page, since the card can sit under the bottom bar on a phone.
       const vit = h.page.locator(".habit-row", { hasText: "Vitamins before 12pm" }).first().getByRole("button", { name: /Vitamins before 12pm/ }).first();
       if (await vit.count()) {
-        await vit.evaluate((el) => { el.scrollIntoView({ block: "center" }); el.click(); }).catch(() => {});
+        // Centred first (so the bottom bar isn't over it), then a real click, so the card growing counts as an answer to input.
+        await vit.evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+        await vit.click({ timeout: 3000 }).catch(() => vit.evaluate((el) => el.click()).catch(() => {}));
         await h.settle(600);
         await h.check("habit sub-habits open");
         // Idea D (owner, Nov 18): the count line under the name changes as one is ticked; a dotted thread joins the checks.
@@ -1005,7 +1009,9 @@ export const FLOWS = [
           await esc(h);
         }
       }
-      await h.toggle(/celebrate today.s wins/i, "today's wins");
+      // The rite's own header (its name first): the whole card is also a swipe button ("Skip tonight Snooze Celebrate…"),
+      // and tapping that one at its centre lands on a win in the open tray and opens its quest editor.
+      await h.toggle(/^celebrate today.s wins/i, "today's wins");
       // Prepare for tomorrow's day opens with Tomorrow's dawn: wake time, room, stones, the seal (owner, Nov 9).
       if (await h.tap(/prepare for tomorrow/i, "prepare for tomorrow", { expectMove: true })) {
         await h.settle(800);

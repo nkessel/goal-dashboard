@@ -89,6 +89,12 @@ function dueShort(iso: string, zone?: string): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: zone });
 }
 
+/** An overdue quest still shows its due day (owner note b2c68c45): "Overdue · Nov 18";
+ *  just "Overdue" when it was due earlier today. */
+function overdueWords(iso: string, zone?: string): string {
+  return daysAhead(new Date(iso), zone) < 0 ? `Overdue · ${dueShort(iso, zone)}` : "Overdue";
+}
+
 /** "25m" / "1h" / "1h 30m" — compact estimate format for the card's clock row. */
 function formatEstimate(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
@@ -895,7 +901,7 @@ export function TaskRow({
               ) : (
                 "📅"
               )}
-              {isOverdue ? "Overdue" : dueShort((task.due_at ?? task.scheduled_start)!, onDevice ? undefined : FIRST_ZONE)}
+              {isOverdue ? overdueWords((task.due_at ?? task.scheduled_start)!, onDevice ? undefined : FIRST_ZONE) : dueShort((task.due_at ?? task.scheduled_start)!, onDevice ? undefined : FIRST_ZONE)}
             </span>
           )}
         </div>

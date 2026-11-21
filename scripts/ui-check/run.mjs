@@ -277,6 +277,12 @@ async function walk({ browser, device, time, tz, cookie }) {
   }
 
   /** Taps something; flags it if it jumps (or bounces) afterwards. */
+  // Playwright's call log says why a tap timed out (another element took it, still moving, off screen): keep its last reason.
+  function tapWhy(msg) {
+    const why = msg.split("\n").filter((l) => /intercepts pointer events|not stable|not visible|outside of the viewport|not enabled/.test(l)).pop();
+    return why ? ` (${why.trim().replace(/^-\s*/, "").slice(0, 200)})` : "";
+  }
+
   async function tap(target, label, { expectMove = false, optional = false, wait = 700 } = {}) {
     const loc = find(target);
     try {
@@ -294,7 +300,7 @@ async function walk({ browser, device, time, tz, cookie }) {
       if (DEVICES[device].hasTouch) await loc.tap({ timeout: 4000 });
       else await loc.click({ timeout: 4000 });
     } catch (e) {
-      record({ kind: "tap-failed", severity: optional ? "info" : "error", target: String(target), detail: `couldn't tap "${label}": ${e.message.split("\n")[0].slice(0, 160)}` });
+      record({ kind: "tap-failed", severity: optional ? "info" : "error", target: String(target), detail: `couldn't tap "${label}": ${e.message.split("\n")[0].slice(0, 160)}${tapWhy(e.message)}` });
       return false;
     }
     const moved = await track;
