@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { SITE_URL } from "@/lib/site";
 
 // Signing in only asks for who you are. Calendar access is optional and is
 // asked for separately, from the Calendar page (connectGoogleCalendar below).
@@ -68,8 +69,8 @@ async function refreshGoogleAccessToken(refreshToken: string) {
 
 // Each preview deploy gets a new address, and Google only sends sign-ins back
 // to addresses listed ahead of time. So on Vercel, sign-in goes through the
-// live site, which hands you back to the preview you started from.
-const SIGN_IN_PROXY = process.env.AUTH_REDIRECT_PROXY_URL ?? (process.env.VERCEL ? "https://goal-dashboard-kappa.vercel.app/api/auth" : undefined);
+// live site (SITE_URL), which hands you back to the preview you started from.
+const SIGN_IN_PROXY = process.env.AUTH_REDIRECT_PROXY_URL ?? (process.env.VERCEL ? `${SITE_URL}/api/auth` : undefined);
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   redirectProxyUrl: SIGN_IN_PROXY,

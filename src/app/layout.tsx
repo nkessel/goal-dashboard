@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { SITE_URL } from "@/lib/site";
 import { Geist, Geist_Mono, Cinzel, EB_Garamond, Manrope, Noto_Naskh_Arabic } from "next/font/google";
 import { ViewTransitionProvider } from "@/components/ui/ViewTransitionProvider";
 import { KeyboardViewport } from "@/components/ui/KeyboardViewport";
@@ -60,6 +61,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: { default: "Goal Dashboard", template: "%s · Goal Dashboard" },
   description: "Personal + social goal & task dashboard",
   // Added to the iPhone Home Screen it opens on its own, full screen, and works offline (owner, Nov 8).
