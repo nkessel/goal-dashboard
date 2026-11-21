@@ -87,6 +87,7 @@ export function makeFixtures() {
   const goblin = tasks.find((t) => t.title.startsWith("Goblin paperwork"));
   const task_sessions = [{ id: randomUUID(), owner_id: OWNER_ID, task_id: goblin.id, starts_at: inHours(26.5), ends_at: inHours(27.5), google_calendar_event_id: null }];
   const [reading] = tasks;
+  const pickup = tasks.find((t) => t.title === "Pick up medication");
   // A quest waiting behind another (a sequence): hidden until the reading is done.
   tasks.push(task("Post the reflection link in the course chat", { board_id: course.id, locked_by_task_id: reading.id }));
   const steps = ["Skim the chapter", "Highlight three ideas", "Write one page", "Post it in the forum"].map((title, i) => ({
@@ -165,6 +166,12 @@ export function makeFixtures() {
           rituals: [{ id: "r1", name: "Couples covenant", done: [day(-12), day(-40)] }],
           questSeries: { [gym1.id]: "g:ev-gym", [gym2.id]: "g:ev-gym" },
           eventQuests: { on: false, made: { "ev-gym-1": gym1.id, "ev-gym-2": gym2.id } },
+          // Per-quest extras kept in the catch-all until they move to columns (split plan, S2): a place, a driving time,
+          // a calendar card colour and a "12 of 32 pages" count, on quests that Today, a board and the calendar show.
+          questPlaces: { [reading.id]: "Natick library", [pickup.id]: "CVS on Main Street", [goblin.id]: "Registry of Motor Vehicles" },
+          questDrives: { [goblin.id]: 25, [pickup.id]: 10 },
+          calCardLooks: { [goblin.id]: { color: "#6b8f71" }, [reading.id]: { color: "#b5651d" } },
+          progressUnits: { [reading.id]: { total: 32, unit: "pages", done: 12 }, [pickup.id]: { total: 4, unit: "pills", done: 1 } },
         },
       },
       { id: FRIEND_ID, google_sub: "ui-check-friend", email: "friend@example.com", name: "Sam Friend", theme: "calm" },
