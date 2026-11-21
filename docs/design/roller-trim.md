@@ -1,6 +1,6 @@
 # Board roller "N more" trim: the owner's pick (Nov 20)
 
-**Status:** design picked, not built. Saved to iterate on later. Review page: https://claude.ai/artifact/L86rUKwmQQJGTd2asBY99i#swoosh (decisions at `#roller`, `#roller2`, `#trim`).
+**Status:** built and live (Nov 21, merged with `review/boards-nov18`): swoosh 4B by default, Settings › Boards › Roller trim (Ornaments · Lines · Plain, per device). Saved to iterate on later. Review page: https://claude.ai/artifact/L86rUKwmQQJGTd2asBY99i#swoosh (decisions at `#roller`, `#roller2`, `#trim`).
 
 ## What it is
 The bottom roller of a board's scroll (`ScrollPull` in `src/components/boards/BoardGrid.tsx`, `.scroll-pull-count` in `globals.css`) says how many quests are still rolled up: "↓ 3 more". A tap unrolls three more.
