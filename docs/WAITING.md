@@ -4,7 +4,6 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Dev loop 2 (run 6, Sonnet, Nov 21 20:30 UTC):** RUN-B-HANDOFF item 0 (b), tablet only: welcome, toucanask, insights, faces, sequence, habiteditor, evening, create (morning, evening). Files: whatever those flows turn up.
 - **Run B (Sonnet 5.5, this account, Nov 20):** step 1 (the three merges) and D0 are on `main`; now on S2/S3 (order in `docs/RUN-B-HANDOFF.md`). Other sessions: leave those to it.
 - **Dev loop 2 (run 5, Opus, Nov 21 20:00 UTC):** RUN-B-HANDOFF item 0 (b), the flows run 4 didn't claim: calendar, calfail, todaycal, questdrop, settings, import, inventory, feedback, language, offline, savekeys, cleaning, navorder, welcomeoff, questextras (phone, tablet). Files: whatever those flows turn up; I'll name them here.
 - **Session claude-2d (Opus, owner's account):** Nov 20, merged the four review branches above to `main`; nothing in progress. `review/boards-nov18` still waits on the owner.
@@ -41,7 +40,7 @@ Started in the owner's Claude project threads; written here so another account c
 
 ## Open for the next Dev loop 2 run (not claimed)
 
-- RUN-B-HANDOFF item 0 (b) continues: phone, morning and evening, is clean for welcome, toucanask, insights, faces, sequence, habiteditor, evening, create, today (Nov 21, run 4). Still to run: those flows on **tablet** (today is done) (the other flows are claimed by run 5).
+- RUN-B-HANDOFF item 0 (b) continues: phone, morning and evening, is clean for welcome, toucanask, insights, faces, sequence, habiteditor, evening, create, today (Nov 21, run 4). **Run 6 (Nov 21): tablet, morning and evening, clean (0 errors) for welcome, toucanask, insights, faces, sequence, habiteditor, evening, create** (only warnings: an insights layout-shift and the time-wheel input over its wheels, both existing). The other flows are run 5's.
 - Feedback 71a6b505 (second half, "the image uploader disappeared from the portrait picker"): the quest editor's picture background (with its upload) sits at the foot of the portrait picker only once a quest exists; on a **new** quest it isn't there. Unclear whether that is what he means: ask him. ad8add7b ("Why can't I edit the board title"): a board's title edits from its parent's ✎ only; editing it in place on the board page is new UI, so a mockup first.
 - Walkthrough intro wording (notes c6ba4030 second half, af13ecc0): his edited text with "I am the Great Toucan Spirit" and options for the bold **exciting**: new wording, so a review page first (`tour/Walkthrough.tsx` line ~71). Not built.
 
