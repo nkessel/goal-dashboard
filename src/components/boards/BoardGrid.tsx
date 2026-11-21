@@ -28,6 +28,7 @@ import type { Task } from "@/lib/data/types";
 import { boardFolderAction, listBoardOptionsAction, moveTaskToBoardAction, nestBoardAction, reorderBoardsAction, setBoardDreamAction } from "@/app/actions";
 import { QuestCardPopup } from "@/components/tasks/QuestCardPopup";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
+import { RollerTrimMark, useRollerTrim } from "./RollerTrim";
 import { CreateSheet } from "@/components/create/CreateSheet";
 import { EditBoardModal } from "./EditBoardModal";
 import { BoardSeal } from "./BoardSeal";
@@ -948,6 +949,7 @@ function NestPicker({ board, isAdventure, onClose: closeNow, onPick }: { board: 
  * them away (owner, Nov 12–13). A tap unrolls three more, or rolls them all back once everything shows.
  */
 function ScrollPull({ shown, total, onChange, label }: { shown: number; total: number; onChange: (n: number) => void; label: string }) {
+  const [trim] = useRollerTrim();
   const start = useRef<{ y: number; n: number; moved: boolean } | null>(null);
   const [live, setLive] = useState<number | null>(null);
   const n = live ?? shown;
@@ -991,10 +993,12 @@ function ScrollPull({ shown, total, onChange, label }: { shown: number; total: n
       {hidden > 0 && (
         // "↓ 3 more", lettered on the roller itself: a bare number said nothing about what it counted (owner, Nov 20).
         <span aria-hidden className="scroll-pull-count">
+          <RollerTrimMark side="l" trim={trim} />
           <svg width="9" height="9" viewBox="0 0 12 12" aria-hidden>
             <path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           {hidden} more
+          <RollerTrimMark side="r" trim={trim} />
         </span>
       )}
     </button>

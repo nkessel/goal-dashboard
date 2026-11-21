@@ -871,6 +871,13 @@ export const FLOWS = [
     async run(h) {
       await h.goto("/settings", { name: "settings" });
       await h.check("top");
+      // Roller trim (owner, Nov 20): Settings › Boards offers Ornaments · Lines · Plain with a preview.
+      await h.goto("/settings?open=boards-look", { name: "settings roller trim" });
+      await h.check("roller trim: ornaments");
+      if (await h.tap((p) => p.getByRole("radio", { name: "Lines" }), "roller trim: lines", { optional: true })) await h.check("roller trim: lines");
+      if (await h.tap((p) => p.getByRole("radio", { name: "Plain" }), "roller trim: plain", { optional: true })) await h.check("roller trim: plain");
+      await h.tap((p) => p.getByRole("radio", { name: "Ornaments" }), "roller trim: back to ornaments", { optional: true });
+      await h.goto("/settings", { name: "settings" });
       const rows = await h.page.locator("main button[aria-expanded=false]").count();
       for (let i = 0; i < Math.min(rows, 12); i++) {
         const row = h.page.locator("main button[aria-expanded=false]").first();

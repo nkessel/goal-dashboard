@@ -3550,3 +3550,11 @@ html[data-tour-open] [data-perched-owl] { visibility: hidden; }
   font: 700 11px/14px var(--font-sans, system-ui); letter-spacing: .02em; color: #3a2a0c;
   text-shadow: 0 1px 0 rgba(255, 238, 190, .55);
 }
+/* Roller trim (owner, Nov 20): swoosh 4B either side of "N more", or hairlines, or nothing. */
+.scroll-pull-count { gap: 8px; letter-spacing: .14em; text-transform: uppercase; font-size: 10.5px; }
+.roller-swoosh { color: #6b3f12; opacity: .9; flex: none; }
+.roller-swoosh.r { transform: scaleX(-1); }
+.scroll-pull .roller-swoosh { width: 27px; height: 8px; }
+.scroll-pull .roller-hair { width: 18px; }
+.scroll-pull-count { gap: 5px; letter-spacing: .1em; }
+.roller-hair { width: 56px; height: 0; border-top: 1px solid rgba(107, 63, 18, .55); border-bottom: 1px solid rgba(255, 244, 205, .7); flex: none; }
