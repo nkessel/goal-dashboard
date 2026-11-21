@@ -9,6 +9,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 - **Run B (Sonnet 5.5, this account, Nov 20):** step 1 (the three merges) and D0 are on `main`; now on S2/S3 (order in `docs/RUN-B-HANDOFF.md`). Other sessions: leave those to it.
 - **Session claude-2d (Opus, owner's account):** Nov 20, merged the four review branches above to `main`; nothing in progress. `review/boards-nov18` still waits on the owner.
 
+- **Waiting on the owner's design review**: `review/complete-earlier-more` (quest editor › Complete › Earlier…: Today · Yesterday · More…, which opens the five days before yesterday and a date field for any day; owner note Nov 21) · https://claude.ai/artifact/2caq35AXp8XRge4dkQqPN6 · Nov 21.
+
 **Shipped Nov 20 (merged to `main` from `merge-nov20`, owner: "do what you think is best"):** `review/faces-feel`, `review/insights-nov19`, `review/insights-timeline`, `review/subquests-sequence`. See `docs/SHIPPED.md`. Review pages: https://claude.ai/artifact/DgobEgqytFM6qsSuC2bZeJ and https://claude.ai/artifact/69UKiWJeE7BgPnJLRU8q6E
 - **Follow-up (Sonnet, a fix):** the check-in's saved draft and its "Last night" card are decided in the browser after load, so Insights and Today move once (listed in `scripts/ui-check/known-issues.json`). Keep the draft and "first check-in today" in a cookie so the server draws them; then drop those three known-issues entries.
 
