@@ -1150,11 +1150,13 @@ export function QuestEditorDialog({
   // Complete asks when it was finished first (owner, Nov 8): just now, or earlier on the time wheels.
   const [askWhen, setAskWhen] = useState(false);
   const [earlier, setEarlier] = useState(false);
-  const [whenYesterday, setWhenYesterday] = useState(false);
+  // How many days ago it was done: Today, Yesterday, or any earlier day from "More…" (owner, Nov 21).
+  const [whenAgo, setWhenAgo] = useState(0);
+  const [whenMore, setWhenMore] = useState(false);
   const [whenMins, setWhenMins] = useState(0);
   function completeEarlier() {
     const at = new Date();
-    if (whenYesterday) at.setDate(at.getDate() - 1);
+    at.setDate(at.getDate() - whenAgo);
     at.setHours(Math.floor(whenMins / 60), whenMins % 60, 0, 0);
     const now = new Date();
     completeExisting(at > now ? now : at);
@@ -3112,12 +3114,41 @@ export function QuestEditorDialog({
                       <Fold open={earlier}>
                         <span className="relative z-[1] flex flex-col items-center gap-2 pt-1">
                           <span className="flex gap-1.5">
-                            {[false, true].map((y) => (
-                              <button key={String(y)} type="button" aria-pressed={whenYesterday === y} onClick={() => setWhenYesterday(y)} className="qe-fact h-8 rounded-full px-3 text-[13px] font-semibold" data-open={whenYesterday === y ? "true" : undefined}>
-                                {y ? "Yesterday" : "Today"}
+                            {[0, 1].map((n) => (
+                              <button key={n} type="button" aria-pressed={whenAgo === n && !whenMore} onClick={() => (setWhenAgo(n), setWhenMore(false))} className="qe-fact h-8 rounded-full px-3 text-[13px] font-semibold" data-open={whenAgo === n && !whenMore ? "true" : undefined}>
+                                {n ? "Yesterday" : "Today"}
                               </button>
                             ))}
+                            {/* Any earlier day (owner, Nov 21: "more options than today or yesterday"). */}
+                            <button type="button" aria-expanded={whenMore} onClick={() => setWhenMore((v) => !v)} className="qe-fact h-8 rounded-full px-3 text-[13px] font-semibold" data-open={whenMore || whenAgo > 1 ? "true" : undefined}>
+                              {whenAgo > 1 ? daysAgoLabel(whenAgo) : "More…"}
+                            </button>
                           </span>
+                          <Fold open={whenMore}>
+                            <span className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
+                              {[2, 3, 4, 5, 6].map((n) => (
+                                <button key={n} type="button" aria-pressed={whenAgo === n} onClick={() => (setWhenAgo(n), setWhenMore(false))} className="qe-fact h-8 rounded-full px-3 text-[13px] font-semibold" data-open={whenAgo === n ? "true" : undefined}>
+                                  {daysAgoLabel(n)}
+                                </button>
+                              ))}
+                              <DateField
+                                value={dayKeyAgo(whenAgo)}
+                                max={dayKeyAgo(0)}
+                                onChange={(v) => {
+                                  if (!v) return;
+                                  const [y, m, d] = v.split("-").map(Number);
+                                  const t = new Date();
+                                  const ago = Math.round((new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime() - new Date(y, m - 1, d).getTime()) / 86_400_000);
+                                  setWhenAgo(Math.max(0, ago));
+                                  setWhenMore(false);
+                                }}
+                                ariaLabel="Another day"
+                                placeholder="Pick a day"
+                                className="h-8 rounded-full border px-3 text-[13px]"
+                                style={{ borderColor: "#b39a6a" }}
+                              />
+                            </span>
+                          </Fold>
                           <TimeWheels value={whenMins} onChange={setWhenMins} />
                           <button type="button" onClick={completeEarlier} disabled={isSaving} className="qe-complete h-10 rounded-full px-4 text-[14.5px] font-semibold disabled:opacity-60">
                             ✦ Complete {noun}
@@ -3130,7 +3161,7 @@ export function QuestEditorDialog({
                     <button
                       type="button"
                       aria-expanded={askWhen}
-                      onClick={() => (setAskWhen((v) => !v), setEarlier(false), setWhenYesterday(false))}
+                      onClick={() => (setAskWhen((v) => !v), setEarlier(false), setWhenAgo(0), setWhenMore(false))}
                       disabled={isSaving || !title.trim()}
                       title={`Complete this ${noun} now`}
                       className="qe-complete flex h-10 items-center gap-1 whitespace-nowrap rounded-full px-3.5 text-[14.5px] font-semibold disabled:cursor-default disabled:opacity-45"
@@ -3285,4 +3316,17 @@ function PillIcon({ k, color }: { k: string; color?: string | null }) {
       )}
     </svg>
   );
+}
+
+/** "Wed 18" for a day `n` days back (the quest editor's "Earlier…" day picks). */
+function daysAgoLabel(n: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric" });
+}
+/** YYYY-MM-DD for the day `n` days back, on this device. */
+function dayKeyAgo(n: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
