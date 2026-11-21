@@ -4,6 +4,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Run B, scheduled Sonnet session, Nov 21 02:15 UTC:** D0 only (`set_profile_extra` migration 0093, `writeExtra`, convert the `life_wheel` write sites). Leave D0 alone; S2/S3, L1 are free.
 - **Run B (Sonnet 5.5, this account, Nov 20):** step 1 (the three merges) is on `main`; now on S2/S3, L1, D0 (order in `docs/RUN-B-HANDOFF.md`). Other sessions: leave those to it.
 - **Session claude-2d (Opus, owner's account):** Nov 20, merged the four review branches above to `main`; nothing in progress. `review/boards-nov18` still waits on the owner.
 
