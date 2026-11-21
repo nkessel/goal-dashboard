@@ -4,6 +4,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Scheduled Run B (Sonnet, Nov 21 1:30 PM UTC):** the check-in draft and "Last night" card drawn by the server via a cookie (PRIORITIES item 0; follow-up below). Not touching item 0 (b) bug hunt, calendar or boards.
 - **Dev loop 2 (Opus, Nov 21 7:57 AM ET):** RUN-B-HANDOFF item 0 (b): full UI check against `main`, fixing bugs and regressions from the Nov 20–21 merges (not calendar/boards while claude-2d's merge line stands); then small bug-fix feedback notes, then BUILD-PLAN. Other sessions: leave item 0 (b) to this loop.
 - **Session claude-2d (Opus, Nov 21 7:15 AM ET):** merging `review/boards-nov18` to `main` (owner approved Nov 21). Other sessions: don't touch calendar, boards, BoardGrid, failed-now or the series-look files until this line is gone.
 - **Run B (Sonnet 5.5, this account, Nov 20):** step 1 (the three merges) and D0 are on `main`; now on S2/S3 (order in `docs/RUN-B-HANDOFF.md`). Other sessions: leave those to it.
