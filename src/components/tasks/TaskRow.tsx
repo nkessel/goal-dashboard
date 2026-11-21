@@ -196,6 +196,8 @@ export function TaskRow({
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [scheduling, setScheduling] = useState(false);
   const [doneEarlier, setDoneEarlier] = useState(false);
+  // Completing from the card asks when first: Just now, or another day and time (owner, Nov 21).
+  const [askWhen, setAskWhen] = useState(false);
   const [sequencing, setSequencing] = useState(false);
   // A sequence fans out into all its quests on a tap, and stacks back on the next (owner, Nov 9–10).
   const [fanned, setFanned] = useState(false);
@@ -350,9 +352,10 @@ export function TaskRow({
     });
   }
 
-  function pick(action: QuestAction, fromMenu = true) {
+  function pick(action: QuestAction, fromMenu = true, sure = false) {
     setMenu(null);
     setError(null);
+    if (action === "complete" && !sure) return setAskWhen(true);
     if (action === "edit") return setEditing(true);
     if (action === "calendar") return setScheduling(true);
     if (action === "focus") return openFocusMode({ ...task, categoryLabel });
@@ -936,6 +939,20 @@ export function TaskRow({
         />
       )}
       {sequencing && <SequenceDialog taskId={task.id} title={task.title} isAdventure={isAdventure} onClose={() => setSequencing(false)} />}
+      {askWhen && (
+        <DoneEarlierDialog
+          title={task.title}
+          isAdventure={isAdventure}
+          askNow
+          onNow={() => (setAskWhen(false), pick("complete", true, true))}
+          onPick={(when) => (setAskWhen(false), completeEarlier(when))}
+          onEdit={() => {
+            setAskWhen(false);
+            setEditing(true);
+          }}
+          onClose={() => setAskWhen(false)}
+        />
+      )}
       {doneEarlier && (
         <DoneEarlierDialog
           title={task.title}
@@ -1108,15 +1125,17 @@ function LockedRewardCard({ reward }: { reward: Task }) {
 }
 
 /** "Already completed": which day (and, if wanted, what time) it was done. */
-function DoneEarlierDialog({ title, isAdventure, onPick, onEdit, onClose: closeNow }: { title: string; isAdventure: boolean; onPick: (when: Date) => void; onEdit: () => void; onClose: () => void }) {
+function DoneEarlierDialog({ title, isAdventure, askNow = false, onNow, onPick, onEdit, onClose: closeNow }: { title: string; isAdventure: boolean; askNow?: boolean; onNow?: () => void; onPick: (when: Date) => void; onEdit: () => void; onClose: () => void }) {
   const { closing, close: onClose } = useClosing(closeNow);
   const pad = (n: number) => String(n).padStart(2, "0");
   const keyOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const [now] = useState(() => new Date());
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  const [day, setDay] = useState(keyOf(yesterday));
-  const [time, setTime] = useState("");
+  const [day, setDay] = useState(keyOf(askNow ? now : yesterday));
+  const [time, setTime] = useState(() => (askNow ? `${pad(now.getHours())}:${pad(now.getMinutes())}` : ""));
+  // From the card: "Just now" first; "Other…" opens the day and time.
+  const [other, setOther] = useState(!askNow);
   const quick = [0, 1, 2].map((n) => {
     const d = new Date(now);
     d.setDate(now.getDate() - n);
@@ -1145,6 +1164,18 @@ function DoneEarlierDialog({ title, isAdventure, onPick, onEdit, onClose: closeN
             {title}
           </p>
         </div>
+        {askNow && (
+          <div className="relative z-[1] flex gap-2">
+            <button type="button" autoFocus onClick={onNow} className="hover-glow h-10 flex-1 rounded-full text-[15px] font-bold" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1.5px solid #8a6116", color: "#2a1c10" }}>
+              Just now
+            </button>
+            <button type="button" aria-expanded={other} onClick={() => setOther((v) => !v)} className="h-10 flex-1 rounded-full text-[15px] font-semibold" style={other ? { background: "rgba(217,180,95,.25)", border: "1.5px solid #8a6116" } : { border: "1.5px solid #b39a6a" }}>
+              Other…
+            </button>
+          </div>
+        )}
+        <Fold open={other}>
+        <div className="relative z-[1] flex flex-col gap-3 pt-0.5">
         <div className="relative z-[1] flex flex-wrap gap-1.5">
           {quick.map((q) => (
             <button
@@ -1163,6 +1194,8 @@ function DoneEarlierDialog({ title, isAdventure, onPick, onEdit, onClose: closeN
           <DateField value={day} max={keyOf(now)} onChange={(v) => v && setDay(v)} ariaLabel="Day" className="h-10 rounded-lg border px-2 text-[16px]" style={{ borderColor: "#b39a6a" }} />
           <TimeToken value={time} onChange={setTime} label="Time (optional)" kind="any" compact quiet placeholder="+ time (optional)" />
         </div>
+        </div>
+        </Fold>
         <div className="relative z-[1] flex flex-wrap justify-end gap-2 pt-1">
           {/* Update it first (steps, XP, notes), then come back here to mark it done. */}
           <button type="button" onClick={onEdit} className="mr-auto h-10 rounded-full px-3 text-[14.5px] font-semibold underline-offset-2 hover:underline" style={{ color: "var(--t-ink)" }}>
@@ -1171,9 +1204,11 @@ function DoneEarlierDialog({ title, isAdventure, onPick, onEdit, onClose: closeN
           <button type="button" onClick={onClose} className="h-10 rounded-full px-4 text-[15px] font-semibold hover:bg-black/5" style={{ border: "1.5px solid #b39a6a" }}>
             Cancel
           </button>
-          <button type="button" onClick={confirm} className="hover-glow h-10 rounded-full px-5 text-[15px] font-bold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
-            Mark completed
-          </button>
+          {other && (
+            <button type="button" onClick={confirm} className="hover-glow h-10 rounded-full px-5 text-[15px] font-bold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+              Mark completed
+            </button>
+          )}
         </div>
       </div>
     </div>,
