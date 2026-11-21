@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { setCalUiWho } from "@/lib/cal-ui";
 
 /**
  * Saves the calendar view (and its day count) so the calendar opens on it
@@ -9,6 +10,9 @@ import { useEffect } from "react";
  * Read back by the calendar page ("cal-view-<id>") when a link names no view.
  */
 export function RememberView({ view, n, who }: { view: string; n: number; who: string }) {
+  useEffect(() => {
+    setCalUiWho(who);
+  }, [who]);
   useEffect(() => {
     document.cookie = `cal-view-${who}=${encodeURIComponent(`${view}|${n}`)}; path=/; max-age=31536000; samesite=lax`;
   }, [view, n, who]);

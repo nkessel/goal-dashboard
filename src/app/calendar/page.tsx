@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { after } from "next/server";
 import type { Task } from "@/lib/data/types";
+import { parseCalUi, calUiCookie } from "@/lib/cal-ui";
 import { RememberView } from "@/components/calendar/RememberView";
 import { ConnectCalendar } from "@/components/calendar/ConnectCalendar";
 import { requireSession } from "@/lib/session";
@@ -64,6 +65,7 @@ export default async function CalendarPage({
   const params = await searchParams;
   // No view in the link: open on the view used last time.
   const remembered = params.view ? null : decodeURIComponent((await cookies()).get(`cal-view-${session.user.id}`)?.value ?? "").split("|");
+  const calUi = parseCalUi((await cookies()).get(calUiCookie(session.user.id))?.value);
   const viewParam = params.view ?? remembered?.[0];
   const nParam = params.n ?? remembered?.[1];
   const dateParam = params.date;
@@ -380,6 +382,7 @@ export default async function CalendarPage({
                 <>
               <CalendarSlide slideKey={`${view}|${nDays}|${formatDateParam(rangeStart)}`}>
               <CalendarLayers
+                ui={calUi}
                 agenda={agenda}
                 interest={interest}
                 view={view}

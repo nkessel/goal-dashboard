@@ -4,7 +4,6 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Run B (Sonnet 5.5, scheduled run, Nov 21 14:30 UTC):** Cal 1d (`cal-ui` cookie): `calendar/RememberView.tsx`, `calendar/page.tsx`, `calendar/CalendarLayers.tsx`, `WeekView.tsx` initial state. Leave those files.
 - **Dev loop 2 (Opus, Nov 21 8:58 AM ET, run 2 of the hourly loop; still working past 10 AM ET):** hydration fixes in `boards/QuestList.tsx`, `plan/*`, `tasks/CompletedTaskRow.tsx`, `matrix/PriorityMatrix.tsx`, new `lib/use-draw-zone.ts`; the feedback button over the walkthrough (`tour/Walkthrough.tsx`, `layout/AppShell.tsx`, `globals.css`). **A later run of this loop that finds this line under 2 hours old: leave those files and take the next feedback notes or BUILD-PLAN instead.**
 - **Run B (Sonnet 5.5, this account, Nov 20):** step 1 (the three merges) and D0 are on `main`; now on S2/S3 (order in `docs/RUN-B-HANDOFF.md`). Other sessions: leave those to it.
 - **Session claude-2d (Opus, owner's account):** Nov 20, merged the four review branches above to `main`; nothing in progress. `review/boards-nov18` still waits on the owner.
@@ -13,6 +12,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 **Shipped Nov 20 (merged to `main` from `merge-nov20`, owner: "do what you think is best"):** `review/faces-feel`, `review/insights-nov19`, `review/insights-timeline`, `review/subquests-sequence`. See `docs/SHIPPED.md`. Review pages: https://claude.ai/artifact/DgobEgqytFM6qsSuC2bZeJ and https://claude.ai/artifact/69UKiWJeE7BgPnJLRU8q6E
 - **Follow-up (Sonnet, a fix):** Insights is now clean (Nov 21: the draft lives in a `checkin-draft` cookie and the server draws it and "Last night"), but on Today the check-in still moves Today's Quests once (~120-130px, steps "check-in open" and "habit sub-habits open"; entry kept in `known-issues.json`). Find that cause (not the Last night fetch).
+
+- **Bug for a fixer (found by Run B's calendar UI check, Nov 21):** `popup-behind` error on the tablet's "Apply these settings to all future repeats?" dialog (step "series look: saved for all"): the dialog is drawn under another element; portal it to the body. Came in with the boards merge; not from Cal 1d.
 
 ## 0a. Work in progress and waiting on the owner (Nov 12)
 

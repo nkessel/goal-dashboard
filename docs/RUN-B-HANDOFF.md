@@ -52,7 +52,7 @@ Waiting on the owner's review, **don't merge** without his OK: `review/boards-no
 **8. Calendar fixes, plus the data copy.** Changed since the plan was written:
 - **Cal 1b, 1c: done** (live with the flash fix).
 - **Cal 2a, 2b, 2c, 2d: on `main`** (merged Nov 21 with `review/boards-nov18`, owner approved). Don't build them again.
-- **Left: Cal 1d** (`cal-ui` cookie for span, zoom, early/late and layers; it fixes the calendar opening on the wrong settings, so it ships straight to `main` after the UI check), and **Cal 3** (migration 0090 and the copy of drives and day holds; nothing visible, verify with SELECTs). Cal 1d touches `WeekView.tsx` and `CalendarLayers.tsx`, which `review/boards-nov18` also changes: build it on top of that branch, or wait until it's merged.
+- **Cal 1d: done Nov 21** (`cal-ui` cookie, `lib/cal-ui.ts`). Was left: (`cal-ui` cookie for span, zoom, early/late and layers; it fixes the calendar opening on the wrong settings, so it ships straight to `main` after the UI check), and **Cal 3** (migration 0090 and the copy of drives and day holds; nothing visible, verify with SELECTs). Cal 1d touches `WeekView.tsx` and `CalendarLayers.tsx`, which `review/boards-nov18` also changes: build it on top of that branch, or wait until it's merged.
 
 **9. Stats on sub-quests** (owner note 4eb6549b, Nov 16: sub-quests "should be a bit more like quests": time, char stat assignment, scheduling). Not designed yet: brainstorm with mockups first. Reuse the quest's stats tray (`tasks/StatSplitEditor.tsx`).
 

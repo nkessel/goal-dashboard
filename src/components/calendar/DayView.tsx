@@ -1,5 +1,6 @@
 "use client";
 
+import type { CalUi } from "@/lib/cal-ui";
 import Link from "next/link";
 import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
@@ -21,7 +22,9 @@ export function DayView({
   daily,
   essentials,
   habitLook,
+  ui,
 }: {
+  ui?: CalUi;
   daily?: DailyLayer;
   essentials?: EssentialsLook;
   habitLook?: HabitLook;
@@ -74,7 +77,7 @@ export function DayView({
           );
         })}
       </div>
-      <WeekView dayKeys={wideKeys ?? [dateKey]} visible={1} buffer={wideKeys ? buffer : 0} tasks={tasks} events={events} theme={theme} portraits={portraits} card={card} daily={daily} essentials={essentials} habitLook={habitLook} />
+      <WeekView dayKeys={wideKeys ?? [dateKey]} visible={1} buffer={wideKeys ? buffer : 0} tasks={tasks} events={events} theme={theme} portraits={portraits} card={card} daily={daily} essentials={essentials} habitLook={habitLook} ui={ui} />
     </div>
   );
 }

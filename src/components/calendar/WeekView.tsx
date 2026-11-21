@@ -34,6 +34,7 @@ import { SCHEDULER_DEFAULTS, dailyEvents, holdAt, localDayKey, mealsOn, type Day
 import { habitBlocksOn } from "@/lib/timed-habits";
 import { driveWords, useAllQuestDrives } from "@/lib/use-quest-cal";
 import { fromFeedback } from "@/lib/from-feedback";
+import { writeCalUi, type CalUi } from "@/lib/cal-ui";
 
 /** Hour height: condensed by default; drag the times on the left to zoom. */
 const DEFAULT_HOUR_PX = 36;
@@ -98,7 +99,10 @@ export function WeekView({
   essentials = "dashed",
   habitLook = "quest",
   embedded = false,
+  ui,
 }: {
+  /** What the server read from the `cal-ui` cookie: starting values, so the first picture is the final one. */
+  ui?: CalUi;
   /** Inside a box of its own that scrolls (Today's day calendar): it scrolls that box, not the page, and stays on its day. */
   embedded?: boolean;
   daily?: DailyLayer;
@@ -120,11 +124,11 @@ export function WeekView({
 }) {
   const isAdventure = theme === "adventure";
   const days = dayKeys.map((k) => parseDateParam(k));
-  const [hourPx, setHourPx] = useState(isAdventure ? ADVENTURE_HOUR_PX : DEFAULT_HOUR_PX);
+  const [hourPx, setHourPx] = useState(ui?.zoom ?? (isAdventure ? ADVENTURE_HOUR_PX : DEFAULT_HOUR_PX));
   // 7 AM–10:30 PM by default; the hours before and after open from a button (owner, Nov 6: "The user should have to click a button to see before 7am and after 10:30pm").
-  const [early, setEarly] = useState(false);
+  const [early, setEarly] = useState(ui?.early ?? false);
   // null: the late hours follow the quests (a quest running past 10:30 PM opens them; owner, Nov 19: "Yes").
-  const [lateChoice, setLate] = useState<boolean | null>(null);
+  const [lateChoice, setLate] = useState<boolean | null>(ui?.late ?? null);
   // Just placed at a time behind the early/late buttons (from a picker): open those hours so it's seen (planner step 2c).
   useEffect(() => {
     let at: string | null = null;
@@ -146,6 +150,7 @@ export function WeekView({
   const [itemMenu, setItemMenu] = useState<{ x: number; y: number; target: MenuTarget } | null>(null);
   const HOUR_PX = hourPx;
   useEffect(() => {
+    if (ui?.zoom) return;
     try {
       const z = Number(window.localStorage.getItem(ZOOM_KEY));
       // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
@@ -153,12 +158,14 @@ export function WeekView({
     } catch {
       /* storage unavailable */
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once after hydration; the cookie value only seeds the start
   }, []);
   function zoomTo(px: number) {
     const v = Math.round(Math.max(MIN_HOUR_PX, Math.min(MAX_HOUR_PX, px)));
     setHourPx(v);
     try {
       window.localStorage.setItem(ZOOM_KEY, String(v));
+      writeCalUi({ zoom: v });
     } catch {
       /* storage unavailable */
     }
@@ -233,7 +240,8 @@ export function WeekView({
   const single = vis === 1;
   // How many days fit on screen, partway too: the zoom slider over the days, or a sideways pinch (owner, Nov 5 and 12:
   // "a slider from 1-14 days… allow partial days to show… super smooth").
-  const [span, setSpan] = useState<number | null>(null);
+  const fromCookie = ui?.span && ui.span >= 1 && ui.span <= MAX_SPAN && Math.max(1, Math.ceil(ui.span - 0.01)) === vis ? ui.span : null;
+  const [span, setSpan] = useState<number | null>(seamless ? fromCookie : null);
   useEffect(() => {
     if (!seamless) return;
     let s: number | null = null;
@@ -244,8 +252,8 @@ export function WeekView({
       /* storage unavailable */
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
-    setSpan(s);
-  }, [vis, seamless]);
+    setSpan(s ?? fromCookie);
+  }, [vis, seamless, fromCookie]);
   const shown = seamless ? Math.max(1, Math.min(MAX_SPAN, days.length - 1, span ?? vis)) : vis;
   /** While zooming: which day (and how far into it) stays under the slider's middle or the pointer. */
   const zoomAnchor = useRef<{ d: number; off: number } | null>(null);
@@ -525,6 +533,7 @@ export function WeekView({
     if (!el || colWidth <= 0) return;
     try {
       window.localStorage.setItem(SPAN_KEY, String(shown));
+      writeCalUi({ span: shown });
     } catch {
       /* storage unavailable */
     }
@@ -1274,8 +1283,14 @@ export function WeekView({
       </div>
       <div className="relative" style={{ paddingBottom: 30 }}>
       {/* Earlier and later hours: on the time bar itself, just above and below its first and last marks (owner, Nov 12). */}
-      <HoursButton side="early" open={early} hidden={hidden.early} isAdventure={isAdventure} top={Math.max(0, headTop - 26)} onToggle={() => setEarly((v) => !v)} />
-      <HoursButton side="late" open={late} hidden={hidden.late} isAdventure={isAdventure} top={headTop + (gridMinutes / 60) * HOUR_PX + 4} onToggle={() => setLate(!late)} />
+      <HoursButton side="early" open={early} hidden={hidden.early} isAdventure={isAdventure} top={Math.max(0, headTop - 26)} onToggle={() => {
+        writeCalUi({ early: !early });
+        setEarly(!early);
+      }} />
+      <HoursButton side="late" open={late} hidden={hidden.late} isAdventure={isAdventure} top={headTop + (gridMinutes / 60) * HOUR_PX + 4} onToggle={() => {
+        writeCalUi({ late: !late });
+        setLate(!late);
+      }} />
       {seamless && (
         // The time column stays put while the days scroll under it (a sticky cell can't leave its grid cell, so it's its own layer).
         // Its parchment is the card's own, lined up with it, so the strip doesn't show as a different colour (owner, Nov 12).
