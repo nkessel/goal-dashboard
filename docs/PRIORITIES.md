@@ -16,7 +16,7 @@ Related: `docs/BUILD-PLAN.md` (tasks for lighter models), `docs/REPEAT-ASKS.md`,
 
 Take them in order. Each is the owner's own ask (note id prefix in brackets; read the full note with the section 3 query, `where id::text like 'xxxx%'`).
 
-0b. **Calendar menus you can rearrange (owner, Nov 16 f562c138; asked again Nov 20 on the boards review page):** the calendar quest and event menus (`calendar/CalendarItemMenu.tsx`) get the app's usual menu arranging: gear → drag rows, eye on the right. The × and the event menu's Delete are done (on `review/boards-nov18`). This is a design change: mockup first, via the quest ⋯ menu's arranging (`ui/ScreenArrange.tsx`, the quest ⋯ menu's gear) as the model.
+0b. ~~Calendar menus you can rearrange~~ **shipped Nov 21** (see `docs/SHIPPED.md`).
 
 0. **Check-in drawn by the server (done on Insights Nov 21; Today still shifts once, see WAITING):** the saved draft and the "Last night" card come from the browser after load, so Insights and Today move once. Details in `docs/WAITING.md` top section.
 

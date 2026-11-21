@@ -31,7 +31,6 @@ The owner's Claude project also keeps a priorities list by model (Nov 16) in its
 
 Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Read the topic's entry there before touching it. When something new waits on him (a design review, a pick), add it there with its branch, review page link and date, and add its name to this list.
 
-- `review/calendar-menu-arrange` (calendar menus: gear, drag, eye, rename): built Nov 21, review page sent.
 - Insights on one graph for every metric (owner, Nov 16): not built. The toucan offering habits: on hold (both in WAITING).
 - Merging Daily Habits and Today's Quests on Today: brainstorm with him first.
 - The email to Daniel about his Champion title: needs his OK and wording.
