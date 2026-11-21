@@ -5,7 +5,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 ## In progress right now (claim before you start; remove your line when you ship)
 
 - **Scheduled Run B (Sonnet, Nov 21 1:30 PM UTC):** the check-in draft and "Last night" card drawn by the server via a cookie (PRIORITIES item 0; follow-up below). Not touching item 0 (b) bug hunt, calendar or boards.
-- **Dev loop 2 (Opus, Nov 21 7:57 AM ET):** RUN-B-HANDOFF item 0 (b): full UI check against `main`, fixing bugs and regressions from the Nov 20–21 merges (not calendar/boards while claude-2d's merge line stands); then small bug-fix feedback notes, then BUILD-PLAN. Other sessions: leave item 0 (b) to this loop.
+- **Dev loop 2 (Opus, Nov 21 8:58 AM ET, run 2; run 1's 7:57 line replaced, it pushed nothing):** RUN-B-HANDOFF item 0 (b): full UI check against `main`, the React #418 hydration errors in UTC (/quests, /plan, /matrix, /journal, / on tablet) and other Nov 20–21 regressions (not calendar/boards); then small bug-fix feedback notes, then BUILD-PLAN. Other sessions: leave item 0 (b) to this loop.
 - **Run B (Sonnet 5.5, this account, Nov 20):** step 1 (the three merges) and D0 are on `main`; now on S2/S3 (order in `docs/RUN-B-HANDOFF.md`). Other sessions: leave those to it.
 - **Session claude-2d (Opus, owner's account):** Nov 20, merged the four review branches above to `main`; nothing in progress. `review/boards-nov18` still waits on the owner.
 
