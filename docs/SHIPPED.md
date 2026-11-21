@@ -10,6 +10,8 @@ Older history: `docs/archive/HANDOFF-2026-10-21.md`.
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- **Nov 21, Cal 1a (nothing visible):** the UI check now runs the server in UTC by default (as on Vercel) while the browser stays in the morning/evening zone, so server/browser time mismatches and hydration errors (already `console-error`) fail the check without a flag. `scripts/ui-check/run.mjs`, `docs/ui-check.md`. Calendar flow on phone and tablet: 0 errors. Note: the build needs `NODE_OPTIONS=--max-old-space-size=6144` in a small cloud container.
+
 - **Nov 21, "When 1" (Run B, nothing visible):** `src/lib/when.ts`, the pure helpers for the one "Complete by" (Flexible / Fixed) model: `WhenValue`, `whenFromTask`, `makeFixed`/`makeFlexible`, `whenWords` (pill face), `landsWords` (line above Import), `whenChanges` (ops; Fixed and Flexible clear each other). 40 checks in `scripts/test-when.mjs` (`node scripts/test-when.mjs`, runs in New York time). Nothing imports it yet, so no screen changed (no UI check needed). Left: `whenFromImportCard` (step 4, needs the import card's attrs). Next in Run B: Cal 1a, Cal 1d, Cal 3; S2/S3 and L1 are claimed by another run.
 
 - **Nov 21: D1, new quest columns (nothing visible).** Migration `0094_quest_extras_columns.sql`: `tasks.place` (text), `tasks.card_look` and `tasks.progress_unit` (jsonb), all nullable. Applied to production and checked with a SELECT on `information_schema.columns`. Nothing reads them yet; D2/D3 in `docs/plans/2026-11-16-split-plan.md` come next. Revert: `alter table tasks drop column …`.

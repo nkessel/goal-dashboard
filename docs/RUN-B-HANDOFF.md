@@ -45,7 +45,7 @@ Waiting on the owner's review, **don't merge** without his OK: `review/boards-no
 
 **6. When 1 (done Nov 21):** `src/lib/when.ts` and its checks (`docs/plans/2026-11-17-due-and-scheduling-plan.md`, section 6 step 1). Nothing visible. The owner approved one "Complete by" date with Flexible / Fixed and the word "Auto-schedule"; nothing else in that plan is approved.
 
-**7. Cal 1a** (`docs/CALENDAR-PLANNER-DESIGN.md`): partly done. The UI check has `--server-tz <zone>` and a `first-picture` check in the calendar flow. Left: run it in two time zones by default (UTC server, New York browser) and fail on hydration errors.
+**7. Cal 1a: done Nov 21** (server runs in UTC by default in the UI check). Was: partly done. The UI check has `--server-tz <zone>` and a `first-picture` check in the calendar flow. Left: run it in two time zones by default (UTC server, New York browser) and fail on hydration errors.
 
 **8. Calendar fixes, plus the data copy.** Changed since the plan was written:
 - **Cal 1b, 1c: done** (live with the flash fix).
