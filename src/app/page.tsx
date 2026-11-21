@@ -23,6 +23,7 @@ import {
   listCompletedTasksForOwner,
   countCompletedTasksForOwner,
 } from "@/lib/data/tasks";
+import { buildCheckInInit, DRAFT_COOKIE } from "@/lib/checkin-init";
 import { getProfileById } from "@/lib/data/profiles";
 import { getWeeklyXpEarned, currentWeekStart } from "@/lib/data/xp";
 import { listFriendIds } from "@/lib/data/friendships";
@@ -218,6 +219,7 @@ export default async function Home() {
   // Due within the reach you chose in Due soon (or missed this past week):
   // these go to the very top of Today on their own, whatever list they're in,
   // what's due next first and past due last.
+  const draftCookie = (await cookies()).get(DRAFT_COOKIE)?.value;
   const dueHours = parseDueHours((await cookies()).get(DUE_HOURS_COOKIE)?.value);
   const nowMs = nowMsOutside();
   // Snoozed for a while: off Today until then.
@@ -250,6 +252,7 @@ export default async function Home() {
         energyAt={energyToday !== null ? (lastEnergy?.created_at ?? null) : null}
         checkMetrics={checkMetrics}
         metricsToday={metricsToday}
+        checkInInit={buildCheckInInit(profile?.life_wheel, appDayKey(), draftCookie)}
         notesToday={recentNotes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))}
       />
     </section>

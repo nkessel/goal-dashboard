@@ -14,6 +14,7 @@ import { addCheckNoteAction, addJournalEntryAction, addToTopOfTodayAction, delet
 import { EMPTY_NIGHT, NightFields, nightIsEmpty, type NightDraft, MoonIcon, SunIcon, TimeToken } from "./NightFields";
 import { DateField } from "@/components/ui/DateField";
 import { shiftDay } from "@/lib/wheel-of-time";
+import { DRAFT_COOKIE, draftCookieValue, type CheckInInit } from "@/lib/checkin-init";
 import { BoltIcon, CloseIcon } from "@/components/ui/Icons";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { useEscape } from "@/lib/use-escape";
@@ -84,7 +85,10 @@ export function EnergyCheck({
   addNights = false,
   simple = false,
   submit,
+  init,
 }: {
+  /** What the server already knows (draft cookie, last night still to log), so the first paint is final. */
+  init?: CheckInInit;
   /** Hands the screen around it a way to save what's entered (e.g. the welcome screen's Complete check-in); the save runs `after` once saved, or straight away if nothing was entered. */
   submit?: (save: (after: () => void) => void) => void;
   /** The welcome screen's check-in: no Edit check-in, and no caret when it opens in full. */
@@ -110,9 +114,10 @@ export function EnergyCheck({
   /** Today's latest reading of each. */
   metricsToday?: Record<string, number>;
 }) {
-  const [value, setRawValue] = useState(today ?? 5.5);
+  const initDraft = init?.draft ?? null;
+  const [value, setRawValue] = useState(initDraft?.energy ?? today ?? 5.5);
   // A new check-in starts with nothing set: Energy sits faded like the others until moved.
-  const [energySet, setEnergySet] = useState(false);
+  const [energySet, setEnergySet] = useState(initDraft?.energy != null);
   const setValue = (n: number) => {
     setRawValue(n);
     setEnergySet(true);
@@ -125,7 +130,7 @@ export function EnergyCheck({
   // The metrics shown and saved here: yours, plus "My day" in the evening.
   const rows = evening && !metrics.some((m) => m.toLowerCase() === DAY_METRIC.toLowerCase()) ? [...metrics, DAY_METRIC] : metrics;
   // A new check-in starts blank: only metrics moved this time are saved and shown.
-  const [vals, setVals] = useState<Record<string, number>>({});
+  const [vals, setVals] = useState<Record<string, number>>(initDraft?.vals ?? {});
   const [savedVals, setSavedVals] = useState<Record<string, number>>(metricsToday);
   const [expanded, setExpanded] = useState(full);
   // Other nights' sleep and wake, added a row at a time (keyed by the morning after).
@@ -137,9 +142,9 @@ export function EnergyCheck({
   const [peek, setPeek] = useState(false);
   const [noting, setNoting] = useState(false);
   const [journaling, setJournaling] = useState(false);
-  const [journalText, setJournalText] = useState("");
+  const [journalText, setJournalText] = useState(initDraft?.journal ?? "");
   // How you feel, on the journal too (owner, Nov 18: "a smiley emotion picker for the journal here too").
-  const [journalFace, setJournalFace] = useState<number | null>(null);
+  const [journalFace, setJournalFace] = useState<number | null>(initDraft?.face ?? null);
   const [journalSaved, setJournalSaved] = useState(false);
   const [supping, setSupping] = useState(false);
   const [supp, setSupp] = useState({ name: "", dose: "", time: "" });
@@ -242,12 +247,13 @@ export function EnergyCheck({
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
   // The Wheel of Time: the day's first check-in also asks about last night.
-  const [wheel, setWheel] = useState<{ effort: string[]; hindrances: string[] } | null>(null);
-  const [night, setNight] = useState<NightDraft>(EMPTY_NIGHT);
+  const initBase = init?.wheel ? { ...EMPTY_NIGHT, effort: init.wheel.pressed.effort, hindrances: init.wheel.pressed.hindrances } : EMPTY_NIGHT;
+  const [wheel, setWheel] = useState<{ effort: string[]; hindrances: string[] } | null>(init?.wheel ? { effort: init.wheel.effort, hindrances: init.wheel.hindrances } : null);
+  const [night, setNight] = useState<NightDraft>(initBase);
   // What the stone wheel already logged for last night; only changes to it count as input.
-  const [nightBase, setNightBase] = useState(JSON.stringify(EMPTY_NIGHT));
+  const [nightBase, setNightBase] = useState(JSON.stringify(initBase));
   useEffect(() => {
-    if (today !== null) return;
+    if (today !== null || init) return;
     let live = true;
     wheelOfTimeAction()
       .then((w) => {
@@ -261,7 +267,7 @@ export function EnergyCheck({
     return () => {
       live = false;
     };
-  }, [today]);
+  }, [today, init]);
 
   // Open or closed is remembered on this device.
   useEffect(() => {
@@ -287,9 +293,11 @@ export function EnergyCheck({
 
   // A check-in you started is kept on this device until you submit it, so leaving the screen loses nothing
   // (owner, Nov 12 and 18: "partial check-ins should be saved when leaving a screen"; "save a check-in as a draft").
+  // Where the server draws the screen (`init`), the draft lives in a cookie so the first paint already has it;
+  // elsewhere (the welcome screen) it stays in this browser's storage and is read after load.
   const DRAFT_KEY = "checkin-draft";
-  const [draftBack, setDraftBack] = useState(false);
-  const draftLoaded = useRef(false);
+  const [draftBack, setDraftBack] = useState(!!initDraft);
+  const draftLoaded = useRef(!!init);
   useEffect(() => {
     if (draftLoaded.current) return;
     draftLoaded.current = true;
@@ -313,14 +321,23 @@ export function EnergyCheck({
   }, []);
   useEffect(() => {
     if (!draftLoaded.current) return;
+    const empty = !energySet && !Object.keys(vals).length && !journalText.trim() && journalFace === null;
+    if (init) {
+      try {
+        if (empty) document.cookie = `${DRAFT_COOKIE}=; path=/; max-age=0; samesite=lax`;
+        else document.cookie = `${DRAFT_COOKIE}=${draftCookieValue({ day: init.dayKey, energy: energySet ? value : null, vals, journal: journalText, face: journalFace })}; path=/; max-age=172800; samesite=lax`;
+      } catch {
+        /* cookies unavailable */
+      }
+      return;
+    }
     try {
-      const empty = !energySet && !Object.keys(vals).length && !journalText.trim() && journalFace === null;
       if (empty) window.localStorage.removeItem(DRAFT_KEY);
       else window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ day: new Date().toDateString(), energy: energySet ? value : null, vals, journal: journalText, face: journalFace }));
     } catch {
       /* storage unavailable */
     }
-  }, [energySet, value, vals, journalText, journalFace]);
+  }, [energySet, value, vals, journalText, journalFace, init]);
   const clearDraft = () => {
     setEnergySet(false);
     setVals({});

@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { buildCheckInInit, DRAFT_COOKIE } from "@/lib/checkin-init";
 import { requireSession } from "@/lib/session";
 import { listBoardsForOwner } from "@/lib/data/boards";
 import { wheelAreasFrom } from "@/lib/wheel-areas";
@@ -124,7 +126,7 @@ export default async function InsightsPage() {
                   Check in
                 </h2>
                 {/* A fresh check-in each visit; today's earlier ones are listed under it, with the chart. */}
-                <EnergyCheck full sleepLink={false} today={null} metrics={metrics} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))} />
+                <EnergyCheck full sleepLink={false} today={null} init={buildCheckInInit(profile?.life_wheel, appDayKey(), (await cookies()).get(DRAFT_COOKIE)?.value)} metrics={metrics} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))} />
                 <CheckInHub zone={appTimeZone()} readings={readings} metrics={["Energy", ...metrics]} wins={chartWins} starred={marks.star ?? []} nights={cleanWheel((profile?.life_wheel as Record<string, unknown> | null | undefined)?.wheelOfTime).log} />
                 </div>
               </section>

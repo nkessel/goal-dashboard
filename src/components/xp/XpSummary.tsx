@@ -9,6 +9,7 @@ import { RefillBadge } from "@/components/settings/RefillBadge";
 import { normalizeInventory } from "@/lib/inventory";
 import { BossBadge, FaceBossButton, type BossView } from "./BossLine";
 import { TodayCheckIn } from "./TodayCheckIn";
+import type { CheckInInit } from "@/lib/checkin-init";
 
 /** One flanking stat tile in the Adventure-theme header (Quests Complete,
  * Quest Streak, XP this week, Party Size) — icon + big number + caption,
@@ -54,6 +55,7 @@ export function XpSummary({
   checkMetrics = [],
   metricsToday = {},
   notesToday = [],
+  checkInInit,
 }: {
   /** Today's latest energy check-in (undefined = don't show the meter). */
   energyToday?: number | null;
@@ -64,6 +66,7 @@ export function XpSummary({
   /** Today's latest reading of each. */
   metricsToday?: Record<string, number>;
   notesToday?: { id: string; body: string; at?: string }[];
+  checkInInit?: CheckInInit;
   /** The boss standing in the way of the next level (null = none set). */
   boss?: BossView | null;
   /** False before the bosses table exists (no "set a boss" prompt then). */
@@ -191,7 +194,7 @@ export function XpSummary({
           </div>
         </div>
 
-        {energyToday !== undefined && <TodayCheckIn today={energyToday} todayAt={energyAt ?? null} metrics={checkMetrics} metricsToday={metricsToday} notesToday={notesToday} />}
+        {energyToday !== undefined && <TodayCheckIn today={energyToday} todayAt={energyAt ?? null} metrics={checkMetrics} metricsToday={metricsToday} notesToday={notesToday} init={checkInInit} />}
 
         {profile.streak_protection_tokens > 0 && (
           <div className="text-center text-xs" style={{ color: "var(--t-cream)", opacity: 0.75 }}>

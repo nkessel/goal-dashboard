@@ -18,7 +18,7 @@ Take them in order. Each is the owner's own ask (note id prefix in brackets; rea
 
 0b. **Calendar menus you can rearrange (owner, Nov 16 f562c138; asked again Nov 20 on the boards review page):** the calendar quest and event menus (`calendar/CalendarItemMenu.tsx`) get the app's usual menu arranging: gear → drag rows, eye on the right. The × and the event menu's Delete are done (on `review/boards-nov18`). This is a design change: mockup first, via the quest ⋯ menu's arranging (`ui/ScreenArrange.tsx`, the quest ⋯ menu's gear) as the model.
 
-0. **Check-in drawn by the server (fix, Sonnet):** the saved draft and the "Last night" card come from the browser after load, so Insights and Today move once. Details in `docs/WAITING.md` top section.
+0. **Check-in drawn by the server (done on Insights Nov 21; Today still shifts once, see WAITING):** the saved draft and the "Last night" card come from the browser after load, so Insights and Today move once. Details in `docs/WAITING.md` top section.
 
 1. **Bug: adding a quest in "Choose tomorrow's quests" clears the whole list** [2664d546], and the quest creator button there is faulty [234f0d70]. Loses work, so first. (`evening/TomorrowQuests.tsx`: local `ticked`/`rowsLocal` state is likely reset when `queued` changes after the add.)
 2. **Right-click menus open as popup menus, not inline trays** [841971c2] (app-wide; quest card ⋯ / right-click, habits, rites).
