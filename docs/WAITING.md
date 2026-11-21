@@ -10,6 +10,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 - **Session claude-2d (Opus, owner's account):** Nov 20, merged the four review branches above to `main`; nothing in progress. `review/boards-nov18` still waits on the owner.
 
 
+- **Waiting on the owner's design review**: `review/calendar-menu-arrange` (the calendar's quest and event menus: gear → drag, eye, rename; owner Nov 16 f562c138, PRIORITIES 0b) · https://claude.ai/artifact/VUvzmyZuGJPHfK2AC817dc · Nov 21.
+
 **Shipped Nov 20 (merged to `main` from `merge-nov20`, owner: "do what you think is best"):** `review/faces-feel`, `review/insights-nov19`, `review/insights-timeline`, `review/subquests-sequence`. See `docs/SHIPPED.md`. Review pages: https://claude.ai/artifact/DgobEgqytFM6qsSuC2bZeJ and https://claude.ai/artifact/69UKiWJeE7BgPnJLRU8q6E
 
 
