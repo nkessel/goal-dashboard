@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { addTaskSessionAction, createQuestAction, reopenTaskAction, unscheduleTaskAction } from "@/app/actions";
 import { FailQuest } from "@/components/tasks/FailQuest";
 import { completeQuestNow } from "@/lib/complete-quest-now";
 import { clearQuestNow, markReopenedNow, questSig, useQuestNow } from "@/lib/failed-now";
-import { CloseIcon } from "@/components/ui/Icons";
+import { CloseIcon, GearIcon } from "@/components/ui/Icons";
+import { arrangeCalMenu, readCalMenuLayout, serverCalMenuLayout, subscribeCalMenuLayout, type CalMenuKind } from "@/lib/cal-menu-layout";
+import { CalMenuArrange } from "./CalMenuArrange";
 import { SlotPickerDialog } from "@/components/tasks/SlotPickerDialog";
 import { sessionRef } from "@/lib/calendar-task-window";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
@@ -39,6 +41,12 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
   const [another, setAnother] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [arranging, setArranging] = useState(false);
+  const layout = useSyncExternalStore(
+    subscribeCalMenuLayout,
+    () => readCalMenuLayout(target.kind),
+    () => serverCalMenuLayout(target.kind)
+  );
 
   useEffect(() => {
     const down = (e: PointerEvent) => !fromFeedback(e) && ref.current && !ref.current.contains(e.target as Node) && !editing && !another && onClose();
@@ -111,6 +119,65 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
       />
     );
   }
+  const menuKind: CalMenuKind = target.kind;
+  const t = target.kind === "task" ? target.task : null;
+  const gcal = (action: string) => () => (target.kind === "event" && window.dispatchEvent(new CustomEvent("gcal-item", { detail: { id: target.id, action } })), onClose());
+  type Row = { key: string; label: string; onClick: () => void; danger?: "red" | "line"; busy?: boolean };
+  const all: (Row | null)[] = t
+    ? [
+        { key: "open", label: "Edit quest", onClick: () => setEditing(t) },
+        shown?.status !== "completed"
+          ? {
+              key: "complete",
+              label: "Complete quest",
+              busy: true,
+              // The check lands on the card at once; the menu closes and the celebration follows.
+              onClick: () => (void completeQuestNow(t, () => router.refresh()), onClose()),
+            }
+          : null,
+        {
+          key: "unschedule",
+          label: t.session_id ? "Remove this session" : "Remove from calendar",
+          busy: true,
+          onClick: () =>
+            startTransition(async () => {
+              await unscheduleTaskAction(sessionRef(t)).catch(() => {});
+              router.refresh();
+              onClose();
+            }),
+        },
+        { key: "another", label: "+ Additional time block for this quest", onClick: () => setAnother(true) },
+        { key: "place", label: place ? place : "Add location or travel time", onClick: () => setMode("place") },
+        { key: "followup", label: "Schedule follow-up quest", danger: "line", onClick: () => setMode("followup") },
+        // Failing a quest, or taking a failure back (owner, Nov 13).
+        shown?.status !== "completed"
+          ? { key: "fail", label: "✕ Quest failure", danger: "red", onClick: () => setMode("fail") }
+          : shown.failed_at
+            ? {
+                key: "fail",
+                label: "Undo quest failure",
+                danger: "line",
+                busy: true,
+                onClick: async () => {
+                  // Shown open at once and the menu closes; back to failed if the server says no.
+                  markReopenedNow(t.id, questSig(t));
+                  onClose();
+                  const ok = await reopenTaskAction(t.id).then(() => true, () => false);
+                  if (!ok) clearQuestNow(t.id);
+                  router.refresh();
+                },
+              }
+            : null,
+      ]
+    : [
+        { key: "edit", label: "Edit", onClick: gcal("edit") },
+        { key: "quest", label: theme === "adventure" ? "Turn into a quest" : "Turn into a task", onClick: gcal("quest") },
+        { key: "followup", label: "Schedule follow-up quest", danger: "line", onClick: () => setMode("followup") },
+        // An event's menu ends with Delete by default (owner, Nov 16 and Nov 18): its own just-this-day / every-repeat question.
+        { key: "delete", label: "Delete…", danger: "red", onClick: gcal("delete") },
+      ];
+  const rows = all.filter((r): r is Row => r !== null).map((r) => (layout.labels?.[r.key] ? { ...r, label: layout.labels[r.key] } : r));
+
   return createPortal(
     <div ref={ref} role="menu" data-menu="calendar-item" className="parchment fixed z-[131] flex flex-col overflow-hidden py-1" style={{ left, top, width: W, borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 30px rgba(0,0,0,.35)" }}>
       {mode === "menu" ? (
@@ -118,99 +185,41 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
           <button type="button" aria-label="Close menu" onClick={onClose} className="absolute right-1 top-1 z-[2] flex h-7 w-7 items-center justify-center rounded-full hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
             <CloseIcon size={12} />
           </button>
-          {target.kind === "task" && (
-            <>
-              <button type="button" role="menuitem" data-mi="open" className={item} style={{ color: "var(--t-ink)" }} onClick={() => setEditing(target.task)}>
-                Edit quest
-              </button>
-              {shown?.status !== "completed" && (
-                <button
-                  type="button"
-                  role="menuitem"
-                  data-mi="complete"
-                  className={item}
-                  style={{ color: "var(--t-ink)" }}
-                  disabled={pending}
-                  onClick={() => {
-                    // The check lands on the card at once; the menu closes and the celebration follows.
-                    void completeQuestNow(target.task, () => router.refresh());
-                    onClose();
-                  }}
-                >
-                  Complete quest
-                </button>
-              )}
+          {/* The gear arranges this menu in place (owner, Nov 16 f562c138): drag rows, eye on the right to hide, tap a name to rename. */}
+          <button
+            type="button"
+            onClick={() => setArranging((v) => !v)}
+            aria-pressed={arranging}
+            aria-label={arranging ? "Done arranging this menu" : "Arrange this menu: order and which items show"}
+            title={arranging ? "Done arranging" : "Arrange this menu"}
+            className="absolute right-8 top-1 z-[2] flex h-7 w-7 items-center justify-center rounded-full hover:bg-black/5"
+            style={{ color: "var(--t-ink-soft)", background: arranging ? "rgba(217,180,95,.3)" : undefined }}
+          >
+            {arranging ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#5c7a2e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : (
+              <GearIcon size={14} />
+            )}
+          </button>
+          {arranging ? (
+            <CalMenuArrange kind={menuKind} rows={rows} layout={layout} />
+          ) : (
+            arrangeCalMenu(rows, layout).map((r, i) => (
               <button
+                key={r.key}
                 type="button"
                 role="menuitem"
-                data-mi="unschedule"
-                className={item}
-                style={{ color: "var(--t-ink)" }}
-                disabled={pending}
-                onClick={() =>
-                  startTransition(async () => {
-                    await unscheduleTaskAction(sessionRef(target.task)).catch(() => {});
-                    router.refresh();
-                    onClose();
-                  })
-                }
+                data-mi={r.key}
+                className={`${item} ${r.key === "place" ? "truncate" : ""} ${r.danger && i > 0 ? "border-t" : ""}`}
+                style={{ color: r.danger === "red" ? "#8a2a1c" : "var(--t-ink)", borderColor: "rgba(139,112,64,.25)", paddingRight: i === 0 ? 64 : undefined }}
+                disabled={r.busy && pending}
+                onClick={r.onClick}
               >
-                {target.task.session_id ? "Remove this session" : "Remove from calendar"}
+                {r.label}
               </button>
-              <button type="button" role="menuitem" data-mi="another" className={item} style={{ color: "var(--t-ink)" }} onClick={() => setAnother(true)}>
-                + Additional time block for this quest
-              </button>
-              <button type="button" role="menuitem" data-mi="place" className={`${item} truncate`} style={{ color: "var(--t-ink)" }} onClick={() => setMode("place")}>
-                {place ? place : "Add location or travel time"}
-              </button>
-            </>
-          )}
-          {target.kind === "event" && (
-            <>
-              <button type="button" role="menuitem" data-mi="edit" className={item} style={{ color: "var(--t-ink)" }} onClick={() => (window.dispatchEvent(new CustomEvent("gcal-item", { detail: { id: target.id, action: "edit" } })), onClose())}>
-                Edit
-              </button>
-              <button type="button" role="menuitem" data-mi="quest" className={item} style={{ color: "var(--t-ink)" }} onClick={() => (window.dispatchEvent(new CustomEvent("gcal-item", { detail: { id: target.id, action: "quest" } })), onClose())}>
-                {theme === "adventure" ? "Turn into a quest" : "Turn into a task"}
-              </button>
-            </>
-          )}
-          <button type="button" role="menuitem" data-mi="followup" className={`${item} flex items-center gap-2 border-t`} style={{ color: "var(--t-ink)", borderColor: "rgba(139,112,64,.25)" }} onClick={() => setMode("followup")}>
-            Schedule follow-up quest
-          </button>
-          {/* Below the last divider (owner, Nov 13): failing a quest, or taking a failure back. */}
-          {target.kind === "task" && shown?.status !== "completed" && (
-            <button type="button" role="menuitem" data-mi="fail" className={`${item} border-t`} style={{ color: "#8a2a1c", borderColor: "rgba(139,112,64,.25)" }} onClick={() => setMode("fail")}>
-              ✕ Quest failure
-            </button>
-          )}
-          {target.kind === "task" && shown?.status === "completed" && shown.failed_at && (
-            <button
-              type="button"
-              role="menuitem"
-              data-mi="unfail"
-              className={`${item} border-t`}
-              style={{ color: "var(--t-ink)", borderColor: "rgba(139,112,64,.25)" }}
-              disabled={pending}
-              onClick={async () => {
-                // Shown open at once and the menu closes; back to failed if the server says no.
-                const t = target.task;
-                markReopenedNow(t.id, questSig(t));
-                onClose();
-                const ok = await reopenTaskAction(t.id).then(() => true, () => false);
-                if (!ok) clearQuestNow(t.id);
-                router.refresh();
-              }}
-            >
-              Undo quest failure
-            </button>
-          )}
-          {/* An event's menu always ends with Delete (owner, Nov 16 and Nov 18). It opens the event's own
-              delete question (just this day, or every repeat). */}
-          {target.kind === "event" && (
-            <button type="button" role="menuitem" data-mi="delete" className={`${item} border-t`} style={{ color: "#8a2a1c", borderColor: "rgba(139,112,64,.25)" }} onClick={() => (window.dispatchEvent(new CustomEvent("gcal-item", { detail: { id: target.id, action: "delete" } })), onClose())}>
-              Delete…
-            </button>
+            ))
           )}
           {error && (
             <p className="relative z-[1] m-0 px-3.5 pb-1 text-[12.5px]" style={{ color: "var(--t-warn)" }}>

@@ -1582,6 +1582,14 @@ export const FLOWS = [
           await card.click({ button: "right" }).catch(() => {});
           await h.settle(400);
           await h.check("quest menu: another session");
+          // The menu's gear arranges it in place (owner, Nov 16): drag rows, the eye hides one, tap a name to rename.
+          if (await h.tap((p) => p.locator("[data-menu=calendar-item]").getByRole("button", { name: /^arrange this menu/i }).first(), "calendar menu: arrange", { optional: true, expectMove: true })) {
+            await h.check("calendar menu: arranging");
+            if (await h.tap((p) => p.locator("[data-cal-menu-arrange]").getByRole("button", { name: /^hide remove from calendar$/i }).first(), "calendar menu: hide a row", { optional: true })) await h.check("calendar menu: a row hidden");
+            await h.tap((p) => p.locator("[data-cal-menu-arrange]").getByRole("button", { name: /^show remove from calendar$/i }).first(), "calendar menu: show it again", { optional: true });
+            await h.tap((p) => p.locator("[data-menu=calendar-item]").getByRole("button", { name: /^done arranging/i }).first(), "calendar menu: done arranging", { optional: true, expectMove: true });
+            await h.check("calendar menu: arranged");
+          }
           if (await h.tap((p) => p.getByRole("menuitem", { name: /additional time block/i }).first(), "another session", { optional: true, expectMove: true })) {
             await h.settle(900);
             await h.check("another session picker");
