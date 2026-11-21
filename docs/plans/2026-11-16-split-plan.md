@@ -224,7 +224,7 @@ Add a line to each branch's entry in `docs/WAITING.md` saying so when phase E st
 Baselines from S3 (sizes, perf numbers): *to be filled in by S3.*
 
 - [x] S1 (Nov 18, `--snapshot` / `--compare`, see docs/ui-check.md) · [ ] S2 · [ ] S3
-- [ ] L1 · [ ] L2 · [ ] L3
+- [x] L1 (Nov 21) · [ ] L2 · [ ] L3
 - [ ] T1 · [ ] T2 · [ ] T3 · [ ] T4 · [ ] T5 · [ ] T6 · [ ] T7
 - [ ] W1 · [ ] W2 · [ ] W3 · [ ] W4 · [ ] W5
 - [ ] I1 · [ ] I2 · [ ] I3 · [ ] I4 · [ ] I5 · [ ] I6

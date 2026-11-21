@@ -1,7 +1,7 @@
 "use client";
 
 import { MagicCalendarIcon } from "@/components/ui/Icons";
-import { talkToToucan } from "@/components/toucan/ToucanGuide";
+import { talkToToucan } from "@/components/toucan/talk";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import {
