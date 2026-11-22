@@ -218,7 +218,7 @@ export const FLOWS = [
     },
   },
   {
-    // The longest flow: it reached its last step right at 4 minutes on a phone (Nov 19), so it gets 7.
+    // The longest flow was split in two (S3, Nov 22): this is the first half, `today2` the second.
     timeoutMs: 420_000,
     name: "today",
     async run(h) {
@@ -449,6 +449,19 @@ export const FLOWS = [
         await h.settle(600);
         await h.check("compass: question and tools");
       }
+    },
+  },
+  {
+    // Second half of the old `today` flow (split in S3, Nov 22: the whole flow ran past its time limit on a phone).
+    timeoutMs: 420_000,
+    name: "today2",
+    async run(h) {
+      await h.goto("/", { name: "today2" });
+      await h.check("loaded");
+      const compass = (p) => p.getByRole("button", { name: /^focus: a question/i }).first();
+      await h.page.hover("text=Today's Quests").catch(() => {});
+      await h.tap(compass, "compass", { optional: true, expectMove: true });
+      await h.settle(600);
       // Prioritize: today's quests first, one five-part bar, Save, skip by swipe, additional quests behind a button.
       if (await h.tap((p) => p.getByRole("button", { name: /^prioritize$/i }).first(), "prioritize", { expectMove: true })) {
         await h.settle(1200);
