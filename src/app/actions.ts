@@ -1,6 +1,7 @@
 "use server";
 
 import { writeExtra } from "@/lib/data/extras";
+import { mirrorEssentialDays, mirrorQuestDrive } from "@/lib/data/calendar-planner";
 import { cleanHabitTicks, habitTicksSeed, type HabitTicks, type HabitTicksSeed } from "@/lib/habit-ticks";
 import { isTentativeTitle } from "@/lib/tentative";
 import { revalidatePath } from "next/cache";
@@ -3259,6 +3260,7 @@ export async function saveSchedulerSettingsAction(settings: Record<string, unkno
   const { data: cur } = await supabaseAdmin().from("profiles").select("scheduler").eq("id", ownerId).maybeSingle<{ scheduler: Record<string, unknown> | null }>();
   const { error } = await supabaseAdmin().from("profiles").update({ scheduler: { ...(cur?.scheduler ?? {}), ...clean } }).eq("id", ownerId);
   if (error) throw new Error(/scheduler/.test(error.message) ? "Saved on this device (your account needs a quick database update to keep it everywhere)." : `Couldn't save: ${error.message}`);
+  if ("essentialDays" in clean) await mirrorEssentialDays(ownerId, clean.essentialDays); // planner step 3: calendar_blocks follows until readers switch over
 }
 
 /** Put a whole plan on the calendar: each quest at its time (and on Google Calendar when connected). */
@@ -3629,6 +3631,7 @@ export async function setQuestDriveAction(taskId: string, minutes: number | null
   else delete all[taskId];
   const { error } = await writeExtra(ownerId, "questDrives", all);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
+  await mirrorQuestDrive(ownerId, taskId, m); // planner step 3: the new columns follow until readers switch over
   revalidatePath("/calendar");
   return m;
 }
