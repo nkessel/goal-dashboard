@@ -8,7 +8,7 @@ Related: `docs/BUILD-PLAN.md` (tasks for lighter models), `docs/REPEAT-ASKS.md`,
 
 ---
 
-**Bugs first (owner, Nov 21):** the live app is buggy after the Nov 20–21 merges (welcome screen opens and vanishes on the first tap, so sleep can't be checked in; more he hasn't listed). Every session takes these before anything else: details in `docs/RUN-B-HANDOFF.md` item 0. Nov 22: the UI check is clean on a phone and a tablet for every flow. (Insights #418 in the evening fixed Nov 22, run 8.)
+**Bugs first (owner, Nov 21):** the live app is buggy after the Nov 20–21 merges (welcome screen opens and vanishes on the first tap, so sleep can't be checked in; more he hasn't listed). Every session takes these before anything else: details in `docs/RUN-B-HANDOFF.md` item 0. Nov 22: the UI check is clean on a phone and a tablet, morning and evening, for every flow (tablet evening finished in run 27). (Insights #418 in the evening fixed Nov 22, run 8.)
 
 **Lighter-model sessions: work from `docs/BUILD-PLAN.md` (Nov 14), top to bottom.**
 
