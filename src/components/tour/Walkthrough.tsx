@@ -68,7 +68,7 @@ const STEPS: Record<string, Step> = {
   intro: {
     title: () => "Welcome, traveller",
     text: () =>
-      "Ah, a new traveller at the forest's edge! Welcome — I am the Great Toucan Spirit, and I'll be your guide here. This is a sacred place where we turn your most important goals into exciting quests so you can lead your most adventurous and fulfilling life. Before we set forth: what name shall I call you by?",
+      "Ah, a new traveller at the forest's edge — welcome! I am the Great Toucan Spirit, and I will be your guide here. This is a sacred place where we turn your most important goals into heroic quests so you can lead your most adventurous and fulfilling life. Before we set forth: by what name shall I call you?",
   },
   character: {
     title: () => "Your character",
