@@ -2,4 +2,5 @@
 // This file must NOT say "use server" (a "use server" file can't re-export, Next 16.3)
 // and must hold only re-exports: add new actions to their area file.
 
+export * from "./actions/quests";
 export * from "./actions/rest";
