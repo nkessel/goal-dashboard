@@ -6,6 +6,7 @@ import { UNCATEGORIZED_ID } from "@/lib/board-ids";
 import { BoardGrid } from "./BoardGrid";
 import { BoardQuestList } from "./BoardQuestList";
 import { BoardSeal } from "./BoardSeal";
+import { BoardTitleEdit } from "./BoardTitleEdit";
 import { ScreenArrange } from "@/components/ui/ScreenArrange";
 
 export type BoardHead = { title: string; ancestors: { id: string; title: string }[] };
@@ -108,7 +109,7 @@ export function BoardBody({
         <BoardSeal color={board.color} size={30} />
         <div className="min-w-0 flex-1">
           <h1 dir="auto" className={`user-text m-0 ${isAdventure ? "font-display text-[22px] leading-tight" : "text-xl font-extrabold"}`} style={{ color: text }}>
-            {board.title}
+            <BoardTitleEdit key={board.title} boardId={board.id} title={board.title} />
             {board.is_private && <span className="ml-1.5 text-xs font-normal">🔒</span>}
           </h1>
           <div className="text-[12.5px]" style={{ color: soft, opacity: 0.75 }}>

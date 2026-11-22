@@ -143,6 +143,13 @@ export async function updateBoardAction(
   revalidatePath(`/boards/${boardId}`);
 }
 
+/** Renames a board from its title in place (owner, Nov 20: "Why can't I edit the board title"). */
+export async function renameBoardAction(boardId: string, title: string) {
+  const ownerId = await requireProfileId();
+  await boardsData.updateBoardMatrix(boardId, ownerId, { title });
+  revalidatePath("/boards", "layout");
+}
+
 /** "Nest into another board" (or back to the top with null). */
 export async function nestBoardAction(boardId: string, parentId: string | null) {
   const ownerId = await requireProfileId();

@@ -2269,6 +2269,13 @@ export const FLOWS = [
         h.screen = "board";
         await h.settle(1500);
         await h.check("board");
+        // The open board's title renames where it sits (owner, Nov 20: "Why can't I edit the board title").
+        if (await h.tap((p) => p.locator("[data-board-rename]").first(), "board: rename title", { optional: true, expectMove: true })) {
+          await h.settle(300);
+          await h.check("board: title being renamed");
+          await h.page.keyboard.press("Escape").catch(() => {});
+          await h.settle(300);
+        }
         // A board's quests in an order you pick (owner, Nov 5): My order, Due soonest, Newest, Most XP, A–Z.
         if (await h.tap((p) => p.getByRole("button", { name: /my order|due soonest|newest|most xp|a–z/i }).first(), "board: order", { optional: true })) {
           await h.settle(400);
