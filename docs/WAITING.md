@@ -6,6 +6,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 - **Run B thread, Run C (Haiku, Nov 22 23:14 UTC):** L3, Cal 1e, T2-T4, W1, W3.
 
+- **Dev loop 2 run 40 note (Nov 22, 23:26 UTC):** Run C claimed 23:14 UTC by another session; everything else is a design change or already parked. Nothing built.
+
 - **Dev loop 2 runs 33–39 note (Nov 22, 18:25 to 23:00 UTC):** `main` unchanged since run 32; no new feedback notes since Nov 21 17:39; no Postgres errors in the last 24h. Same finding: nothing unclaimed that ships straight to `main`. Nothing built.
 
 - **Dev loop 2 run 32 note (Nov 22, 17:30 UTC):** read Run B, PRIORITIES and the open feedback queue (since Nov 19): every remaining item is a design change (needs a review branch) or already parked below (e16f1f7a, 71a6b505, 57f4201a). Nothing built; no claims were open.
