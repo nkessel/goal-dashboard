@@ -5,4 +5,5 @@
 export * from "./actions/quests";
 export * from "./actions/calendar";
 export * from "./actions/social";
+export * from "./actions/profile";
 export * from "./actions/rest";
