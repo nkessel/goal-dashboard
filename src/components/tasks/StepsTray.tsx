@@ -157,17 +157,23 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
     >
       <div className="relative z-[1] flex flex-col">
         {steps && steps.length > 0 && (
-          // How far along: a gilded bar that fills as you tick.
+          // How far along: a gilded bar that fills as you tick. Not shown at 0% (owner: "demotivating").
           <div className="mb-2 flex items-center gap-2.5 px-2">
             <span className={isAdventure ? "font-display text-[16px]" : "text-[12px] font-bold uppercase tracking-wide"} style={{ color: isAdventure ? "#6b4a12" : soft }}>
               Sub-quests
             </span>
+{pct > 0 ? (
+              <>
             <span className="relative h-[8px] flex-1 overflow-hidden rounded-full" style={{ background: "rgba(90,64,20,.14)", boxShadow: "inset 0 1px 2px rgba(0,0,0,.2), 0 1px 0 rgba(255,255,255,.6)" }}>
               <span className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500 ease-out" style={{ width: `${pct}%`, background: "linear-gradient(90deg,#c99a3a,#f2d27e)", boxShadow: "0 0 6px rgba(242,210,126,.6)" }} />
             </span>
             <span className="text-[12px] tabular-nums" style={{ color: soft }}>
               {pct}% done · {progressWords(doneCount, live.length)}
             </span>
+              </>
+            ) : (
+              <span className="text-[12px]" style={{ color: soft }}>{progressWords(doneCount, live.length)}</span>
+            )}
           </div>
         )}
         {steps === null && !error && (

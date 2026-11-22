@@ -197,7 +197,7 @@ export function FocusSteps({ taskId, progress = 0 }: { taskId: string; /** The q
           </span>
           <div className="-mb-1 flex items-center justify-between text-[11.5px]" style={{ color: "#6b5534" }}>
             <span>How far along this step is (slide to set)</span>
-            <span className="font-semibold tabular-nums">{focus.progress}%</span>
+            <span className="font-semibold tabular-nums">{focus.progress > 0 ? `${focus.progress}%` : ""}</span>
           </div>
           <div className="relative h-4">
             <div className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full" style={{ background: "rgba(120,90,40,.15)", border: "1px solid rgba(139,112,64,.4)" }}>

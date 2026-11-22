@@ -1422,9 +1422,9 @@ export function QuestEditorDialog({
       }} style={{ background: "#f7eed6", borderLeft: "1px solid rgba(139,112,64,.4)", borderTop: "1px solid rgba(139,112,64,.4)" }} />
       {((steps && steps.length > 0) || stepXpPop !== null) && (
         <span className="flex min-w-0 items-center gap-2 whitespace-nowrap text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
-          {steps && steps.length > 0 && (
+          {steps && steps.length > 0 && stepsShare(steps) > 0 && (
             <>
-              {/* How far the sub-quests carry the quest, labelled (owner, Nov 4). */}
+              {/* How far the sub-quests carry the quest, labelled (owner, Nov 4); never at 0% (owner, Nov 16 and 22). */}
               <span className="h-2.5 min-w-[40px] max-w-[160px] flex-1 overflow-hidden rounded-full" style={{ background: "#141a13", border: "1px solid #8a6c2c", boxShadow: "inset 0 1px 3px rgba(0,0,0,.6)" }} aria-label={`Sub-quests ${stepsShare(steps)}% done`}>
                 <span className="block h-full rounded-full transition-[width] duration-300" style={{ width: `${stepsShare(steps)}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)", boxShadow: "0 0 6px rgba(242,210,126,.5)" }} />
               </span>
