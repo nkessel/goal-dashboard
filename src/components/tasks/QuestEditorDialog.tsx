@@ -17,7 +17,6 @@ import { progressWords } from "@/lib/progress-words";
 import { FileChips } from "@/components/ui/FileChips";
 import { AddFile } from "@/components/ui/AddFile";
 import type { FileRef } from "@/lib/file-refs";
-
 import { TimeToken } from "@/components/xp/NightFields";
 import { LinkOuts } from "@/components/ui/Linked";
 import { TimeWheels } from "@/components/ui/TimeWheels";
@@ -72,7 +71,6 @@ import { addOptimisticQuest, markOptimisticQueued, resolveOptimisticQuest } from
 import { CoinIcon } from "@/components/ui/Icons";
 import { StatSplitEditor } from "./StatSplitEditor";
 import { StatXpLine } from "./StatXpLine";
-import { statAbbr } from "@/lib/stats";
 import { LevelScales, useScaleStyle, type ScaleItem } from "@/components/ui/LevelScales";
 import { QuestPicker, SequenceDialog } from "./Sequence";
 import { coinsForXp, XP_PER_COIN } from "@/lib/coins";
@@ -85,6 +83,9 @@ import { DateField } from "@/components/ui/DateField";
 import type { QuestDraft, QuestEditorMode } from "./editor/types";
 import { localDate, localTime, shortTime, slotWords, planByIn, dueIso, dueChipLabel, dueQuickPicks, ESTIMATE_PICKS } from "./editor/dates";
 import { PinGlyph, FactCaret } from "./editor/glyphs";
+import { AutoGrowText } from "./editor/AutoGrowText";
+import { LABEL_CLS, chipBorderFor, fieldStyleFor, smallBtnClass } from "./editor/style";
+
 export type { QuestDraft, QuestEditorMode };
 
 const noSubscribe = () => () => {};
@@ -756,13 +757,9 @@ export function QuestEditorDialog({
   }
 
   const noun = isAdventure ? "quest" : "task";
-  const fieldStyle: React.CSSProperties = {
-    borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)",
-    background: isAdventure ? "var(--t-panel-2)" : "var(--t-bg)",
-    color: "var(--t-ink)",
-  };
-  const chipBorder = isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)";
-  const labelCls = "text-[13px] font-semibold";
+  const fieldStyle = fieldStyleFor(isAdventure);
+  const chipBorder = chipBorderFor(isAdventure);
+  const labelCls = LABEL_CLS;
 
   function celebrateCompleted() {
     if (!task || !completedNow) return;
@@ -828,8 +825,6 @@ export function QuestEditorDialog({
     window.addEventListener("qe-request-close", h);
     return () => window.removeEventListener("qe-request-close", h);
   }, [create, hasWriting]);
-
-
 
   /** Shrink the dialog into the newly created quest's card, if it's on screen. */
   async function flyInto(id: string) {
@@ -1087,7 +1082,6 @@ export function QuestEditorDialog({
     });
   }
 
-
   function remove(archive = false) {
     if (!task) return;
     setError(null);
@@ -1143,7 +1137,7 @@ export function QuestEditorDialog({
   const toolbarHost = useEditorToolbar();
   const otherDrafts = drafts.filter((d) => d.id !== draftId);
   // In the + sheet these sit in its scrolling row, so they look like its other choices.
-  const smallBtn = toolbarHost ? "create-kind flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" : "flex h-8 shrink-0 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold";
+  const smallBtn = smallBtnClass(!!toolbarHost);
   const smallBtnStyle = (on: boolean): React.CSSProperties =>
     toolbarHost
       ? { border: "1.5px solid transparent", color: "var(--t-ink)", background: on ? "rgba(217,180,95,.45)" : "rgba(70,50,20,.08)" }
@@ -2818,7 +2812,6 @@ export function QuestEditorDialog({
           })}
           {!arranging && morePills}
 
-
           {isCompleted && task && (
             // A victory seal: what was won and when, with a quiet way to take it back.
             <div className="defeated-box flex items-center gap-3 rounded-2xl px-3 py-2.5">
@@ -3094,48 +3087,6 @@ export function QuestEditorDialog({
       </div>
     </div>,
     portalTarget
-  );
-}
-
-/** A textarea that grows with its text, so nothing is cut off after one line. */
-function AutoGrowText({
-  value,
-  onChange,
-  minRows = 1,
-  placeholder,
-  ariaLabel,
-  className,
-  style,
-  onKeyDown,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-  minRows?: number;
-  placeholder?: string;
-  ariaLabel: string;
-  className?: string;
-  style?: React.CSSProperties;
-}) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight + 2}px`;
-  }, [value]);
-  return (
-    <textarea
-      ref={ref}
-      value={value}
-      rows={minRows}
-      onChange={(e) => onChange(e.target.value)}
-      onKeyDown={onKeyDown}
-      placeholder={placeholder}
-      aria-label={ariaLabel}
-      className={`resize-none overflow-hidden ${className ?? ""}`}
-      style={style}
-    />
   );
 }
 
