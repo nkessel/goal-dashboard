@@ -4,6 +4,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 11 (Opus, Nov 22 04:00 UTC):** small bug notes: button text selectable (e74f11c9), sub-habit XP keyboard (910591c7), calendar card full title (3f71730b), tap-to-place hint hidden by the scheduling list (0d594111). Files: `globals.css`, habit editor, `calendar/CalendarTaskChip.tsx`, calendar scheduler.
 - **Run B item 9 (Sonnet 5.5, Nov 22 00:35 UTC):** data step is on `main` (0095). The sub-quest card editor (Time · XP · Stats · Make it a quest pills) is built on `review/subquest-details`, UI check `sequence` clean on phone; **waiting on the owner's design review:** https://claude.ai/artifact/VNLeBHaRZaCd9fJ4eFbQMi#a1 (pills), https://claude.ai/artifact/VNLeBHaRZaCd9fJ4eFbQMi#a4 (Stats tray). Data side of the **When** pill is on `main` (0096, Nov 22). Not built yet: the pill itself, the calendar block (`listScheduledSteps` in `WeekView.tsx`) and the calendar flow check. Free for another run.
 
 - **Run B (Sonnet 5.5, this account, Nov 20):** step 1 (the three merges) and D0 are on `main`; now on S2/S3 (order in `docs/RUN-B-HANDOFF.md`). Other sessions: leave those to it.
