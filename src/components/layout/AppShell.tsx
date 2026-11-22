@@ -26,6 +26,7 @@ import { FailSceneHost, FeedbackDock, KeptTarget, SeriesLookAsk, Walkthrough } f
 import { PlanMyDayHost } from "@/components/calendar/PlanMyDay";
 import { NotificationPreview } from "@/components/notifications/NotificationPreview";
 import { Suspense } from "react";
+import { SlideContinue } from "@/components/layout/SlideContinue";
 
 /**
  * App shell for the mobile-app-style redesign (matches the Productivity RPG
@@ -119,6 +120,7 @@ export async function AppShell({
           {profileId && profile && <span aria-hidden className="h-10 w-10 shrink-0" />}
         </div>
 
+        <SlideContinue />
         <main className="page-enter flex-1 px-5 pb-36 pt-2">{children}</main>
       </div>
 

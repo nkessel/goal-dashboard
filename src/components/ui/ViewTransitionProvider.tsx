@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { IdlePreload, NavLoader } from "./NavLoader";
+import { markEnterStart } from "@/lib/standin";
 
 type ViewTransitionContextValue = {
   /**
@@ -76,6 +77,11 @@ export function ViewTransitionProvider({ children }: { children: React.ReactNode
     const pending = pendingRef.current;
     pendingRef.current = null;
     html.removeAttribute("data-nav-pending");
+    // The route committed onto a tab's stand-in (its loading.tsx) while the real screen is still
+    // loading: keep the wait marker (the loading flourish, after its short beat) until the stand-in
+    // is replaced; the stand-in removes it. Routes without a stand-in never get here: the old
+    // screen simply stays dimmed until they commit, as before.
+    if (document.querySelector("main[data-standin]")) html.setAttribute("data-nav-pending", "standin");
     // A board opening or closing as a popup over the screen: the screen under it
     // stays still (it never left), so no entrance plays and nothing jumps.
     const boardPeek = (p: string | null) => !!p && /^\/boards\/[^/]+/.test(p);
@@ -86,6 +92,7 @@ export function ViewTransitionProvider({ children }: { children: React.ReactNode
     const menu = (p: string | null) => !!p && p.startsWith("/settings");
     if (!pending && screenUnder && (menu(pathname) || (menu(previousPathnameRef.current) && pathname === screenUnder))) return;
     html.setAttribute("data-enter", pending?.direction ?? "fade");
+    markEnterStart();
     const t = setTimeout(
       () => {
         html.removeAttribute("data-enter");

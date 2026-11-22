@@ -538,6 +538,43 @@ export const FLOWS = [
     },
   },
   {
+    // Tabs that feel instant (owner, Nov 22): tapping a bottom-bar tab commits at once onto the tab's stand-in
+    // (its loading.tsx) and the slide plays there; the real screen then replaces it in place. The screen's data
+    // is held back ~1.4s here so the stand-in moment can be seen and screenshot.
+    name: "tabsinstant",
+    timeoutMs: 300_000,
+    async run(h) {
+      await h.goto("/", { name: "tabsinstant" });
+      await h.settle(1200);
+      await h.page.route(/_rsc=/, async (route) => {
+        await new Promise((r) => setTimeout(r, 1400));
+        await route.continue().catch(() => {});
+      });
+      for (const [href, label] of [["/calendar", "Calendar"], ["/boards", "Quests"], ["/insights", "Insights"], ["/feed", "Friends"], ["/", "Today"]]) {
+        const tab = h.page.locator(`nav[data-app-nav] a[href="${href}"]`);
+        if (!(await tab.count())) { h.record({ kind: "tabsinstant", severity: "error", target: label, detail: `no ${href} tab` }); continue; }
+        await tab.click({ timeout: 3000 }).catch(() => {});
+        const shown = await h.page.waitForSelector("main[data-standin]", { timeout: 4000 }).then(() => true).catch(() => false);
+        if (!shown) {
+          h.record({ kind: "tabsinstant", severity: "error", target: label, detail: `${href}: no stand-in showed after the tap` });
+        } else {
+          await h.settle(150);
+          await h.check(`${label}: stand-in, mid-slide`);
+          await h.settle(500);
+          await h.check(`${label}: stand-in, at rest`);
+        }
+        await h.page.waitForSelector("main[data-standin]", { state: "detached", timeout: 8000 }).catch(() => h.record({ kind: "tabsinstant", severity: "error", target: label, detail: `${href}: the stand-in never gave way to the screen` }));
+        await h.settle(700);
+        if (await h.page.evaluate(() => document.documentElement.hasAttribute("data-nav-pending"))) h.record({ kind: "tabsinstant", severity: "error", target: label, detail: `${href}: the wait marker stayed on after the screen loaded` });
+        await h.check(`${label}: loaded`);
+      }
+      // A popup over a tab never shows a stand-in under it.
+      await h.page.unroute(/_rsc=/);
+      await h.goto("/settings", { name: "tabsinstant-settings" });
+      if (await h.page.locator("main[data-standin]").count()) h.record({ kind: "tabsinstant", severity: "error", target: "settings", detail: "a stand-in showed under Settings" });
+    },
+  },
+  {
     // The bottom bar's tabs reorder by dragging a tab (owner, Nov 14); the screen slide follows the new order.
     name: "navorder",
     async run(h) {
