@@ -1,6 +1,7 @@
 "use client";
 
 import { useHiddenEvents } from "@/lib/hidden-events";
+import { createPortal } from "react-dom";
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { daySummary, useWeatherRange } from "@/lib/use-weather";
 import { useRouter } from "next/navigation";
@@ -150,14 +151,19 @@ export function WeekView({
   const [gripY, setGripY] = useState<number | null>(null);
   const [itemMenu, setItemMenu] = useState<{ x: number; y: number; target: MenuTarget } | null>(null);
   // Days too narrow for words show each card as its icon; a tap shows what it is beside it (owner, Nov 22, CAL-1).
-  const [peek, setPeek] = useState<string | null>(null);
+  const [peek, setPeek] = useState<{ key: string; x: number; y: number; right: boolean; title: string; label: string } | null>(null);
   useEffect(() => {
     if (!peek) return;
     const off = (e: PointerEvent) => {
       if (!(e.target as Element | null)?.closest?.("[data-icon-only]")) setPeek(null);
     };
+    const shut = () => setPeek(null);
     window.addEventListener("pointerdown", off);
-    return () => window.removeEventListener("pointerdown", off);
+    window.addEventListener("scroll", shut, true);
+    return () => {
+      window.removeEventListener("pointerdown", off);
+      window.removeEventListener("scroll", shut, true);
+    };
   }, [peek]);
   const HOUR_PX = hourPx;
   useEffect(() => {
@@ -1551,6 +1557,12 @@ export function WeekView({
                   })}
                   topOf={(d) => (offset(d, day) / 60) * HOUR_PX}
                   isAdventure={isAdventure}
+                  narrow={colWidth > 0 && colWidth < 54}
+                  onPeek={(el, key, title, label) => {
+                    const r = el.getBoundingClientRect();
+                    const right = r.left + r.width / 2 < window.innerWidth / 2;
+                    setPeek({ key, x: right ? r.right + 4 : r.left - 4, y: r.top, right, title, label });
+                  }}
                 />
               )}
               {dayItems.flatMap((it) => {
@@ -1592,7 +1604,7 @@ export function WeekView({
                 const isMoving = moving?.key === it.key;
                 const cardW = fan ? colWidth - l.lane * step - 1 : colWidth / l.count - 2;
                 const iconOnly = colWidth > 0 && cardW < 52;
-                const peeking = iconOnly && peek === it.key;
+                const peeking = iconOnly && peek?.key === it.key;
                 // Adventure: a finished quest is a victory, so it keeps its colour; past ones only soften.
                 const fade = !past || isMoving ? undefined : isAdventure && it.kind === "task" ? (it.task.status === "completed" ? undefined : "saturate(.6) brightness(1.03)") : "saturate(.2) contrast(.6) brightness(1.12)";
                 return (
@@ -1610,7 +1622,9 @@ export function WeekView({
                       if (iconOnly && !peeking) {
                         e.stopPropagation();
                         e.preventDefault();
-                        setPeek(it.key);
+                        const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                        const right = r.left + r.width / 2 < window.innerWidth / 2;
+                        setPeek({ key: it.key, x: right ? r.right + 4 : r.left - 4, y: r.top, right, title: it.kind === "task" ? it.task.title : it.event.title, label });
                       }
                     }}
                     data-icon-only={iconOnly ? "" : undefined}
@@ -1642,16 +1656,6 @@ export function WeekView({
                     ) : (
                       <CalendarTaskChip task={it.task} theme={theme} compact timeLabel={label} oneLine={oneLine || (portraits && height < 64)} portrait={portraits} show={card} box={colWidth > 0 ? { w: cardW, h: height } : undefined} />
                     )}
-                    {peeking && (
-                      <span
-                        role="tooltip"
-                        className="card-pop-in cal-peek pointer-events-none absolute top-0 z-[45] w-max max-w-[170px] rounded-lg px-2 py-1 text-[12.5px] leading-snug"
-                        style={{ ...(it.dayIndex >= 4 ? { right: "calc(100% + 4px)" } : { left: "calc(100% + 4px)" }) }}
-                      >
-                        <span className="font-display block font-semibold">{it.kind === "task" ? it.task.title : it.event.title}</span>
-                        <span className="block text-[11px] opacity-75">{label}</span>
-                      </span>
-                    )}
                     {canDrag && height >= 18 && !iconOnly && (
                       <div data-resize aria-hidden title="Drag to change how long it runs" className="cal-resize absolute inset-x-1 bottom-0 h-[7px] cursor-ns-resize" />
                     )}
@@ -1673,6 +1677,19 @@ export function WeekView({
       </div>
       {todayOff && !embedded && <GoToday onClick={goToday} />}
 
+      {/* CAL-1: what an icon is, beside it (fixed, so nothing on the grid draws over it). */}
+      {peek &&
+        createPortal(
+          <span
+            role="tooltip"
+            className="card-pop-in cal-peek pointer-events-none fixed z-[90] w-max max-w-[180px] rounded-lg px-2 py-1 text-[12.5px] leading-snug"
+            style={peek.right ? { left: peek.x, top: peek.y } : { right: window.innerWidth - peek.x, top: peek.y }}
+          >
+            <span className="font-display block font-semibold">{peek.title}</span>
+            <span className="block text-[11px] opacity-75">{peek.label}</span>
+          </span>,
+          document.body
+        )}
       {itemMenu && <CalendarItemMenu target={itemMenu.target} x={itemMenu.x} y={itemMenu.y} theme={theme} onClose={() => setItemMenu(null)} />}
       {addRange && (
         <CalendarAddPopup
@@ -1849,7 +1866,25 @@ type HoldTarget = { key: string; label: string; at: number; minutes: number; kep
  * it shows in a muted red (owner, Nov 4). Right-click or double-tap one for its menu: keep it where it is
  * (the red goes), move it or change its length, or leave it out today.
  */
-function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventure }: { day: Date; daily: DailyLayer; essentials: EssentialsLook; habitLook: HabitLook; busy: { start: number; end: number }[]; topOf: (d: Date) => number; isAdventure: boolean }) {
+/** A meal or habit in a narrow week: only its icon; a tap shows its name (owner, Nov 22 CAL-1). */
+function IconBlock({ hold, top, height, label, quest, look, raised, children }: { hold: Record<string, string>; top: number; height: number; label: string; quest: boolean; look: React.CSSProperties; raised: boolean; children: React.ReactNode }) {
+  return (
+    <div
+      {...hold}
+      data-icon-only=""
+      aria-label={label}
+      title={label}
+      className={`${quest ? "quest-card " : ""}absolute inset-x-0.5 flex justify-center overflow-hidden pt-[3px]`}
+      style={{ top: top + 1, height, zIndex: raised ? 3 : 1, borderRadius: quest ? 10 : 6, ...(quest ? {} : look) }}
+    >
+      <span aria-hidden className="flex items-center justify-center" style={{ width: Math.min(22, height - 6), height: Math.min(22, height - 6), fontSize: Math.min(16, height - 8), lineHeight: 1 }}>
+        {children}
+      </span>
+    </div>
+  );
+}
+
+function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventure, narrow = false, onPeek }: { day: Date; daily: DailyLayer; essentials: EssentialsLook; habitLook: HabitLook; busy: { start: number; end: number }[]; topOf: (d: Date) => number; isAdventure: boolean; narrow?: boolean; onPeek?: (el: HTMLElement, key: string, title: string, label: string) => void }) {
   const router = useRouter();
   const dayKey = localDayKey(day);
   const looks = useSyncExternalStore(subscribeLooks, readLooks, () => noLooks);
@@ -1925,6 +1960,8 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
       const last = lastTap.current;
       if (!(last && last.key === t.key && d.t - last.at < 360)) {
         lastTap.current = { key: t.key, at: d.t };
+        // Icon only (a narrow week, owner Nov 22 CAL-1): a tap shows what it is.
+        if (narrow && el && onPeek) onPeek(el, `d:${t.key}`, t.label, new Date(t.at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }));
         return;
       }
       lastTap.current = null;
@@ -1975,6 +2012,7 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
               : { border: `1.5px ${h.kept ? "solid" : "dashed"} rgba(139,112,64,.6)`, borderRadius: 6 };
         const t: HoldTarget = { key: h.key, label: h.name, at: h.at, minutes: h.minutes, kept: !!h.kept, crowded: h.crowded, meal: true };
         const asQuest = (looks[h.key] ?? (essentials === "quest" ? "quest" : "hold")) === "quest";
+        if (narrow) return <IconBlock key={h.key} hold={handlers(t)} top={top} height={height} label={h.name} quest={asQuest} look={look} raised={menu?.key === h.key}>{h.icon}</IconBlock>;
         if (asQuest) {
           // Like a quest: a storybook card with its emoji.
           return (
@@ -2023,6 +2061,17 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
         const quest = (looks[`h:${b.habit.id}`] ?? (habitLook === "quest" ? "quest" : "hold")) === "quest";
         const t: HoldTarget = { key: `h:${b.habit.id}`, label: b.habit.title, at: b.start, minutes: Math.round((b.end - b.start) / 60_000), kept: !!b.kept, crowded: !!b.crowded, meal: false };
         const crowdedLook: React.CSSProperties = b.crowded ? { background: "linear-gradient(rgba(178,84,66,.2), rgba(178,84,66,.2)), linear-gradient(180deg,#f6e8c4,#e8d29c)", border: "1.5px dashed rgba(160,70,52,.7)" } : {};
+        if (narrow)
+          return (
+            <IconBlock key={b.habit.id} hold={handlers(t)} top={top} height={height} label={b.habit.title} quest={quest} look={b.crowded ? crowdedLook : { border: `1.5px ${b.kept ? "solid" : "dashed"} rgba(139,112,64,.6)` }} raised={menu?.key === t.key}>
+              {b.habit.icon_key ? (
+                // eslint-disable-next-line @next/next/no-img-element -- habit portrait
+                <img src={b.habit.icon_key} alt="" className="h-full w-full rounded object-cover" draggable={false} />
+              ) : (
+                "🌱"
+              )}
+            </IconBlock>
+          );
         if (quest && isAdventure) {
           // Like a quest: a storybook card with the habit's portrait beside its name (owner's mockup, Nov 3).
           // Tall enough: the portrait stands above the name (so a narrow week column still shows both); else beside it.
