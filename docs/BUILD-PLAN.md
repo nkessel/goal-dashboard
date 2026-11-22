@@ -128,7 +128,7 @@ Streaks, add one in the past simply, tracked-event options shown. Read all four 
   instead of "Keep it as it was" [a5453c54]. **O** if it touches the box's placement code in `FeedbackDock.tsx`.
 - Welcome section headers and the Habits part [29018ed3] (read first).
 
-### 18. Load speed, measured — O
+### 18. Load speed, measured — O (Nov 22: not measurable from a cloud session, see `docs/WAITING.md` run 21)
 After the Nov 14 fix (forest background + "Opening your quest log…" instead of a black screen; the day's
 first welcome opens from the last data the device saw after 1.5s), measure the first open of the day in Safari
 on the live app if any signed-in browser is available; otherwise look for the next server wait on `/` and
