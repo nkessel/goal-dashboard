@@ -377,7 +377,8 @@ export const FLOWS = [
         await h.page.locator(".habit-row", { hasText: "Vitamins before 12pm" }).first().getByRole("checkbox", { name: /^B12/ }).first().evaluate((el) => el.click()).catch(() => {});
         await h.settle(600);
         await h.check("habit sub-habit ticked");
-        await vit.evaluate((el) => el.click()).catch(() => {});
+        // Closed with a real click too, so the tray folding away counts as an answer to input.
+        await vit.click({ timeout: 3000 }).catch(() => vit.evaluate((el) => el.click()).catch(() => {}));
         await h.settle(300);
       }
       // Schedule a quest from its ⋯ menu: the day drawn, tap a time (repeat ask 10).
@@ -818,6 +819,11 @@ export const FLOWS = [
           await h.check("habit editor: sub-habit optional");
           await h.page.keyboard.press("Escape").catch(() => {});
           await h.settle(200);
+          // With unsaved edits, Escape asks Save or Discard first (b9d04a98); a second Escape goes back to editing.
+          if (await h.page.getByRole("alertdialog", { name: /save your changes/i }).first().isVisible().catch(() => false)) {
+            await h.page.keyboard.press("Escape").catch(() => {});
+            await h.settle(300);
+          }
         }
         // Escape above may have shut the editor: open it again for the pills.
         if (!(await h.page.locator("[data-mi=pills]").first().isVisible().catch(() => false))) {
@@ -840,6 +846,13 @@ export const FLOWS = [
         if (await h.tap((p) => p.locator("[data-time-range] button", { hasText: /^Between$/ }).first(), "when: between", { optional: true, expectMove: true })) await h.check("habit editor: between two times");
         if (await h.tap((p) => p.getByRole("button", { name: /^more$/i }).first(), "habit menu", { optional: true, expectMove: true })) {
           await h.check("habit editor: menu");
+        }
+        // Leaving with unsaved edits asks Save or Discard (owner, Nov 18, b9d04a98).
+        if (await h.tap((p) => p.getByRole("dialog").getByRole("button", { name: /^close$/i }).first(), "habit editor: close with edits", { optional: true, expectMove: true })) {
+          await h.settle(300);
+          await h.check("habit editor: save or discard");
+          await h.tap((p) => p.getByRole("alertdialog", { name: /save your changes/i }).getByRole("button", { name: /^discard$/i }), "habit editor: discard", { optional: true });
+          await h.settle(400);
         }
         await esc(h);
       }

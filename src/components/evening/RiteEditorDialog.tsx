@@ -44,7 +44,7 @@ export function RiteEditorDialog({
   onClose: () => void;
 }) {
   const isHabit = slot === "day";
-  useEscape(() => close());
+  useEscape(() => (confirmLeave ? setConfirmLeave(false) : requestClose()));
   const [title, setTitle] = useState(rite?.title ?? "");
   const [description, setDescription] = useState(rite?.description ?? "");
   const [xp, setXp] = useState(rite?.xp_value ?? 5);
@@ -98,6 +98,13 @@ export function RiteEditorDialog({
     setClosing(true);
     setTimeout(onClose, 180);
   }
+  // Leaving with unsaved edits asks first: Save or Discard (owner, Nov 18, b9d04a98). Same bar as the quest editor's.
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const unsaved = rite ? dirty : !!title.trim();
+  function requestClose() {
+    if (unsaved && !isSaving && !closing) setConfirmLeave(true);
+    else close();
+  }
 
   function save() {
     setError(null);
@@ -141,7 +148,7 @@ export function RiteEditorDialog({
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center p-3 ${closing ? "overlay-fade-out" : "overlay-fade-in"}`}
       style={{ background: "rgba(6,8,22,.65)" }}
-      onClick={close}
+      onClick={requestClose}
     >
       <div
         role="dialog"
@@ -165,7 +172,7 @@ export function RiteEditorDialog({
                 ⋯
               </button>
             )}
-            <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
+            <button type="button" onClick={requestClose} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
               <CloseIcon size={14} />
             </button>
           </span>
@@ -549,6 +556,19 @@ export function RiteEditorDialog({
         )}
 
         <div data-editor-foot className="sticky -bottom-5 z-[2] -mx-5 -mb-5 flex items-center justify-between gap-2 px-5 pb-5 pt-2" style={{ order: 99, background: "linear-gradient(180deg, rgba(240,226,192,0), rgba(240,226,192,.96) 30%)" }}>
+          {confirmLeave && (
+            <div role="alertdialog" aria-label="Save your changes?" className="card-pop-in absolute inset-x-3 bottom-3 z-30 flex items-center gap-2 rounded-xl px-3.5 py-2.5" style={{ background: "rgba(20,14,6,.94)", border: "1px solid rgba(242,210,126,.55)", boxShadow: "0 8px 24px rgba(0,0,0,.45)" }}>
+              <span className="min-w-0 flex-1 text-[14.5px]" style={{ color: "#f6ecd2" }}>
+                Save your changes?
+              </span>
+              <button type="button" onClick={() => (setConfirmLeave(false), close())} className="h-9 rounded-full px-2.5 text-[13.5px] underline" style={{ color: "#f0b8a8" }}>
+                Discard
+              </button>
+              <button type="button" autoFocus onClick={() => (setConfirmLeave(false), save())} disabled={!title.trim()} className="h-9 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+                Save
+              </button>
+            </div>
+          )}
           <span />
           <span className="flex gap-2">
 
