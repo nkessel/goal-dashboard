@@ -61,11 +61,27 @@ export const FLOWS = [
       await h.typeIn((p) => p.locator("[data-toucan-question] textarea").first(), "toucan's question answer");
       await h.page.locator("[data-toucan-question] textarea").first().fill("Call Dad about Sunday");
       await h.check("the toucan's question, answered");
+      // The card's gear (owner, Nov 21): his settings open in a panel above the card.
+      if (await h.tap((p) => p.locator("[data-toucan-question]").getByRole("button", { name: /^the toucan's settings$/i }).first(), "toucan's question: gear", { optional: true, expectMove: true })) {
+        await h.settle(500);
+        await h.check("the toucan's question: its settings");
+        await h.tap((p) => p.locator("[data-toucan-question]").getByRole("button", { name: /^close the toucan's settings$/i }).first(), "toucan's question: gear closed", { optional: true, expectMove: true });
+        await h.settle(500);
+      }
       await h.tap((p) => p.locator("[data-toucan-question]").getByRole("button", { name: /^keep it$/i }).first(), "keep it", { expectMove: true });
       await h.settle(1200);
       await h.check("kept: the floating target");
       if (await h.tap((p) => p.getByRole("button", { name: /^what's most important today$/i }).first(), "open the kept target", { optional: true, expectMove: true })) {
         await h.check("kept: open");
+        // Hold the wise line for its menu: Like it · Skip to another · Hide quotes (owner, Nov 21).
+        const q = h.page.locator("[data-kept-quote]").first();
+        if (await q.count()) {
+          await q.click({ button: "right" }).catch(() => {});
+          await h.settle(400);
+          await h.check("kept: the quote's menu");
+          await h.tap((p) => p.getByRole("menuitem", { name: /^skip to another$/i }).first(), "kept: skip the quote", { optional: true });
+          await h.settle(300);
+        }
         await h.tap((p) => p.locator("[data-kept-card]").getByRole("button", { name: /^shrink$/i }).first(), "kept: shrink", { optional: true, expectMove: true });
       }
       await h.goto("/settings?open=welcome-screen", { name: "toucanask-settings" });

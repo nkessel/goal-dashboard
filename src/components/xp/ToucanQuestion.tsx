@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { addJournalEntryAction } from "@/app/actions";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
+import { AskBackground } from "@/components/settings/ToucanSettings";
+import { GearIcon } from "@/components/ui/Icons";
 import { loadFx, subscribeFx } from "@/lib/celebration-fx";
 import { keepImportant } from "@/lib/toucan-kept";
 
@@ -22,6 +24,9 @@ export function ToucanQuestion({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [ready, setReady] = useState(false);
+  // The card's gear (owner, Nov 21: "We have a settings button in the top right too, right?"): what's behind him,
+  // how thick the mist is and the wise line, in a panel above the card.
+  const [tuning, setTuning] = useState(false);
   // The part of the screen you can see (smaller with a phone's keyboard up), so the card stays centred in it.
   const [view, setView] = useState<{ top: number; h: number } | null>(null);
   const boxRef = useRef<HTMLTextAreaElement>(null);
@@ -79,11 +84,29 @@ export function ToucanQuestion({ onClose }: { onClose: () => void }) {
       {/* Centred in what you can see (owner, Nov 19: "more centered"), above a phone's keyboard. */}
       <div className="absolute inset-x-0 flex flex-col items-center justify-center px-4" style={view ? { top: view.top, height: view.h } : { top: 0, bottom: 0 }}>
       <div className="relative flex w-full max-w-[400px] flex-col items-center">
+        <div className="drawer-body w-full" data-open={tuning ? "true" : undefined}>
+          <div className="drawer-inner">
+            <div className="parchment mb-3 rounded-2xl px-4 py-3" data-toucan-ask-tune style={{ border: "1px solid #b39a6a", color: "var(--t-ink)" }}>
+              <AskBackground />
+            </div>
+          </div>
+        </div>
         <div className="tq-toucan mb-2">
           <ToucanArt size={92} />
         </div>
-        <div className="tq-card w-full rounded-[18px] px-5 pb-4 pt-4" style={{ background: "linear-gradient(160deg, rgba(18,51,47,.95), rgba(10,32,29,.97))", border: "1.2px solid rgba(217,180,95,.75)", boxShadow: "0 16px 36px rgba(0,0,0,.45)", color: "#f3e7c6" }}>
-          <div className="text-[11.5px] uppercase tracking-[.16em]" style={{ color: "#d9b45f" }}>
+        <div className="tq-card relative w-full rounded-[18px] px-5 pb-4 pt-4" style={{ background: "linear-gradient(160deg, rgba(18,51,47,.95), rgba(10,32,29,.97))", border: "1.2px solid rgba(217,180,95,.75)", boxShadow: "0 16px 36px rgba(0,0,0,.45)", color: "#f3e7c6" }}>
+          <button
+            type="button"
+            onClick={() => setTuning((v) => !v)}
+            aria-pressed={tuning}
+            aria-label={tuning ? "Close the toucan's settings" : "The toucan's settings"}
+            title="Settings"
+            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full"
+            style={{ color: "rgba(217,180,95,.8)", background: tuning ? "rgba(217,180,95,.18)" : undefined }}
+          >
+            <GearIcon size={15} />
+          </button>
+          <div className="pr-8 text-[11.5px] uppercase tracking-[.16em]" style={{ color: "#d9b45f" }}>
             {hello}
           </div>
           <h2 className="font-display m-0 mt-1 text-[24px] font-semibold leading-tight">What&rsquo;s most important right now?</h2>
@@ -107,11 +130,12 @@ export function ToucanQuestion({ onClose }: { onClose: () => void }) {
               {error}
             </p>
           )}
-          <div className="mt-4 flex items-center justify-end gap-4">
-            <button type="button" disabled={busy} onClick={() => finish(true)} className="h-10 px-1 text-[15px] font-semibold underline underline-offset-4 disabled:opacity-60" style={{ color: "#f3e7c6", textDecorationColor: "rgba(217,180,95,.6)" }}>
+          {/* Two equal pills (owner, Nov 21: layout 1, "This one"). */}
+          <div className="mt-4 flex items-center gap-2.5">
+            <button type="button" disabled={busy} onClick={() => finish(true)} className="font-display h-11 flex-1 rounded-full text-[16px] font-semibold disabled:opacity-60" style={{ border: "1.2px solid rgba(217,180,95,.7)", color: "#f3e7c6" }}>
               Keep it
             </button>
-            <button type="button" disabled={busy} onClick={() => finish(false)} className="font-display h-11 rounded-full px-6 text-[16px] font-semibold disabled:opacity-60" style={{ background: "linear-gradient(180deg,#f6dc8e,#d9b45f)", border: "1.2px solid #8a6116", color: "#2a1c10" }}>
+            <button type="button" disabled={busy} onClick={() => finish(false)} className="font-display h-11 flex-1 rounded-full text-[16px] font-semibold disabled:opacity-60" style={{ background: "linear-gradient(180deg,#f6dc8e,#d9b45f)", border: "1.2px solid #8a6116", color: "#2a1c10" }}>
               Continue
             </button>
           </div>
