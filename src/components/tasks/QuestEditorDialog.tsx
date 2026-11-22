@@ -2278,7 +2278,8 @@ export function QuestEditorDialog({
           <circle cx="11" cy="13" r="5.3" fill="#fffaf0" stroke="#a3412a" strokeWidth="1.6" />
           <circle cx="11" cy="13" r="2.2" fill="#a3412a" />
           <path d="M11 13 20.5 3.5" stroke="#4a3913" strokeWidth="1.6" strokeLinecap="round" />
-          <path d="M18 3.2l2.8.3.3 2.8M17.4 6.4l1.5.2M20.6 6.1l.2 1.5" stroke="#4a3913" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          {/* Feathers at the tail, so the arrow is struck in the centre, not flying out of it (owner, Nov 22). */}
+          <path d="M16.5 7.5L19.5 4.5L21.7 5.5L18.7 8.5Z M16.5 7.5L19.5 4.5L18.5 2.3L15.5 5.3Z" fill="#b5452e" stroke="#6b2a1a" strokeWidth=".6" strokeLinejoin="round" />
         </svg>
       );
     // eslint-disable-next-line @next/next/no-img-element -- card glyph
