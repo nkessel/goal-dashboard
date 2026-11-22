@@ -690,6 +690,14 @@ export const FLOWS = [
           await h.settle(3500);
           await h.check("celebration: how do you feel");
           if (await h.tap((p) => p.locator("[data-felt-ask] [role=radio][aria-label=Great]").first(), "celebration: great", { optional: true, expectMove: true })) await h.check("celebration: felt kept");
+          // Its ✎ opens the editor over the celebration, which is still there once it closes (owner, 3afc21f4).
+          if (await h.tap((p) => p.getByRole("button", { name: /^edit this quest$/i }).first(), "celebration: edit", { optional: true, expectMove: true })) {
+            await h.settle(1500);
+            await h.check("celebration: editor over it");
+            await esc(h);
+            await h.settle(900);
+            await h.check("celebration: back after the editor");
+          }
           await h.tap(/continue your journey/i, "continue your journey", { optional: true, expectMove: true });
           await h.settle(800);
         }

@@ -515,7 +515,9 @@ export function IconPicker({
                 </p>
               )}
               {library && (
-                <div className={`grid gap-1.5 overflow-y-auto overflow-x-hidden p-1 transition-[max-height] duration-300 ${wide ? "max-h-[62vh] grid-cols-5 sm:grid-cols-8" : "max-h-52 grid-cols-5"}`}>
+                // No scroll box of its own: the grid runs on and the picker itself scrolls, so scrolling down
+                // shows more portraits (owner, 71a6b505: "scroll down the popup ... instead of having to click a button").
+                <div className={`grid gap-1.5 overflow-x-hidden p-1 ${wide ? "grid-cols-5 sm:grid-cols-8" : "grid-cols-5"}`}>
                   {filteredLibrary?.map((entry) => (
                     <div key={entry.id} className="group/tile relative">
                       {/* Tap to use it; long-press (or right-click) to delete it from the library. */}
@@ -587,7 +589,7 @@ function LibraryTile({ src, title, disabled, current, onPick, onLong }: { src: s
       style={{ border: `2px solid ${current ? "var(--t-gold)" : "transparent"}` }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- static /design asset or external Supabase Storage URL */}
-      <img src={src} alt="" draggable={false} className="pointer-events-none h-full w-full object-cover" />
+      <img src={src} alt="" loading="lazy" decoding="async" draggable={false} className="pointer-events-none h-full w-full object-cover" />
     </button>
   );
 }
