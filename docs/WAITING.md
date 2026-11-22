@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 28 (Opus, Nov 22 14:58 UTC):** open feedback notes that are bug fixes or small, clear changes, then BUILD-PLAN.
+
 - **Dev loop 2 run 26 note (Nov 22):** tablet morning UI check of the 15 flows left in RUN-B-HANDOFF 0(b): 0 errors on a clean re-run. The full run had two errors that did not repeat when `todaycal` and `settings` ran alone (twice): React #185 on `todaycal` after the earlier flows, and a `settings bubble` layout shift (-958px). Treat as flakes unless they show again; if #185 returns on Today, look at the drag-over-calendar step. Tablet evening not run.
 
 - **Dev loop 2 run 19 (Opus, Nov 22 08:57 UTC):** bugs (UI check on flows changed since run 9), then open feedback notes that are bug fixes or small, clear changes.
