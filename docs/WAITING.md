@@ -4,8 +4,6 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Run B thread, Run C (Haiku, Nov 22 23:14 UTC):** L3, Cal 1e, T2-T4, W1, W3.
-
 - **Dev loop 2 run 40 note (Nov 22, 23:26 UTC):** Run C claimed 23:14 UTC by another session; everything else is a design change or already parked. Nothing built.
 
 - **Dev loop 2 runs 33–39 note (Nov 22, 18:25 to 23:00 UTC):** `main` unchanged since run 32; no new feedback notes since Nov 21 17:39; no Postgres errors in the last 24h. Same finding: nothing unclaimed that ships straight to `main`. Nothing built.
@@ -62,6 +60,7 @@ Started in the owner's Claude project threads; written here so another account c
 
 ## Open for the next Dev loop 2 run (not claimed)
 
+- **Run C code moves (Haiku, Nov 22, no screen change, no browser here):** L3, Cal 1e, T2-T4 and W1, W3 moved code out of `toucan/ToucanGuide.tsx` and `xp/WelcomeCard.tsx` (see `docs/SHIPPED.md`). Owner or a session with a browser: run `npm run ui-check -- --only welcome,today,toucanask --devices phone` on `main` after these moves, and check the flows are clean (the snapshot compare should show no differences if it was taken before).
 - **Tabs that feel instant, step 1 (built Nov 22, pending UI check):** `review/tabs-instant` has a `loading.tsx` stand-in for each bottom-bar tab (Today, Calendar, All Quests, Priority, Insights, Friends), so a tap commits at once and the slide plays before the data arrives; the NavLoader flourish still shows over it on a slow load. The UI check couldn't run in the cloud container (no browser). To do: run `npm run ui-check -- --only tabsinstant,navorder --devices phone,tablet` on `review/tabs-instant`, fix errors, then publish a review page with phone-first screenshots of each tab's stand-in and the slide, each decision labelled with a short code beside it: **TI-1** stand-in look per tab, **TI-2** slide timing, **TI-3** the nav highlight now snaps instead of sliding on the commit (keep as is, or carry the old slide?), **TI-4** no avatar/menu button on the stand-in until the real screen arrives. Then list it under the waiting lines below. Step 2 (faster loading itself, from the owner's Nov 22 ask) is not started.
 - **Run 31 (Nov 22, 17:30 UTC):** no notes since Nov 21 17:39. Shipped f6349b0f (find boards from the boards list). Three open notes no doc had mentioned, all new UI (mockup first, not built): **637820fc** (habit editor: "add XP to my character stats here", like the quest editor's stat XP under the XP slider), **a5b90b87** (Insights: edit check-in factors and reorder them), **ff84a102** (Insights: "set an exact time for an event"; unclear which event log he means, ask him).
 - **Run 29 (Nov 22):** no new feedback notes since run 28; every Run B item is shipped or waiting on his review. Nothing built.

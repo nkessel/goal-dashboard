@@ -147,7 +147,7 @@ Small steps, each its own `review/<topic>` branch and review page unless marked 
 | 1b | Cards, essentials and now-line drawn only in the browser (`useHydrated`) | Sonnet 5.5 | `WeekView.tsx`, `MonthView.tsx` (check its day placing too). |
 | 1c | Only the visible days until measured | Sonnet 5.5 | `WeekView.tsx` lines 392–424, 1212, 1252. |
 | 1d | `cal-ui` cookie for span, hour zoom, early/late, layers; page passes starting values | Sonnet 5.5 | `RememberView.tsx`, `calendar/page.tsx`, `CalendarLayers.tsx`. |
-| 1e | No full prefetch of `/calendar` from the bottom bar | Haiku 5.5 | `BottomNav.tsx` line 182. |
+| 1e | No full prefetch of `/calendar` from the bottom bar | Haiku 5.5 | `BottomNav.tsx` line 182. **Done (Run C, Nov 22):** the idle loop skips `/calendar`; its link still fetches on pointer down. |
 | 2a | Picker: day chips keep the time of day; label from the pick; no hidden pick | Haiku 5.5 | `WhenPicker.tsx`. Add a UI-check step: pick, switch day, place, read the time. |
 | 2b | Move the app's time first, Google after | Haiku 5.5 | `attachCalendarEvent` in `actions.ts`. Nothing visible. |
 | 2c | A time outside the shown hours opens early/late and scrolls to it | Sonnet 5.5 | `WeekView.tsx` `outside`, `offset`. |
