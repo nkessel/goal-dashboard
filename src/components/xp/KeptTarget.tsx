@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useLongPress } from "@/lib/use-long-press";
 import { loadFx, patchFx, subscribeFx } from "@/lib/celebration-fx";
 import { moveKept, putAwayKept, readKept, subscribeKept } from "@/lib/toucan-kept";
 
@@ -10,12 +11,26 @@ const LINES = ["Do the thing in front of you, and do it well.", "One thing, done
 /**
  * The floating target after "Keep it" (owner, Nov 19): drag it anywhere; tap it to see your words. Like the
  * feedback box, – shrinks it back to the target and × puts it away (no asking, owner Nov 19). No other buttons. A wise line
- * sits under your words; "hide" turns it off (back on in Settings › Toucan Spirit › His look).
+ * sits under your words; hold it (or right-click it) to like it, skip to another or hide quotes (owner, Nov 21;
+ * back on in Settings › Toucan Spirit › His look).
  */
 export function KeptTarget() {
   const kept = useSyncExternalStore(subscribeKept, readKept, () => null);
   const quoteOn = useSyncExternalStore(subscribeFx, () => loadFx().toucanKeptQuote !== false, () => true);
+  const liked = useSyncExternalStore(subscribeFx, () => loadFx().toucanKeptLiked, () => undefined);
+  const skip = useSyncExternalStore(subscribeFx, () => loadFx().toucanKeptSkip, () => undefined);
   const [open, setOpen] = useState(false);
+  const [quoteMenu, setQuoteMenu] = useState(false);
+  const press = useLongPress(() => setQuoteMenu(true));
+  // The quote's menu closes on a tap anywhere else.
+  useEffect(() => {
+    if (!quoteMenu) return;
+    const off = (e: PointerEvent) => {
+      if (!(e.target as Element | null)?.closest?.("[role=menu][aria-label='The wise line']")) setQuoteMenu(false);
+    };
+    window.addEventListener("pointerdown", off);
+    return () => window.removeEventListener("pointerdown", off);
+  }, [quoteMenu]);
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
   const start = useRef<{ px: number; py: number; x: number; y: number; moved: boolean } | null>(null);
   if (!kept) return null;
@@ -26,7 +41,11 @@ export function KeptTarget() {
   const clampY = (y: number) => Math.max(60, Math.min(vh - size - 110, y));
   const pos = drag ?? { x: clampX(kept.x ?? vw - size - 12), y: clampY(kept.y ?? Math.round(vh * 0.3)) };
   const left = pos.x < vw / 2;
-  const line = LINES[[...kept.day].reduce((a, c) => a + c.charCodeAt(0), 0) % LINES.length];
+  // Liked lines come round twice as often; a skip moves to the next one for today.
+  const pool = [...LINES, ...(liked ?? []).filter((l) => LINES.includes(l))];
+  const skips = skip && skip.day === kept.day ? skip.n : 0;
+  const line = pool[([...kept.day].reduce((a, c) => a + c.charCodeAt(0), 0) + skips) % pool.length];
+  const isLiked = (liked ?? []).includes(line);
   return (
     <>
       <button
@@ -72,7 +91,8 @@ export function KeptTarget() {
           style={{ top: pos.y + size + 8, ...(left ? { left: Math.max(8, pos.x) } : { right: Math.max(8, vw - pos.x - size) }), width: "min(300px, calc(100vw - 16px))", background: "linear-gradient(160deg, rgba(18,51,47,.96), rgba(10,32,29,.98))", border: "1.2px solid rgba(217,180,95,.75)", boxShadow: "0 12px 28px rgba(0,0,0,.4)", color: "#f3e7c6" }}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-[.16em]" style={{ color: "#d9b45f" }}>
+            {/* T1 (owner, Nov 21: "less in your face (smaller and possibly sans serif)"): small, faint, sans-serif. */}
+            <span className="text-[9.5px] font-semibold uppercase tracking-[.1em]" style={{ color: "rgba(217,180,95,.75)", fontFamily: "Inter, system-ui, sans-serif" }}>
               Most important today
             </span>
             <span className="flex items-center">
@@ -96,14 +116,24 @@ export function KeptTarget() {
           </div>
           <div className="font-display mt-0.5 text-[19px] leading-snug">{kept.text}</div>
           {quoteOn && (
-              <div className="mt-2.5 flex items-start gap-2 pt-2" style={{ borderTop: "1px solid rgba(217,180,95,.3)" }}>
-                <span className="font-display flex-1 text-[14.5px] italic" style={{ color: "rgba(243,231,198,.82)" }}>
-                  &ldquo;{line}&rdquo;
-                </span>
-                <button type="button" onClick={() => patchFx({ toucanKeptQuote: false })} className="text-[12px] underline underline-offset-2" style={{ color: "rgba(217,180,95,.85)" }}>
-                  hide
-                </button>
-              </div>
+            <div className="relative mt-2.5 pt-2" style={{ borderTop: "1px solid rgba(217,180,95,.3)" }}>
+              <span {...press.handlers} title="Hold for more" className="font-display block select-none text-[14.5px] italic" style={{ color: "rgba(243,231,198,.82)", WebkitTouchCallout: "none" } as React.CSSProperties} data-kept-quote>
+                &ldquo;{line}&rdquo;
+              </span>
+              {quoteMenu && (
+                <div role="menu" aria-label="The wise line" className="card-pop-in parchment absolute right-0 top-full z-[2] mt-1 flex min-w-[170px] flex-col overflow-hidden rounded-xl py-1" style={{ border: "1px solid #b39a6a", boxShadow: "0 10px 22px rgba(0,0,0,.4)", color: "var(--t-ink)" }}>
+                  <button type="button" role="menuitem" className="flex min-h-10 items-center gap-2 px-3 text-left text-[14px] hover:bg-black/5" onClick={() => (patchFx({ toucanKeptLiked: isLiked ? (liked ?? []).filter((l) => l !== line) : [...(liked ?? []), line] }), setQuoteMenu(false))}>
+                    <Heart on={isLiked} /> {isLiked ? "Liked" : "Like it"}
+                  </button>
+                  <button type="button" role="menuitem" className="flex min-h-10 items-center gap-2 px-3 text-left text-[14px] hover:bg-black/5" onClick={() => (patchFx({ toucanKeptSkip: { day: kept.day, n: skips + 1 } }), setQuoteMenu(false))}>
+                    <SkipIcon /> Skip to another
+                  </button>
+                  <button type="button" role="menuitem" className="flex min-h-10 items-center border-t px-3 text-left text-[14px] hover:bg-black/5" style={{ borderColor: "rgba(139,112,64,.25)" }} onClick={() => (patchFx({ toucanKeptQuote: false }), setQuoteMenu(false))}>
+                    Hide quotes
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -123,6 +153,21 @@ function TargetArrow({ size }: { size: number }) {
       {/* The arrow, struck in the centre from the upper right: its shaft, and two pairs of red feathers at the tail. */}
       <path d="M22 26L41 7" stroke="#3b2a14" strokeWidth="2.2" strokeLinecap="round" />
       <path d="M34 14L39.5 8.5L44 10.5L38.5 16Z M34 14L39.5 8.5L37.5 4L32 9.5Z" fill="#b5452e" stroke="#6b2a1a" strokeWidth=".8" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function Heart({ on }: { on: boolean }) {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden fill={on ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round">
+      <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" />
+    </svg>
+  );
+}
+function SkipIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 12a7 7 0 1 1-2.1-5M19 4v4h-4" />
     </svg>
   );
 }

@@ -41,8 +41,12 @@ export type FxSettings = {
   toucanAskBg?: "mist" | "fog" | "forest" | "clear";
   /** How much mist drifts across, 0 (little) to 1 (lots). */
   toucanAskMist?: number;
-  /** The wise line under what you kept (off once you tap "hide"). */
+  /** The wise line under what you kept (off with the quote's menu › Hide quotes). */
   toucanKeptQuote?: boolean;
+  /** Wise lines you liked (the quote's menu › Like it, owner Nov 21): they come back more often. */
+  toucanKeptLiked?: string[];
+  /** How many times you skipped today's wise line (the quote's menu › Skip to another). */
+  toucanKeptSkip?: { day: string; n: number };
   /** Back after this many hours since your last check-in: a "welcome back" screen (0 = never). */
   welcomeBackHours?: number;
   /** Your own "welcome back" greetings, one per line (they take turns with the built-in ones left on). */

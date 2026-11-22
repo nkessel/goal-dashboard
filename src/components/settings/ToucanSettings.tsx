@@ -361,7 +361,7 @@ const ASK_BGS = [
  * What's behind him when he asks what's most important (the toucan's question, owner Nov 19: "let's have this
  * background be editable in some settings"), and how thick the mist is.
  */
-function AskBackground() {
+export function AskBackground() {
   const bg = useSyncExternalStore(subscribeFx, () => loadFx().toucanAskBg ?? "mist", () => "mist");
   const mist = useSyncExternalStore(subscribeFx, () => loadFx().toucanAskMist ?? 0.7, () => 0.7);
   const quote = useSyncExternalStore(subscribeFx, () => loadFx().toucanKeptQuote !== false, () => true);
