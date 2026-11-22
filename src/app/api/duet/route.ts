@@ -3,6 +3,7 @@ import { runDuet } from "@/lib/duet";
 
 // Claude, in another app, reaches the quests, habits and boards through here (see docs/DUET.md): the database
 // function `public.duet(action, args)` posts to this route with the key held in app_defaults. No session, no cookies.
+// Live since Nov 22 (switched on with the owner's yes); off switch: delete secret.duet_key.
 export const dynamic = "force-dynamic";
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "cache-control": "no-store" } });
