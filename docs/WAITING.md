@@ -7,7 +7,6 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 - **Dev loop 2 run 27 (Opus, Nov 22 13:58 UTC):** RUN-B 0(b) tablet **evening** UI check of the 15 flows left (welcomeoff, navorder, todaycal, savekeys, cleaning, import, settings, questdrop, calfail, calendar, feedback, language, offline, inventory, questextras); fix what it finds.
 - **Dev loop 2 run 26 note (Nov 22):** tablet morning UI check of the 15 flows left in RUN-B-HANDOFF 0(b): 0 errors on a clean re-run. The full run had two errors that did not repeat when `todaycal` and `settings` ran alone (twice): React #185 on `todaycal` after the earlier flows, and a `settings bubble` layout shift (-958px). Treat as flakes unless they show again; if #185 returns on Today, look at the drag-over-calendar step. Tablet evening not run.
 
-- **Dev loop 2 run 25 (Opus, Nov 22 13:00 UTC):** full UI check on `main` (phone) after the Duet pay-out move (`lib/data/quest-ops.ts`) and the `tasks/editor/` code move; fix what it finds.
 - **Dev loop 2 run 19 (Opus, Nov 22 08:57 UTC):** bugs (UI check on flows changed since run 9), then open feedback notes that are bug fixes or small, clear changes.
 - **Run B item 9 (Sonnet 5.5, Nov 22 00:35 UTC):** data step is on `main` (0095). The sub-quest card editor (Time · XP · Stats · Make it a quest pills) is built on `review/subquest-details`, UI check `sequence` clean on phone; **waiting on the owner's design review:** https://claude.ai/artifact/VNLeBHaRZaCd9fJ4eFbQMi#a1 (pills), https://claude.ai/artifact/VNLeBHaRZaCd9fJ4eFbQMi#a4 (Stats tray). Data side of the **When** pill is on `main` (0096, Nov 22). Not built yet: the pill itself, the calendar block (`listScheduledSteps` in `WeekView.tsx`) and the calendar flow check. **Update Nov 22 (run 12):** the When pill is on `review/subquest-when`, the calendar block (week, day and Today's day calendar) on `review/subquest-calendar`; all three branches stack, UI check `sequence` and `calendar` clean. **Waiting on the owner's design review of all of it:** https://claude.ai/artifact/VNLeBHaRZaCd9fJ4eFbQMi#a1 (pills), #a5 (When tray), #a6 (week block), #a7 (day block). Merge `review/subquest-calendar` on his OK. Left: a menu on the block.
 
@@ -51,6 +50,8 @@ Started in the owner's Claude project threads; written here so another account c
 ---
 
 ## Open for the next Dev loop 2 run (not claimed)
+
+- **Run 25 (Nov 22, 14:10 UTC):** full UI check on `main` @ d49edba, phone, morning and evening, every flow (727 shots): **0 errors**, 113 warnings (the usual ones: owl under the keyboard, the XP-20 corner badge, calendar overlaps). Covers the Duet pay-out move to `lib/data/quest-ops.ts` and the `tasks/editor/` code move: completing a quest still pays XP and the celebration flow is unchanged. No new notes since Nov 21 17:39. Nothing to fix; tablet not re-run.
 
 - **Run 24 (Nov 22, 12:30 UTC):** nothing new on `main` or in notes since run 23; every Run B item is shipped or waiting on his review. Nothing built.
 
