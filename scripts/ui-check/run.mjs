@@ -370,6 +370,9 @@ async function walk({ browser, device, time, tz, cookie }) {
   async function goto(path, { welcome = false, name, reset = welcome } = {}) {
     screen = name || path.replace(/^\//, "").replace(/\//g, "-") || "today";
     if (reset) await fetch(`http://127.0.0.1:${DB_PORT}/__reset`, { method: "POST" });
+    // Forget the last screen before this first load too: with it set (say to Settings), "/" redirects there and
+    // that screen's own LastScreen can set the cookie again after the clear below, so the flow opened on Settings.
+    await page.context().clearCookies({ name: "last-path" }).catch(() => {});
     await page.goto(base + "/", { waitUntil: "domcontentloaded" });
     await page.evaluate(
       ({ welcome }) => {

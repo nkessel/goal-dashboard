@@ -11,25 +11,7 @@ import { deleteGoogleEventAction, recordEventQuestAction, rsvpGoogleEventAction,
 import { cleanEventDescription } from "@/lib/event-text";
 import { useEscape } from "@/lib/use-escape";
 import { CloseIcon } from "@/components/ui/Icons";
-
-const HIDDEN_KEY = "hidden-gcal-events-v1";
-
-function readHidden(): Set<string> {
-  try {
-    const raw = window.localStorage.getItem(HIDDEN_KEY);
-    return raw ? new Set(JSON.parse(raw)) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-function writeHidden(ids: Set<string>) {
-  try {
-    window.localStorage.setItem(HIDDEN_KEY, JSON.stringify(Array.from(ids)));
-  } catch {
-    // best-effort — ignore storage failures (private browsing, quota, etc.)
-  }
-}
+import { hideEventId, hiddenEventIds } from "@/lib/hidden-events";
 
 /**
  * A real Google Calendar appointment plotted on the Calendar view (distinct
@@ -66,7 +48,7 @@ export function GoogleEventChip({
   // client's first paint may immediately swap to hidden if the viewer
   // hid this appointment earlier, which is an acceptable one-frame flash
   // for a purely client-side, per-browser preference like this.
-  const [hidden, setHidden] = useState(() => (typeof window !== "undefined" ? readHidden().has(event.id) : false));
+  const [hidden, setHidden] = useState(() => (typeof window !== "undefined" ? hiddenEventIds().has(event.id) : false));
   const [open, setOpen] = useState(false);
   useEscape(() => setOpen(false), open);
   // Where the popup has been dragged to (back to the middle each time it opens).
@@ -145,9 +127,7 @@ export function GoogleEventChip({
   if (hidden || (converted && !creating)) return null;
 
   function hideEvent() {
-    const ids = readHidden();
-    ids.add(event.id);
-    writeHidden(ids);
+    hideEventId(event.id);
     setHidden(true);
     setOpen(false);
   }
@@ -175,9 +155,7 @@ export function GoogleEventChip({
     // Remembered on the account: its event stays when the quest is removed, and a repeating event's quests
     // share one look (owner, Nov 18).
     if (id) void recordEventQuestAction(id, event.id, event.recurringEventId ?? null).catch(() => {});
-    const ids = readHidden();
-    ids.add(event.id);
-    writeHidden(ids);
+    hideEventId(event.id);
     setConverted(true);
     router.refresh();
   }

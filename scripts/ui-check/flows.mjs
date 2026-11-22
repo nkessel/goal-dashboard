@@ -1544,6 +1544,9 @@ export const FLOWS = [
           await h.check("auto-scheduler: other grouping");
           await h.tap((p) => p.getByRole("button", { name: /by when|folders/i }).first(), "auto-scheduler: grouping back", { optional: true, expectMove: true });
         }
+        // Closed again: on a phone the window covers the calendar's gear, which the next steps tap.
+        await h.tap((p) => p.getByRole("button", { name: /^close the auto-scheduler$/i }).first(), "close the auto-scheduler", { optional: true });
+        await h.settle(400);
       }
       await h.page.locator("[title^='Edit \"Goblin']").first().evaluate((el) => el.scrollIntoView({ block: "start" })).catch(() => {});
       await h.settle(400);
@@ -2128,7 +2131,7 @@ export const FLOWS = [
         await h.check("add item sheet");
         await h.typeIn((p) => p.getByLabel("Item name").first(), "add item: name", "Thai spoon");
         await h.check("add item sheet: typing");
-        await h.tap((p) => p.getByRole("button", { name: /paint it$/i }).first(), "add item: paint it", { optional: true, expectMove: true });
+        await h.tap((p) => p.getByRole("button", { name: /custom portrait$|paint it$/i }).first(), "add item: paint it", { optional: true, expectMove: true });
         await h.typeIn((p) => p.getByLabel("Describe the portrait").first(), "add item: describe", "a wooden spoon");
         await h.check("add item sheet: describing");
         await h.tap((p) => p.getByRole("button", { name: /^\+ add a note$/i }).first(), "add item: add a note", { optional: true, expectMove: true });

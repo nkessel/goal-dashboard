@@ -3549,7 +3549,10 @@ html[data-tour-feedback] [data-feedback-root].fixed { z-index: 138; }
 /* A check or ✕ that lands on a calendar card when it's done from there (owner, Nov 12: "fly onto the calendar card from
    above with the same slam they do in the celebration screen"). */
 .cal-slam { animation: qc-checkDrop .9s linear both; transform-origin: center; position: relative; z-index: 2; }
-@media (prefers-reduced-motion: reduce) { .cal-slam { animation: none; } }
+/* Undone: the mark lifts back up off the card (the slam played backwards, lighter). */
+@keyframes cal-lift { 0% { opacity: 1; transform: scale(1); } 25% { transform: scale(.9, 1.08); } 100% { opacity: 0; transform: translateY(-18px) scale(2.6) rotate(-10deg); } }
+.cal-lift { animation: cal-lift .5s cubic-bezier(.4,0,.8,.4) both; transform-origin: center; position: relative; z-index: 2; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .cal-slam, .cal-lift { animation: none; } }
 
 /* Quest Drop: the falling card shakes when it can't go that way. */
 @keyframes quest-drop-shake { 0%, 100% { translate: 0 0; } 25% { translate: -4px 0; } 75% { translate: 4px 0; } }

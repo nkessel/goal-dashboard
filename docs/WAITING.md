@@ -4,10 +4,10 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Run B item 9 (Sonnet 5.5, Nov 22 00:35 UTC):** data step is on `main` (0095). The sub-quest card editor (Time · XP · Stats · Make it a quest pills) is built on `review/subquest-details`, UI check `sequence` clean on phone; **waiting on the owner's design review:** https://claude.ai/artifact/VNLeBHaRZaCd9fJ4eFbQMi#a1 (pills), https://claude.ai/artifact/VNLeBHaRZaCd9fJ4eFbQMi#a4 (Stats tray). Not built yet: the **When** pill (sub-quest on the calendar: own block, ticking it gives its XP share) and the calendar flow check. Free for another run.
+- **Dev loop 2 (Opus, Nov 22 01:55 UTC):** UI check, the 15 remaining flows on tablet (RUN-B-HANDOFF item 0 (b)), fixing errors; then small feedback bug fixes.
+- **Run B item 9 (Sonnet 5.5, Nov 22 00:35 UTC):** data step is on `main` (0095). The sub-quest card editor (Time · XP · Stats · Make it a quest pills) is built on `review/subquest-details`, UI check `sequence` clean on phone; **waiting on the owner's design review:** https://claude.ai/artifact/VNLeBHaRZaCd9fJ4eFbQMi#a1 (pills), https://claude.ai/artifact/VNLeBHaRZaCd9fJ4eFbQMi#a4 (Stats tray). Data side of the **When** pill is on `main` (0096, Nov 22). Not built yet: the pill itself, the calendar block (`listScheduledSteps` in `WeekView.tsx`) and the calendar flow check. Free for another run.
 
 - **Run B (Sonnet 5.5, this account, Nov 20):** step 1 (the three merges) and D0 are on `main`; now on S2/S3 (order in `docs/RUN-B-HANDOFF.md`). Other sessions: leave those to it.
-- **Dev loop 2 (run 8, Opus, Nov 21 23:58 UTC):** RUN-B-HANDOFF item 0 (b): UI check on all flows, phone first, against `main` @ 9e134e5 (runs 5 and 7 left no results; their stale claims removed), then small bug-fix feedback notes, then BUILD-PLAN task 9. Files: I'll name them here.
 - **Session claude-2d (Opus, owner's account):** Nov 20, merged the four review branches above to `main`; nothing in progress. `review/boards-nov18` still waits on the owner.
 
 
@@ -40,7 +40,8 @@ Started in the owner's Claude project threads; written here so another account c
 
 ## Open for the next Dev loop 2 run (not claimed)
 
-- RUN-B-HANDOFF item 0 (b) continues: phone, morning and evening, is clean for welcome, toucanask, insights, faces, sequence, habiteditor, evening, create, today (Nov 21, run 4). **Run 6 (Nov 21): tablet, morning and evening, clean (0 errors) for welcome, toucanask, insights, faces, sequence, habiteditor, evening, create** (only warnings: an insights layout-shift and the time-wheel input over its wheels, both existing). The other flows are run 5's.
+- RUN-B-HANDOFF item 0 (b) continues: phone, morning and evening, is clean for welcome, toucanask, insights, faces, sequence, habiteditor, evening, create, today (Nov 21, run 4). **Run 6 (Nov 21): tablet, morning and evening, clean (0 errors) for welcome, toucanask, insights, faces, sequence, habiteditor, evening, create** (only warnings: an insights layout-shift and the time-wheel input over its wheels, both existing). **Run 9 (Nov 22): phone, morning and evening, clean (0 errors) for the other 15 flows** (welcomeoff, navorder, todaycal, savekeys, cleaning, import, settings, questdrop, calfail, calendar, feedback, language, offline, inventory, questextras). Left: those 15 on tablet (`--devices tablet`, a few per run; set `NODE_OPTIONS=--max-old-space-size=6144` or the build runs out of memory).
+- Calendar notes e16f1f7a / 682be93f, still to do (new UI, mockup first): "Hide from calendar" in the event's right-click menu, an "are you sure" before hiding (hidden ones come back from the calendar settings), and hidden events fading out. The phantom slot and the room for the others shipped Nov 22.
 - Feedback 71a6b505 (second half, "the image uploader disappeared from the portrait picker"): the quest editor's picture background (with its upload) sits at the foot of the portrait picker only once a quest exists; on a **new** quest it isn't there. Unclear whether that is what he means: ask him. ad8add7b ("Why can't I edit the board title"): a board's title edits from its parent's ✎ only; editing it in place on the board page is new UI, so a mockup first.
 - Walkthrough intro wording (notes c6ba4030 second half, af13ecc0): his edited text with "I am the Great Toucan Spirit" and options for the bold **exciting**: new wording, so a review page first (`tour/Walkthrough.tsx` line ~71). Not built.
 
