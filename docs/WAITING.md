@@ -5,7 +5,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 ## In progress right now (claim before you start; remove your line when you ship)
 
 - **Run B thread, Run D (Sonnet, Nov 22 23:30 UTC):** actions.ts split, T1, T5, W2, C1, E1-E3, E5, E8, D2, D3, I1-I6, Light 5, Light 7.
-- **Dev loop 2 run 40 note (Nov 22, 23:26 UTC):** Run C claimed 23:14 UTC by another session; everything else is a design change or already parked. Nothing built.
+- **Dev loop 2 runs 40–41 note (Nov 22, 23:26 and 23:56 UTC):** Run C, then Run D (actions.ts split, live on `main` 23:32 onward) are another session's; no new feedback notes since Nov 21 17:39; everything else is a design change or already parked. Nothing built; UI check left for after Run D's split lands.
 
 - **Dev loop 2 runs 33–39 note (Nov 22, 18:25 to 23:00 UTC):** `main` unchanged since run 32; no new feedback notes since Nov 21 17:39; no Postgres errors in the last 24h. Same finding: nothing unclaimed that ships straight to `main`. Nothing built.
 
