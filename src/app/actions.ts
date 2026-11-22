@@ -1127,7 +1127,22 @@ export async function setTaskIconAction(
  * card across several pages. */
 export async function listTaskIconLibraryAction(): Promise<TaskIconLibraryEntry[]> {
   const ownerId = await requireProfileId();
-  return taskIconLibraryData.listAllPortraits(ownerId);
+  const [all, extras] = await Promise.all([taskIconLibraryData.listAllPortraits(ownerId), readExtras(ownerId)]);
+  const hidden = new Set(Array.isArray(extras.hiddenPortraits) ? (extras.hiddenPortraits as unknown[]).filter((u): u is string => typeof u === "string") : []);
+  return hidden.size ? all.filter((e) => !hidden.has(e.image_url)) : all;
+}
+
+/**
+ * Takes a portrait the picker only lists (one a quest or reward already uses, a built-in one, a
+ * character) off its list for this person (owner's note 1873c121: those had no ✕). Quests using it keep it.
+ */
+export async function hidePortraitAction(imageUrl: string) {
+  const ownerId = await requireProfileId();
+  const extras = await readExtras(ownerId);
+  const was = Array.isArray(extras.hiddenPortraits) ? (extras.hiddenPortraits as unknown[]).filter((u): u is string => typeof u === "string") : [];
+  if (was.includes(imageUrl)) return;
+  const { error } = await writeExtra(ownerId, "hiddenPortraits", [...was, imageUrl].slice(-500));
+  if (error) throw new Error(`Couldn't hide that portrait: ${error.message}`);
 }
 
 /** Picking a task icon straight from the shared library (a preset or

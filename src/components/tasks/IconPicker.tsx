@@ -8,6 +8,7 @@ import {
   pickTaskIconFromLibraryAction,
   generateQuestIconImageAction,
   removeTaskIconFromLibraryAction,
+  hidePortraitAction,
 } from "@/app/actions";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -168,7 +169,10 @@ export function IconPicker({
   function removeEntry(entry: TaskIconLibraryEntry) {
     setConfirmRemove(null);
     setLibrary((prev) => prev?.filter((e) => e.id !== entry.id) ?? prev);
-    if (!entry.id.startsWith("new-") && !entry.id.includes(":")) void removeTaskIconFromLibraryAction(entry.id).catch(() => {});
+    if (entry.id.startsWith("new-")) return;
+    // Listed only (used by a quest or reward, built in, a character): off this person's list, not deleted.
+    if (entry.id.includes(":")) void hidePortraitAction(entry.image_url).catch(() => {});
+    else void removeTaskIconFromLibraryAction(entry.id).catch(() => {});
   }
 
   useEffect(() => {
@@ -527,7 +531,7 @@ export function IconPicker({
                         disabled={isPending}
                         current={currentImageUrl === entry.image_url}
                         onPick={() => pickLibraryEntry(entry.image_url)}
-                        onLong={entry.id.includes(":") ? undefined : () => setConfirmRemove(entry)}
+                        onLong={() => setConfirmRemove(entry)}
                       />
                       {/* Delete: a small menu right on the tile (owner, Nov 3: "a much smaller context menu"). */}
                       {confirmRemove?.id === entry.id && (
@@ -540,7 +544,6 @@ export function IconPicker({
                           </button>
                         </div>
                       )}
-                      {!entry.id.includes(":") && (
                       <button
                         type="button"
                         onClick={() => setConfirmRemove(entry)}
@@ -551,7 +554,6 @@ export function IconPicker({
                       >
                         <CloseIcon size={9} />
                       </button>
-                      )}
                     </div>
                   ))}
                   {filteredLibrary?.length === 0 && (

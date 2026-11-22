@@ -2,7 +2,7 @@
 
 import { Linked } from "@/components/ui/Linked";
 import { progressWords } from "@/lib/progress-words";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { listQuestStepsAction, saveQuestStepsAction, setTaskProgressAction } from "@/app/actions";
 import { celebrateProgress } from "@/components/celebration/QuestCelebrationHost";
@@ -20,12 +20,25 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
   const [error, setError] = useState<string | null>(null);
   const [pop, setPop] = useState<number | null>(null);
   const [, start] = useTransition();
+  // Its own tick is still saving: a reload then would put back what the server had before it.
+  const saving = useRef(0);
+  // Reloads when the quest's step counts change from elsewhere (ticked in the quest editor, owner's
+  // note 367d6ccd: the tray kept showing them undone after the editor closed).
   useEffect(() => {
+    if (saving.current > 0) return;
+    let current = true;
     listQuestStepsAction(task.id).then(
-      (rows) => setSteps(treeOrder((rows ?? []).map((r) => ({ key: r.id, id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, coins: r.coins ?? 0, minutes: r.minutes ?? null, statSplit: r.stat_split ?? null, weight: r.weight ?? null, progress: r.progress ?? (r.done ? 100 : 0), state: r.state ?? null, parentKey: r.parent_id ?? null })))),
-      () => setError("Couldn't load the sub-quests.")
+      (rows) => {
+        if (current && saving.current === 0) setSteps(treeOrder((rows ?? []).map((r) => ({ key: r.id, id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, coins: r.coins ?? 0, minutes: r.minutes ?? null, statSplit: r.stat_split ?? null, weight: r.weight ?? null, progress: r.progress ?? (r.done ? 100 : 0), state: r.state ?? null, parentKey: r.parent_id ?? null }))));
+      },
+      () => {
+        if (current) setError("Couldn't load the sub-quests.");
+      }
     );
-  }, [task.id]);
+    return () => {
+      current = false;
+    };
+  }, [task.id, task.steps_done, task.steps_total]);
 
   const holders = steps ? parentKeys(steps) : new Set<string>();
   const live = (steps ?? []).filter((st) => !holders.has(st.key) && st.state !== "skipped");
@@ -36,9 +49,12 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
     const next = steps.map((st) => (st.key === key ? { ...st, done, progress: done ? 100 : 0, state: null } : st));
     setSteps(next);
     setError(null);
+    saving.current += 1;
     start(async () => {
       try {
-        const res = await saveQuestStepsAction(task.id, stepPayload(next));
+        const res = await saveQuestStepsAction(task.id, stepPayload(next)).finally(() => {
+          saving.current -= 1;
+        });
         let xp = res.xpEarned;
         // The steps carry the quest along: its progress rises to what they add up to (never down here).
         const share = stepsShare(next);
