@@ -108,7 +108,7 @@ export function StepCardEditor({
     "qe-fact flex h-8 shrink-0 items-center rounded-full px-3 text-[12.5px] font-semibold";
   const soft = "var(--t-ink-soft)";
   return (
-    <div className="reveal ml-[26px] mr-1 pb-1.5 pt-1" data-step-card-editor>
+    <div className="due-in ml-[26px] mr-1 pb-1.5 pt-1" data-step-card-editor>
       <div ref={rowRef} className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
