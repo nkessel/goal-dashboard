@@ -22,7 +22,7 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
   const [, start] = useTransition();
   useEffect(() => {
     listQuestStepsAction(task.id).then(
-      (rows) => setSteps(treeOrder((rows ?? []).map((r) => ({ key: r.id, id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, coins: r.coins ?? 0, minutes: r.minutes ?? null, statSplit: r.stat_split ?? null, weight: r.weight ?? null, progress: r.progress ?? (r.done ? 100 : 0), state: r.state ?? null, parentKey: r.parent_id ?? null })))),
+      (rows) => setSteps(treeOrder((rows ?? []).map((r) => ({ key: r.id, id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, coins: r.coins ?? 0, minutes: r.minutes ?? null, statSplit: r.stat_split ?? null, weight: r.weight ?? null, progress: r.progress ?? (r.done ? 100 : 0), state: r.state ?? null, parentKey: r.parent_id ?? null, slotStart: r.scheduled_start ?? null, slotEnd: r.scheduled_end ?? null })))),
       () => setError("Couldn't load the sub-quests.")
     );
   }, [task.id]);

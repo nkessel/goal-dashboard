@@ -637,7 +637,7 @@ export const FLOWS = [
               await h.settle(400);
               await h.check("sub-quests: its card editor (pills)");
               const card = (name) => (p) => p.locator("[data-step-card-editor]").getByRole("button", { name }).first();
-              for (const [label, re] of [["time", /^(Time|\d+ min|\d+h)/], ["XP", /\d+ XP$/], ["stats", /^(Stats|[A-Z]{3} \d+%)/]]) {
+              for (const [label, re] of [["time", /^(Time|\d+ min|\d+h)/], ["XP", /\d+ XP$/], ["stats", /^(Stats|[A-Z]{3} \d+%)/], ["when", /^(When|[A-Z][a-z]{2},? )/]]) {
                 if (await h.tap(card(re), `sub-quest card: ${label} pill`, { optional: true, expectMove: true })) {
                   await h.settle(500);
                   await h.check(`sub-quests: card ${label} tray`);

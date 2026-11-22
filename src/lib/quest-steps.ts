@@ -1,6 +1,6 @@
 /** A quest's steps (a checklist that can nest): order, weights, and what they add up to. Shared by the editor and the card's steps tray. */
 
-export type StepDraft = { key: string; id?: string; title: string; done: boolean; xp?: number; coins?: number; minutes?: number | null; statSplit?: Record<string, number> | null; weight?: number | null; progress?: number; state?: "skipped" | "failed" | null; parentKey?: string | null };
+export type StepDraft = { key: string; id?: string; title: string; done: boolean; xp?: number; coins?: number; minutes?: number | null; statSplit?: Record<string, number> | null; weight?: number | null; progress?: number; state?: "skipped" | "failed" | null; parentKey?: string | null; slotStart?: string | null; slotEnd?: string | null };
 
 /** Steps that hold sub-tasks of their own (they count through those). */
 export const parentKeys = (list: StepDraft[]) => new Set(list.map((st) => st.parentKey).filter(Boolean) as string[]);

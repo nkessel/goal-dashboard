@@ -4,14 +4,16 @@ import { useState } from "react";
 import { InlineNumber } from "@/components/ui/InlineNumber";
 import { Fold } from "@/components/ui/Fold";
 import { StatSplitEditor } from "./StatSplitEditor";
+import { WhenPicker } from "@/components/calendar/WhenPicker";
+import { scheduleStepAction, unscheduleStepAction } from "@/app/actions";
 import type { StepDraft } from "@/lib/quest-steps";
 
-type Pill = "time" | "xp" | "stats";
+type Pill = "time" | "xp" | "stats" | "when";
 
 /**
  * The small editor inside a sub-quest's card (owner, Nov 21, option C): the quest editor's own `.qe-fact`
  * pills for this one sub-quest: Time, XP, Stats, and Make it a quest. The tray of the pill you tap opens
- * under the pills. Stats uses the app's one StatSplitEditor. (Its When pill is the next step.)
+ * under the pills. Stats uses the app's one StatSplitEditor. When puts it on the calendar as its own block (WhenPicker, the same slot picker as quests).
  */
 export function StepCardEditor({
   step,
@@ -34,6 +36,36 @@ export function StepCardEditor({
   onMakeQuest: () => void;
 }) {
   const [pill, setPill] = useState<Pill | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const placed = step.slotStart && step.slotEnd ? { start: step.slotStart, end: step.slotEnd } : null;
+  async function place(s: { start: string; end: string }) {
+    if (!step.id) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await scheduleStepAction(step.id, s.start, s.end);
+      onUpdate({ slotStart: s.start, slotEnd: s.end });
+      setPill(null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't put it on the calendar.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function takeOff() {
+    if (!step.id) return;
+    setBusy(true);
+    try {
+      await unscheduleStepAction(step.id);
+      onUpdate({ slotStart: null, slotEnd: null });
+    } catch {
+      setErr("Couldn't take it off.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  const whenLabel = placed ? new Date(placed.start).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" }).replace(/\s?([AaPp])\.?\s?[Mm]\.?$/, (_, p: string) => p.toLowerCase()) : "When";
   const toggle = (p: Pill) => setPill((o) => (o === p ? null : p));
   const own = step.statSplit ?? {};
   const ownKeys = Object.keys(own).filter((k) => own[k] > 0);
@@ -53,6 +85,9 @@ export function StepCardEditor({
         </button>
         <button type="button" className={pillCls} onClick={() => toggle("stats")} aria-expanded={pill === "stats"} data-open={pill === "stats" ? "true" : undefined}>
           {statsLabel}
+        </button>
+        <button type="button" className={pillCls} onClick={() => toggle("when")} aria-expanded={pill === "when"} data-open={pill === "when" ? "true" : undefined}>
+          {whenLabel}
         </button>
         <button type="button" className={`${pillCls} ml-auto`} onClick={onMakeQuest}>
           Make it a quest
@@ -84,6 +119,25 @@ export function StepCardEditor({
             )}
           </span>
         </div>
+      </Fold>
+      <Fold open={pill === "when"}>
+        {pill === "when" && (
+          <div className="qe-fact-panel flex flex-col gap-1.5 rounded-xl p-2.5 text-[12.5px]" style={{ color: soft }}>
+            {step.id ? (
+              <>
+                <WhenPicker minutes={mins || 15} title={step.title} isAdventure={isAdventure} initial={placed?.start ?? null} placing={busy} onPick={(s) => void place(s)} />
+                {placed && (
+                  <button type="button" onClick={() => void takeOff()} disabled={busy} className="self-start underline underline-offset-2 disabled:opacity-50">
+                    Take it off the calendar
+                  </button>
+                )}
+              </>
+            ) : (
+              <span>Save the quest first, then you can give this sub-quest a time.</span>
+            )}
+            {err && <span style={{ color: "var(--t-warn)" }}>{err}</span>}
+          </div>
+        )}
       </Fold>
       <Fold open={pill === "stats"}>
         <div className="flex flex-col gap-1">
