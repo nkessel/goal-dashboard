@@ -635,7 +635,14 @@ export const FLOWS = [
             await h.check("sub-quests: its ⋯ menu");
             if (await h.tap((p) => p.getByRole("menuitem", { name: /Time, progress/ }).first(), "time, progress & XP share", { optional: true, expectMove: true })) {
               await h.settle(400);
-              await h.check("sub-quests: its time and details");
+              await h.check("sub-quests: its card editor (pills)");
+              const card = (name) => (p) => p.locator("[data-step-card-editor]").getByRole("button", { name }).first();
+              for (const [label, re] of [["time", /^(Time|\d+ min|\d+h)/], ["XP", /\d+ XP$/], ["stats", /^(Stats|[A-Z]{3} \d+%)/]]) {
+                if (await h.tap(card(re), `sub-quest card: ${label} pill`, { optional: true, expectMove: true })) {
+                  await h.settle(500);
+                  await h.check(`sub-quests: card ${label} tray`);
+                }
+              }
             }
           }
         }

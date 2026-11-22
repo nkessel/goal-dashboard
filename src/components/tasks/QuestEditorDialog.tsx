@@ -72,6 +72,7 @@ import { isNetworkError, isOffline, queueOffline, saveOrQueue } from "@/lib/offl
 import { addOptimisticQuest, markOptimisticQueued, resolveOptimisticQuest } from "@/lib/optimistic-quests";
 import { CoinIcon } from "@/components/ui/Icons";
 import { StatSplitEditor } from "./StatSplitEditor";
+import { StepCardEditor } from "./StepCardEditor";
 import { StatXpLine } from "./StatXpLine";
 import { statAbbr } from "@/lib/stats";
 import { LevelScales, useScaleStyle, type ScaleItem } from "@/components/ui/LevelScales";
@@ -694,6 +695,33 @@ export function QuestEditorDialog({
       const gone = descendants(list ?? [], key);
       return (list ?? []).filter((st) => !gone.has(st.key));
     });
+    setStepsDirty(true);
+  }
+  /** "Make it a quest": a quest from this sub-quest (title, time, XP, stats, same board), and it leaves the list. */
+  const [madeQuest, setMadeQuest] = useState<{ id: string; step: StepDraft; index: number } | null>(null);
+  async function makeStepQuest(key: string) {
+    const st = steps?.find((x) => x.key === key);
+    if (!st || !steps) return;
+    const wl = stepWeights(steps);
+    const share = wl[steps.indexOf(st)] ?? 0;
+    try {
+      const id = await createQuestAction({ title: st.title.trim() || "New quest", importance, urgency, xpValue: Math.round(share * xp) + (st.xp ?? 0), estimateMinutes: st.minutes ?? null, boardId, placement: "none" });
+      const own = st.statSplit && Object.keys(st.statSplit).length ? st.statSplit : statSplit;
+      if (Object.keys(own).length) await setTaskStatSplitAction(id, own).catch(() => {});
+      setMadeQuest({ id, step: st, index: steps.indexOf(st) });
+      removeStep(key);
+      setStepDetail(null);
+    } catch {
+      setMadeQuestError(true);
+    }
+  }
+  const [madeQuestError, setMadeQuestError] = useState(false);
+  async function undoMadeQuest() {
+    if (!madeQuest) return;
+    const m = madeQuest;
+    setMadeQuest(null);
+    await deleteTaskAction(m.id).catch(() => {});
+    setSteps((list) => { const l = [...(list ?? [])]; l.splice(Math.min(m.index, l.length), 0, m.step); return l; });
     setStepsDirty(true);
   }
   const holders = parentKeys(steps ?? []);
@@ -1511,6 +1539,7 @@ export function QuestEditorDialog({
                                 }
                               }
                             }}
+                            onClick={() => { if (!isHolder && !isCompleted) setStepDetail((d) => (d === st.key ? null : st.key)); }}
                             ariaLabel="Step"
                             className={`bare-input min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-[3px] text-[16px] leading-snug focus:outline-none ${st.state ? "line-through" : ""}`}
                             style={st.state === "failed" ? { color: "#b5321f", textDecorationColor: "#b5321f" } : st.state === "skipped" ? { color: "#9a9286", textDecorationColor: "#9a9286" } : { color: "var(--t-ink)" }}
@@ -1601,53 +1630,20 @@ export function QuestEditorDialog({
                             )}
                           </span>
                         </div>
-                        {/* Labelled, and each number is typed over in place (owner, Nov 4): how far along it is, and its share of the quest's XP. */}
-                        {!isHolder && !isCompleted && stepDetail === st.key && (
-                          <div className="reveal ml-[26px] mr-9 flex flex-col gap-0.5 pb-1 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-                            <span className="flex items-center gap-2">
-                              <span className="w-[74px] shrink-0">Time</span>
-                              <InlineNumber value={st.minutes ?? 0} min={0} max={1440} suffix=" min" label={`Time estimate for ${st.title}, in minutes`} onChange={(v) => updateStep(st.key, { minutes: v > 0 ? v : null })} className="justify-end font-semibold" style={{ color: "var(--t-ink)" }} />
-                            </span>
-                            {!st.done && !st.state && (
-                              <span className="flex items-center gap-2">
-                                <span className="w-[74px] shrink-0">Done</span>
-                                <InlineNumber value={st.progress ?? 0} label={`How far along ${st.title} is, in percent`} onChange={(v) => updateStep(st.key, { progress: v, done: v >= 100 })} className="w-[38px] justify-end font-semibold" style={{ color: "var(--t-ink)" }} />
-                                <input
-                                  type="range"
-                                  min={0}
-                                  max={100}
-                                  step={5}
-                                  value={st.progress ?? 0}
-                                  onChange={(e) => {
-                                    const v = Number(e.target.value);
-                                    updateStep(st.key, { progress: v, done: v >= 100 });
-                                  }}
-                                  aria-label={`How far along ${st.title} is`}
-                                  className="step-progress min-w-0 flex-1"
-                                  style={{ ["--p" as string]: `${st.progress ?? 0}%` }}
-                                />
-                              </span>
-                            )}
-                            <span className="flex items-center gap-2">
-                              <span className="w-[74px] shrink-0">Share of XP</span>
-                              <InlineNumber value={st.weight ?? Math.round((wOf.get(st.key) ?? 0) * 100)} min={1} label={`Share of the quest's XP for ${st.title}, in percent`} onChange={(v) => updateStep(st.key, { weight: v })} className="w-[38px] justify-end font-semibold" style={{ color: "var(--t-ink)" }} />
-                              <input
-                                type="range"
-                                min={1}
-                                max={100}
-                                value={st.weight ?? Math.round((wOf.get(st.key) ?? 0) * 100)}
-                                onChange={(e) => updateStep(st.key, { weight: Number(e.target.value) })}
-                                aria-label={`Share of the quest's XP for ${st.title}, in percent`}
-                                className="step-progress min-w-0 flex-1"
-                                style={{ ["--p" as string]: `${st.weight ?? Math.round((wOf.get(st.key) ?? 0) * 100)}%` }}
+                        {!isHolder && !isCompleted && (
+                          <Fold open={stepDetail === st.key}>
+                            {stepDetail === st.key && (
+                              <StepCardEditor
+                                step={st}
+                                xpTotal={Math.round((wOf.get(st.key) ?? 0) * xp) + (st.xp ?? 0)}
+                                defaultShare={Math.round((wOf.get(st.key) ?? 0) * 100)}
+                                questStats={statTotal > 0}
+                                isAdventure={isAdventure}
+                                onUpdate={(patch) => updateStep(st.key, patch)}
+                                onMakeQuest={() => void makeStepQuest(st.key)}
                               />
-                              {st.weight != null && (
-                                <button type="button" onClick={() => updateStep(st.key, { weight: null })} className="shrink-0 underline underline-offset-2" title="Back to an equal share">
-                                  equal
-                                </button>
-                              )}
-                            </span>
-                          </div>
+                            )}
+                          </Fold>
                         )}
                         </li>
                         );
@@ -1717,6 +1713,18 @@ export function QuestEditorDialog({
                     >
                       <span aria-hidden className="text-[16px] leading-none">+</span> Add sub-quest
                     </button>
+                  )}
+                  {(madeQuest || madeQuestError) && (
+                    <p role="status" className="reveal m-0 flex items-center gap-2 px-1 pt-1 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                      {madeQuest ? (
+                        <>
+                          <span>Made a quest of “{madeQuest.step.title}”.</span>
+                          <button type="button" onClick={() => void undoMadeQuest()} className="font-semibold underline underline-offset-2" style={{ color: "var(--t-ink)" }}>Undo</button>
+                        </>
+                      ) : (
+                        <span>Couldn&apos;t make that a quest. Try again.</span>
+                      )}
+                    </p>
                   )}
     </div>
   );
@@ -3208,9 +3216,11 @@ function AutoGrowText({
   className,
   style,
   onKeyDown,
+  onClick,
 }: {
   value: string;
   onChange: (v: string) => void;
+  onClick?: () => void;
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   minRows?: number;
   placeholder?: string;
@@ -3232,6 +3242,7 @@ function AutoGrowText({
       rows={minRows}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={onKeyDown}
+      onClick={onClick}
       placeholder={placeholder}
       aria-label={ariaLabel}
       className={`resize-none overflow-hidden ${className ?? ""}`}
