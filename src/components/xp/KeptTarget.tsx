@@ -17,8 +17,11 @@ const LINES = ["Do the thing in front of you, and do it well.", "One thing, done
 export function KeptTarget() {
   const kept = useSyncExternalStore(subscribeKept, readKept, () => null);
   const quoteOn = useSyncExternalStore(subscribeFx, () => loadFx().toucanKeptQuote !== false, () => true);
-  const liked = useSyncExternalStore(subscribeFx, () => loadFx().toucanKeptLiked, () => undefined);
-  const skip = useSyncExternalStore(subscribeFx, () => loadFx().toucanKeptSkip, () => undefined);
+  // Read as text so the snapshot stays the same between reads (a fresh array each time loops React).
+  const likedRaw = useSyncExternalStore(subscribeFx, () => JSON.stringify(loadFx().toucanKeptLiked ?? []), () => "[]");
+  const skipRaw = useSyncExternalStore(subscribeFx, () => JSON.stringify(loadFx().toucanKeptSkip ?? null), () => "null");
+  const liked = JSON.parse(likedRaw) as string[];
+  const skip = JSON.parse(skipRaw) as { day: string; n: number } | null;
   const [open, setOpen] = useState(false);
   const [quoteMenu, setQuoteMenu] = useState(false);
   const press = useLongPress(() => setQuoteMenu(true));
