@@ -12,4 +12,5 @@ export * from "./actions/evening";
 export * from "./actions/journal";
 export * from "./actions/extras";
 export * from "./actions/quest-extras";
+export * from "./actions/toucan";
 export * from "./actions/rest";
