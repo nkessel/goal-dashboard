@@ -204,7 +204,7 @@ export function WhenPicker({ minutes, title, isAdventure, initial, placing, onPi
       {/* The day itself: tap where it should go. */}
       {/* Drawn like the calendar screen's day (owner, Nov 22: "the calendar should be the same look and feel as the
           main calendar screen"): parchment, serif hours, dashed events, the quest as a calendar card. */}
-      <div ref={scroller} className={`parchment relative max-h-[320px] overflow-y-auto overscroll-contain ${bare ? "rounded-md" : "rounded-xl"}`} style={bare ? undefined : { border: "1px solid rgba(139,112,64,.45)", boxShadow: "inset 0 1px 3px rgba(74,57,19,.12)" }} data-when-day>
+      <div ref={scroller} className={`relative max-h-[320px] overflow-y-auto overscroll-contain ${bare ? "rounded-md" : "rounded-xl"}`} style={{ background: "#ecdab4 url(/design/tex-parchment-2.jpg) 0 0 / 384px 384px repeat", ...(bare ? {} : { border: "1px solid rgba(139,112,64,.45)", boxShadow: "inset 0 1px 3px rgba(74,57,19,.12)" }) }} data-when-day>
         {busy === null ? (
           <p className="m-0 py-10 text-center text-[13.5px] italic" style={{ color: soft }}>
             Opening your day…
