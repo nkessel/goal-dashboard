@@ -19,6 +19,7 @@ Read these only when you need them. Don't load them all at the start.
 | `docs/FEEDBACK-BY-SCREEN.md` | Before changing any screen: its open notes and the `universal` ones (see `CLAUDE.md`). |
 | `docs/FEEDBACK-OPEN.md`, `docs/HIGH-EFFORT.md` | The owner's open notes by area (to Nov 5); bigger asks that need a long, high-effort session. |
 | `docs/WAITING.md` | **Its top section lists work other sessions have claimed right now: read it before starting, add your own line.** Also section 0a below, parked ideas, reminders. |
+| `docs/DUET.md` | The owner's Claude (in another app) changing his quests, habits and boards through `public.duet(...)`: the actions, the rules for that Claude, switching it on and off. On `review/duet-tools` until he says yes. |
 | `docs/CALENDAR-PLANNER-DESIGN.md` | Before any calendar scheduling work: causes found, one data model, build order (steps 1–10). |
 | `docs/SHIPPED.md` | To learn how a feature was built, which files hold it, or whether an ask is already done. Search it (`grep -n`), don't read it whole. |
 | `docs/ui-check.md` | Running or extending the UI check, and its before/after compare (`--snapshot`, `--compare`) for splits. |
