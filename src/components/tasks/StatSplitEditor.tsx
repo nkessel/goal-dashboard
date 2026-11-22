@@ -168,7 +168,7 @@ export function StatSplitEditor({
             )}
             {total > 0 && !adding && (
               <button type="button" onClick={() => ((borrowed.current = {}), onChange({}))} className="ml-auto text-[13px] underline underline-offset-2" style={{ color: soft }}>
-                Reset to 0%
+                Clear
               </button>
             )}
           </div>
