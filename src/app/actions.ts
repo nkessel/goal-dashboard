@@ -10,4 +10,5 @@ export * from "./actions/art";
 export * from "./actions/rewards";
 export * from "./actions/evening";
 export * from "./actions/journal";
+export * from "./actions/extras";
 export * from "./actions/rest";
