@@ -26,7 +26,6 @@ import { GearIcon, CloseIcon } from "@/components/ui/Icons";
 import { Fragment, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import type { Task } from "@/lib/data/types";
 import {
   deleteQuestTemplateAction,
   listQuestTemplatesAction,
@@ -83,37 +82,10 @@ import { EditorArrange } from "./EditorArrange";
 import { EarlyBonusFields } from "./EarlyBonusFields";
 import { readEditorLayout, serverEditorLayout, subscribeEditorLayout, type EditorPart } from "@/lib/quest-editor-layout";
 import { DateField } from "@/components/ui/DateField";
-
-export type QuestDraft = {
-  title?: string;
-  description?: string;
-  estimateMinutes?: number | null;
-  /** 0–5, e.g. from clicking a spot on the Priority Matrix. */
-  importance?: number;
-  urgency?: number;
-  effort?: number;
-};
-
-export type QuestEditorMode =
-  | { kind: "edit"; task: Task }
-  | {
-      kind: "create";
-      boardId?: string | null;
-      pinToBattle?: boolean;
-      /** @deprecated Today's Quests no longer has a limit; kept for callers. */
-      todayFull?: boolean;
-      /** Start as a quick power-up (prefills a short time). */
-      powerUp?: boolean;
-      /** "Doing now": log something already under way — created and completed at once. */
-      doingNow?: boolean;
-      /** A tiny task: 5 minutes and no portrait to start with; half height on Today. */
-      tiny?: boolean;
-      /** Place the new quest on the calendar (e.g. from a Google event). */
-      schedule?: { startISO: string; endISO: string; googleEventId?: string };
-      prefill?: QuestDraft;
-      /** A follow-up: the new quest waits right after this one. */
-      after?: { id: string; title: string };
-    };
+import type { QuestDraft, QuestEditorMode } from "./editor/types";
+import { localDate, localTime, shortTime, slotWords, planByIn, dueIso, dueChipLabel, dueQuickPicks, ESTIMATE_PICKS } from "./editor/dates";
+import { PinGlyph, FactCaret } from "./editor/glyphs";
+export type { QuestDraft, QuestEditorMode };
 
 const noSubscribe = () => () => {};
 
@@ -122,12 +94,6 @@ const XP_STEP = 10;
 /** Coins follow XP (1 per XP_PER_COIN) unless a quest sets its own. */
 const autoCoins = coinsForXp;
 
-const pad = (n: number) => String(n).padStart(2, "0");
-function localDate(iso: string | null | undefined) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
 /** Short names for the "More" fold's one-line summary. */
 const MORE_NAMES: Partial<Record<EditorPart, string>> = {
   stats: "stats",
@@ -146,72 +112,6 @@ const MORE_NAMES: Partial<Record<EditorPart, string>> = {
   sequence: "sequence",
   steps: "sub-quests",
 };
-/** The due chip's label: "today", "tomorrow", "Fri", or "Nov 12". */
-export function dueChipLabel(day: string) {
-  const d = new Date(`${day}T12:00`);
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
-  const days = Math.round((d.getTime() - today.getTime()) / 86_400_000);
-  if (days === 0) return "today";
-  if (days === 1) return "tomorrow";
-  if (days > 1 && days < 7) return d.toLocaleDateString(undefined, { weekday: "short" });
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-/** One tap for the usual due dates: today, tomorrow, a week and two weeks from now. */
-export function dueQuickPicks() {
-  const at = (n: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + n);
-    return localDate(d.toISOString());
-  };
-  // No "Next Friday"; two weeks instead (owner, Nov 7).
-  return [
-    { label: "Today", day: at(0) },
-    { label: "Tomorrow", day: at(1) },
-    { label: "In a week", day: at(7) },
-    { label: "In 2 weeks", day: at(14) },
-  ].filter((q, i, all) => all.findIndex((x) => x.day === q.day) === i);
-}
-function FactCaret({ open }: { open: boolean }) {
-  return (
-    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="opacity-60 transition-transform" style={{ transform: open ? "rotate(180deg)" : undefined }}>
-      <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-/** "" for an end-of-day deadline (no particular time). */
-function localTime(iso: string | null | undefined) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const t = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  return t === "23:59" ? "" : t;
-}
-/** "3:30pm". */
-export function shortTime(iso: string) {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).replace(/\s?([AaPp])\.?\s?[Mm]\.?$/, (_, p: string) => `${p.toLowerCase()}m`);
-}
-/** "Sat 3–3:30pm" this week, "Nov 20 3–3:30pm" further off. */
-export function slotWords(s: { start: string; end: string }) {
-  const d = new Date(s.start);
-  const days = (d.getTime() - Date.now()) / 86_400_000;
-  const day = days > -1 && days < 6 ? d.toLocaleDateString(undefined, { weekday: "short" }) : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  const a = shortTime(s.start).replace(":00", "");
-  const b = shortTime(s.end).replace(":00", "");
-  return `${day} ${a.slice(-2) === b.slice(-2) ? a.slice(0, -2) : a}–${b}`;
-}
-/** The plan-by for "Schedule within N days": the end of that day. */
-function planByIn(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  d.setHours(23, 59, 0, 0);
-  return d.toISOString();
-}
-function dueIso(date: string, time: string): string | null {
-  if (!date) return null;
-  const d = new Date(`${date}T${time || "23:59"}`);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
-}
-
 /**
  * One compact dialog for creating and editing quests, laid out like a quest
  * card: portrait on the left, title + description on the right; then time to
@@ -223,8 +123,6 @@ function dueIso(date: string, time: string): string | null {
  * once. `origin="fab"` makes it rise out of the + button; inside the + sheet
  * (EmbedHost) it renders in place without its own overlay or header.
  */
-export const ESTIMATE_PICKS = [5, 10, 15, 30];
-
 export function QuestEditorDialog({
   mode,
   theme = "calm",
@@ -3241,28 +3139,6 @@ function AutoGrowText({
 }
 
 export { IconScale } from "./IconScale";
-
-/** A tiny ticked list: the Steps label glyph. */
-export function StepsGlyph({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0" style={{ color: "#7a5f2a" }}>
-      <rect x="3" y="4" width="5" height="5" rx="1.2" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M4.3 6.6l1.2 1.2 2.1-2.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <rect x="3" y="14" width="5" height="5" rx="1.2" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M11 6.5h10M11 16.5h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-/** A map pin (a quest's place). */
-function PinGlyph() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M12 21s-6.5-6.2-6.5-11.2a6.5 6.5 0 0 1 13 0C18.5 14.8 12 21 12 21z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" fill="rgba(217,180,95,.35)" />
-      <circle cx="12" cy="9.8" r="2.3" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
-  );
-}
 
 /** The + (or −) on the editor's add-on pills: drawn, so it sits exactly on the text's middle (owner, Nov 20). */
 function PlusMark({ minus = false }: { minus?: boolean }) {
