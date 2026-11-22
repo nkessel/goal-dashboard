@@ -1682,8 +1682,9 @@ export function WeekView({
         createPortal(
           <span
             role="tooltip"
-            className="card-pop-in cal-peek pointer-events-none fixed z-[90] w-max max-w-[180px] rounded-lg px-2 py-1 text-[12.5px] leading-snug"
-            style={peek.right ? { left: peek.x, top: peek.y } : { right: window.innerWidth - peek.x, top: peek.y }}
+            className="card-pop-in cal-peek pointer-events-none fixed z-[200] w-max max-w-[180px] rounded-lg px-2 py-1 text-[12.5px] leading-snug"
+            // Kept clear of the bottom bar and the + button.
+            style={{ top: Math.max(8, Math.min(peek.y, window.innerHeight - 210)), ...(peek.right ? { left: peek.x } : { right: window.innerWidth - peek.x }) }}
           >
             <span className="font-display block font-semibold">{peek.title}</span>
             <span className="block text-[11px] opacity-75">{peek.label}</span>
