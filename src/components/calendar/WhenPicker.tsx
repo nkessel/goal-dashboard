@@ -202,7 +202,9 @@ export function WhenPicker({ minutes, title, isAdventure, initial, placing, onPi
         ))}
       </div>
       {/* The day itself: tap where it should go. */}
-      <div ref={scroller} className="relative max-h-[300px] overflow-y-auto overscroll-contain rounded-xl" style={{ background: isAdventure ? "rgba(255,250,238,.65)" : "var(--t-bg)", border: "1px solid rgba(139,112,64,.3)" }}>
+      {/* Drawn like the calendar screen's day (owner, Nov 22: "the calendar should be the same look and feel as the
+          main calendar screen"): parchment, serif hours, dashed events, the quest as a calendar card. */}
+      <div ref={scroller} className="parchment relative max-h-[320px] overflow-y-auto overscroll-contain rounded-xl" style={{ border: "1px solid rgba(139,112,64,.45)", boxShadow: "inset 0 1px 3px rgba(74,57,19,.12)" }} data-when-day>
         {busy === null ? (
           <p className="m-0 py-10 text-center text-[13.5px] italic" style={{ color: soft }}>
             Opening your day…
@@ -226,10 +228,20 @@ export function WhenPicker({ minutes, title, isAdventure, initial, placing, onPi
           >
             {hours.map((m) => (
               <div key={m} className="pointer-events-none absolute inset-x-0 flex items-start" style={{ top: ((m - range.from) / 15) * PX15 }}>
-                <span className="w-10 shrink-0 -translate-y-[7px] pr-1 text-right text-[10.5px] tabular-nums" style={{ color: soft }}>
-                  {hm(day.getTime() + m * 60_000).replace(":00", "")}
+                <span className="font-display w-10 shrink-0 -translate-y-[6px] pr-1.5 text-right text-[11px] leading-[1.05]" style={{ color: "#6b5631" }}>
+                  {(() => {
+                    const t = hm(day.getTime() + m * 60_000).replace(":00", "");
+                    const n = t.replace(/[ap]m?$/, "");
+                    const ap = /p/.test(t.slice(-2)) ? "PM" : "AM";
+                    return (
+                      <>
+                        {n}
+                        <span className="block text-[9px] uppercase tracking-wide">{ap}</span>
+                      </>
+                    );
+                  })()}
                 </span>
-                <span className="h-px flex-1" style={{ background: "rgba(139,112,64,.18)" }} />
+                <span className="h-px flex-1" style={{ background: "rgba(139,112,64,.28)" }} />
               </div>
             ))}
             {/* Before now on today: quietly greyed. */}
@@ -237,8 +249,8 @@ export function WhenPicker({ minutes, title, isAdventure, initial, placing, onPi
             {inDay.map((b, i) => (
               <div
                 key={i}
-                className="pointer-events-none absolute left-11 right-1 overflow-hidden rounded-md px-1.5 text-[11px] leading-tight"
-                style={{ top: Math.max(0, yOf(b.start)), height: Math.max(10, yOf(Math.min(b.end, t1)) - Math.max(0, yOf(b.start)) - 1), background: b.habit ? "rgba(92,138,70,.18)" : "rgba(90,80,60,.2)", border: b.habit ? "1px dashed rgba(63,106,44,.6)" : "1px solid rgba(90,80,60,.25)", color: "#3d3628" }}
+                className="font-display pointer-events-none absolute left-11 right-1 overflow-hidden rounded-lg px-2 text-[12px] italic leading-tight"
+                style={{ top: Math.max(0, yOf(b.start)), height: Math.max(10, yOf(Math.min(b.end, t1)) - Math.max(0, yOf(b.start)) - 1), background: b.habit ? "rgba(92,138,70,.12)" : "rgba(255,250,235,.55)", border: b.habit ? "1.2px dashed rgba(63,106,44,.55)" : "1.2px dashed rgba(139,112,64,.55)", color: "#3d3628" }}
                 title={`${b.title ?? "Busy"} · ${hm(b.start)}–${hm(b.end)}`}
               >
                 {b.title ?? "Busy"}
@@ -253,7 +265,7 @@ export function WhenPicker({ minutes, title, isAdventure, initial, placing, onPi
                   </span>
                   <span className="h-[2px] flex-1" style={{ background: "#c0392b", boxShadow: "0 0 4px rgba(192,57,43,.5)" }} />
                 </div>
-                <div data-when-block className="reveal absolute left-14 right-1 z-[1] flex cursor-grab touch-none items-center overflow-hidden rounded-md px-2 text-[12px] font-bold active:cursor-grabbing" title="Drag to move it" style={{ top: yOf(pick) + 1, height: Math.max(14, yOf(pick + len) - yOf(pick) - 1), background: gold, border: `1.5px solid ${clash ? "#a3412a" : "#4a3913"}`, color: "#2a1c10", boxShadow: "0 4px 12px rgba(0,0,0,.3)", transition: "top 120ms ease" }}>
+                <div data-when-block className="font-display reveal absolute left-14 right-1 z-[1] flex cursor-grab touch-none items-center overflow-hidden rounded-[10px] px-2.5 text-[13px] font-semibold active:cursor-grabbing" title="Drag to move it" style={{ top: yOf(pick) + 1, height: Math.max(16, yOf(pick + len) - yOf(pick) - 1), background: "linear-gradient(180deg,#fffaf0,#f6ead0)", border: `1.6px solid ${clash ? "#a3412a" : "#c9a24a"}`, color: "#2a1c10", boxShadow: "0 3px 10px rgba(74,57,19,.28)", transition: "top 120ms ease" }}>
                   <span className="truncate">
                     {hm(pick)}–{hm(pick + len)} · {title}
                   </span>
