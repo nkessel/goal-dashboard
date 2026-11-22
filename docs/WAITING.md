@@ -13,6 +13,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 
 
+- **Waiting on the owner's design review**: `review/toucan-question-t1` (the toucan's question: two equal pills, gear top right opening his settings above the card; kept card: T1 title, the quote's hold menu Like it · Skip to another · Hide quotes) · https://claude.ai/artifact/BPVwECytEiCCt3HUa5EobL#built · Nov 22.
+
 **Shipped Nov 20 (merged to `main` from `merge-nov20`, owner: "do what you think is best"):** `review/faces-feel`, `review/insights-nov19`, `review/insights-timeline`, `review/subquests-sequence`. See `docs/SHIPPED.md`. Review pages: https://claude.ai/artifact/DgobEgqytFM6qsSuC2bZeJ and https://claude.ai/artifact/69UKiWJeE7BgPnJLRU8q6E
 
 
