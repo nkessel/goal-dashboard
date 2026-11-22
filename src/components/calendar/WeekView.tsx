@@ -2,6 +2,7 @@
 
 import { useHiddenEvents } from "@/lib/hidden-events";
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useNowMinute } from "@/lib/use-now-minute";
 import { daySummary, useWeatherRange } from "@/lib/use-weather";
 import { useRouter } from "next/navigation";
 import { scheduleTaskAction, updateGoogleEventAction } from "@/app/actions";
@@ -60,18 +61,6 @@ const MAX_SPAN = 14;
 function spanWords(s: number): string {
   const r = Math.round(s * 2) / 2;
   return `${Math.floor(r)}${r % 1 ? "½" : ""} day${r === 1 ? "" : "s"}`;
-}
-
-/** The current minute, ticking once a minute (0 on the server, so nothing time-dependent renders there). */
-export function useNowMinute() {
-  return useSyncExternalStore(
-    (cb) => {
-      const id = setInterval(cb, 30_000);
-      return () => clearInterval(id);
-    },
-    () => Math.floor(Date.now() / 60_000),
-    () => 0
-  );
 }
 
 /**

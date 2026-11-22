@@ -35,8 +35,8 @@ import { Fold } from "@/components/ui/Fold";
 import { saveOrQueue } from "@/lib/offline";
 import { cleanXp, journalPrompts, type JournalPrompt } from "@/lib/journal-prompts";
 import { DawnPath } from "@/components/dawn/DawnPath";
+import type { WelcomeAward } from "@/components/xp/welcome/types";
 
-export type WelcomeAward = { xp: number; streak: number; coins: number; fromPct: number; toPct: number; caption: string };
 
 const CONFETTI_COLORS = ["#f2c94c", "#e2bf63", "#58a04a", "#c0503a", "#4d7fc0", "#f6e6bb"];
 const PIECES = Array.from({ length: 24 }, (_, i) => {

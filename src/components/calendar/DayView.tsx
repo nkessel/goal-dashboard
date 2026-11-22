@@ -5,7 +5,8 @@ import Link from "next/link";
 import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 import { addDays, formatDateParam, isSameDay, parseDateParam, startOfWeek } from "@/lib/calendar-dates";
-import { WeekView, useNowMinute } from "./WeekView";
+import { WeekView } from "./WeekView";
+import { useNowMinute } from "@/lib/use-now-minute";
 import type { CardShow } from "./CalendarLayers";
 import type { DailyLayer, EssentialsLook, HabitLook } from "./CalendarLayers";
 
