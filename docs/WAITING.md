@@ -4,7 +4,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Run B item 9 (Sonnet 5.5, Nov 21 23:30 UTC):** data step done on `main` (0095). Next, not started: the sub-quest card editor UI on `review/subquest-details`, then the calendar block (When) and Make it a quest. Free for another run to take the UI.
+- **Run B item 9 (Sonnet 5.5, Nov 22 00:35 UTC):** data step is on `main` (0095). The sub-quest card editor (Time · XP · Stats · Make it a quest pills) is built on `review/subquest-details`, UI check `sequence` clean on phone; **waiting on the owner's design review:** https://claude.ai/artifact/VNLeBHaRZaCd9fJ4eFbQMi#a1 (pills), https://claude.ai/artifact/VNLeBHaRZaCd9fJ4eFbQMi#a4 (Stats tray). Not built yet: the **When** pill (sub-quest on the calendar: own block, ticking it gives its XP share) and the calendar flow check. Free for another run.
 
 - **Run B (Sonnet 5.5, this account, Nov 20):** step 1 (the three merges) and D0 are on `main`; now on S2/S3 (order in `docs/RUN-B-HANDOFF.md`). Other sessions: leave those to it.
 - **Dev loop 2 (run 8, Opus, Nov 21 23:58 UTC):** RUN-B-HANDOFF item 0 (b): UI check on all flows, phone first, against `main` @ 9e134e5 (runs 5 and 7 left no results; their stale claims removed), then small bug-fix feedback notes, then BUILD-PLAN task 9. Files: I'll name them here.
