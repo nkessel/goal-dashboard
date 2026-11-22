@@ -4,7 +4,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Dev loop 2 run 26 (Sonnet, Nov 22 13:30 UTC):** tablet UI check (morning) of the 15 flows still unchecked on tablet (welcomeoff, navorder, todaycal, savekeys, cleaning, import, settings, questdrop, calfail, calendar, feedback, language, offline, inventory, questextras); fix what it finds. Run 25 has phone.
+- **Dev loop 2 run 26 note (Nov 22):** tablet morning UI check of the 15 flows left in RUN-B-HANDOFF 0(b): 0 errors on a clean re-run. The full run had two errors that did not repeat when `todaycal` and `settings` ran alone (twice): React #185 on `todaycal` after the earlier flows, and a `settings bubble` layout shift (-958px). Treat as flakes unless they show again; if #185 returns on Today, look at the drag-over-calendar step. Tablet evening not run.
 
 - **Dev loop 2 run 25 (Opus, Nov 22 13:00 UTC):** full UI check on `main` (phone) after the Duet pay-out move (`lib/data/quest-ops.ts`) and the `tasks/editor/` code move; fix what it finds.
 - **Dev loop 2 run 19 (Opus, Nov 22 08:57 UTC):** bugs (UI check on flows changed since run 9), then open feedback notes that are bug fixes or small, clear changes.
