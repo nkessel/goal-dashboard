@@ -265,6 +265,7 @@ export function StepCardEditor({
               {step.id ? (
                 <>
                   <WhenPicker
+                    bare
                     minutes={mins || 15}
                     title={step.title}
                     isAdventure={isAdventure}

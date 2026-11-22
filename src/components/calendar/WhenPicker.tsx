@@ -35,7 +35,7 @@ const dayStartOf = (d: Date) => {
  * hours below with what's already there (your calendars, quests, timed habits), and a gold block for
  * this quest: tap anywhere to put it there, nudge it by 15 minutes, or take one of the first free spots.
  */
-export function WhenPicker({ minutes, title, isAdventure, initial, placing, onPick }: { minutes: number; title: string; isAdventure: boolean; initial?: string | null; placing?: boolean; onPick: (slot: PickedSlot) => void }) {
+export function WhenPicker({ minutes, title, isAdventure, initial, placing, onPick, bare = false }: { minutes: number; title: string; isAdventure: boolean; initial?: string | null; placing?: boolean; onPick: (slot: PickedSlot) => void; /** Inside a drawer that is already its frame: no second border around the day. */ bare?: boolean }) {
   const len = Math.max(15, Math.round(minutes / 15) * 15) * 60_000;
   const [now] = useState(() => Date.now());
   const today = useMemo(() => dayStartOf(new Date(now)), [now]);
@@ -204,7 +204,7 @@ export function WhenPicker({ minutes, title, isAdventure, initial, placing, onPi
       {/* The day itself: tap where it should go. */}
       {/* Drawn like the calendar screen's day (owner, Nov 22: "the calendar should be the same look and feel as the
           main calendar screen"): parchment, serif hours, dashed events, the quest as a calendar card. */}
-      <div ref={scroller} className="parchment relative max-h-[320px] overflow-y-auto overscroll-contain rounded-xl" style={{ border: "1px solid rgba(139,112,64,.45)", boxShadow: "inset 0 1px 3px rgba(74,57,19,.12)" }} data-when-day>
+      <div ref={scroller} className={`parchment relative max-h-[320px] overflow-y-auto overscroll-contain ${bare ? "rounded-md" : "rounded-xl"}`} style={bare ? undefined : { border: "1px solid rgba(139,112,64,.45)", boxShadow: "inset 0 1px 3px rgba(74,57,19,.12)" }} data-when-day>
         {busy === null ? (
           <p className="m-0 py-10 text-center text-[13.5px] italic" style={{ color: soft }}>
             Opening your day…
