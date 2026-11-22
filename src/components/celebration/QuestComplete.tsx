@@ -213,11 +213,12 @@ export function QuestComplete(props: QuestCompleteProps) {
   const amb = useMemo(() => (lite ? [] : embers(fx)), [fx, lite]);
 
 
-  // Editing replaces the celebration (it comes back when the editor closes),
-  // so the two never draw over each other.
-  if (editTask) return <QuestEditorDialog mode={{ kind: "edit", task: editTask }} theme="adventure" onClose={() => closeEditor(editTask)} />;
+  // The editor opens over the celebration, which stays behind it (owner, 3afc21f4: "have the
+  // editor pop up over the celebration screen instead of exiting it"). Both sit at z-50; the
+  // editor's portal joins the page after the celebration's, so it draws on top.
+  const editor = editTask ? <QuestEditorDialog mode={{ kind: "edit", task: editTask }} theme="adventure" onClose={() => closeEditor(editTask)} /> : null;
 
-  return createPortal(
+  return <>{createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -523,7 +524,7 @@ export function QuestComplete(props: QuestCompleteProps) {
       </div>
     </div>,
     document.body
-  );
+  )}{editor}</>;
 }
 
 /** The treasure chest inside the celebration: pick one reward, or move on. */

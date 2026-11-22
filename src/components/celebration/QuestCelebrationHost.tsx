@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { QuestComplete } from "./QuestComplete";
 import { ProgressCelebration, type ProgressCelebrationDetail } from "./ProgressCelebration";
 import { xpToNextLevel } from "@/lib/levels";
@@ -57,6 +57,8 @@ function kept(): QuestCelebration | null {
 /** App-wide: shows the Quest Complete scene, then Choose a Reward / Continue. */
 export function QuestCelebrationHost({ avatarSrc, totalXp: shellTotalXp, levelCap = 10 }: { avatarSrc: string; totalXp: number; levelCap?: number }) {
   const [current, setCurrentRaw] = useState<QuestCelebration | null>(null);
+  // The quest whose scene is showing, so the one it replaces hears that it closed.
+  const shownId = useRef<string | null>(null);
   const setCurrent = (next: QuestCelebration | null | ((c: QuestCelebration | null) => QuestCelebration | null)) =>
     setCurrentRaw((c) => {
       const v = typeof next === "function" ? next(c) : next;
@@ -80,7 +82,14 @@ export function QuestCelebrationHost({ avatarSrc, totalXp: shellTotalXp, levelCa
   const rewardScene = reward ? <RewardCelebration key={reward.n} {...reward} levelCap={levelCap} onClose={() => setReward(null)} /> : null;
 
   useEffect(() => {
-    const on = (e: Event) => setCurrent((e as CustomEvent<QuestCelebration>).detail);
+    const on = (e: Event) => {
+      const next = (e as CustomEvent<QuestCelebration>).detail;
+      // A new scene replaces one still showing: that quest's card can take its check now.
+      const was = shownId.current;
+      if (was && was !== next.taskId) window.dispatchEvent(new CustomEvent("quest-complete-closed", { detail: { taskId: was } }));
+      shownId.current = next.taskId;
+      setCurrent(next);
+    };
     let n = 0;
     const onProgress = (e: Event) => setProgress({ ...(e as CustomEvent<ProgressCelebrationDetail>).detail, n: ++n });
     const onUpdate = (e: Event) => {
@@ -129,7 +138,7 @@ export function QuestCelebrationHost({ avatarSrc, totalXp: shellTotalXp, levelCa
       taskId={current.taskId}
       coinsEarned={current.coinsEarned ?? 0}
       isReward={current.isReward}
-      onClose={() => setCurrent(null)}
+      onClose={() => (setCurrent(null), (shownId.current = null), window.dispatchEvent(new CustomEvent("quest-complete-closed", { detail: { taskId: current.taskId } })))}
     />
     </>
   );

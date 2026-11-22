@@ -174,7 +174,9 @@ async function walk({ browser, device, time, tz, cookie }) {
     if (m.type() !== "error") return;
     const t = m.text();
     if (/Failed to load resource.*(favicon|_vercel)/.test(t)) return;
-    errors.push({ kind: "console-error", detail: t.split("\n")[0].slice(0, 300) });
+    // "Failed to load resource" says nothing of which one: add its path.
+    const where = /Failed to load resource/.test(t) && m.location()?.url ? ` (${new URL(m.location().url).pathname})` : "";
+    errors.push({ kind: "console-error", detail: (t.split("\n")[0] + where).slice(0, 300) });
   });
   page.on("response", (r) => {
     if (r.status() >= 500) errors.push({ kind: "server-error", detail: `${r.status()} ${r.request().method()} ${new URL(r.url()).pathname}` });

@@ -309,6 +309,22 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  // Two fingers on the chart are always a pinch (note e401492c): without this the browser can take the
+  // gesture as a page scroll and cancel one finger, so the pinch stalls and its lift reads as a tap.
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const hold = (e: TouchEvent) => e.touches.length >= 2 && e.cancelable && e.preventDefault();
+    const gest = (e: Event) => e.preventDefault();
+    el.addEventListener("touchstart", hold, { passive: false });
+    el.addEventListener("touchmove", hold, { passive: false });
+    el.addEventListener("gesturestart", gest);
+    return () => {
+      el.removeEventListener("touchstart", hold);
+      el.removeEventListener("touchmove", hold);
+      el.removeEventListener("gesturestart", gest);
+    };
+  }, []);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- saved choices are only readable after hydration */
@@ -736,7 +752,11 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
             // One finger lifted mid-pinch: carry on as a drag from where the other is.
             if (left.length === 1 && gesture.current) gesture.current = { ...gesture.current, dist: 0, mid: svgX(left[0]), win: [v0, v1] };
           }}
-          onPointerCancel={(e) => fingers.current.delete(e.pointerId)}
+          onPointerCancel={(e) => {
+            fingers.current.delete(e.pointerId);
+            // A cancelled finger (the page took it as a scroll) never ends in a click: don't let its stale gesture eat the next tap.
+            if (!fingers.current.size) gesture.current = null;
+          }}
           onClick={(e) => {
             // A pinch or drag just ended: not a tap.
             const g = gesture.current;

@@ -33,7 +33,7 @@ function localInput(d: Date) {
  * type. Pick when it happened: now, this morning, yesterday, or any moment.
  * The last few show below, each removable.
  */
-export function EventLog({ notes }: { notes: Note[] }) {
+export function EventLog({ notes, zone }: { notes: Note[]; zone?: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
@@ -150,9 +150,14 @@ export function EventLog({ notes }: { notes: Note[] }) {
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const all = notes.filter((n) => !gone.has(n.id)).slice(-30).reverse();
-  const todayKey = new Date().toDateString();
-  const todays = all.filter((n) => new Date(n.created_at).toDateString() === todayKey);
-  const earlier = all.filter((n) => new Date(n.created_at).toDateString() !== todayKey);
+  // Today in the app's time zone, the same on the server (UTC on Vercel) and in the browser: in the device's
+  // own zone the server and the phone disagreed on which events were today's each evening, and React threw
+  // the page away and drew it again (#418, UI check Nov 22).
+  const [now] = useState(() => Date.now());
+  const keyIn = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+  const todayKey = keyIn(new Date(now));
+  const todays = all.filter((n) => keyIn(new Date(n.created_at)) === todayKey);
+  const earlier = all.filter((n) => keyIn(new Date(n.created_at)) !== todayKey);
   const visible = showEarlier ? all : todays;
   // Edits shown at once while they save (the page refreshes after).
   const [detailsOf, setDetailsOf] = useState<Record<string, string | null>>({});

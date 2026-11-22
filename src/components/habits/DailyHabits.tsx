@@ -522,8 +522,11 @@ export function DailyHabits({
         aria-expanded={lookMenu}
         title="Habit display settings"
         // The app's one gear, on the header's top-right corner: shows when the header is hovered
-        // (or focused, or its menu is open); on touch screens it stays, faintly.
-        className={`absolute -right-1.5 -top-2.5 z-[5] flex h-8 w-8 items-center justify-center rounded-full transition-opacity duration-200 focus-visible:opacity-100 group-hover:opacity-100 ${lookMenu ? "opacity-100" : "opacity-0 [@media(hover:none)]:opacity-50"}`}
+        // (or focused, or its menu is open); on touch screens it stays, faintly. Only while the
+        // section is open (owner, 8d2bfa6a): closed, it fades out and can't be tapped.
+        tabIndex={open || bare || lookMenu ? undefined : -1}
+        aria-hidden={open || bare || lookMenu ? undefined : true}
+        className={`absolute -right-1.5 -top-2.5 z-[5] flex h-8 w-8 items-center justify-center rounded-full transition-opacity duration-200 ${lookMenu ? "opacity-100" : open || bare ? "opacity-0 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-50" : "pointer-events-none opacity-0"}`}
         style={
           isAdventure
             ? { color: "#f2d27e", background: "radial-gradient(circle at 40% 35%, #3a3524, #1c1a10)", boxShadow: "0 0 0 1.5px #8d7642, 0 2px 6px rgba(0,0,0,.5)" }
