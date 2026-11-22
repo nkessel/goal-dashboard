@@ -179,7 +179,9 @@ export function BottomNav({ theme, name = null, toucan = null, navOrder = null }
     const later = () => {
       const busy = document.documentElement.hasAttribute("data-welcome-open") || document.documentElement.hasAttribute("data-fog");
       if (busy) return void (t = window.setTimeout(later, 1500));
-      for (const it of ITEMS) if (it.href !== pathname) router.prefetch(it.href, { kind: "full" } as Parameters<typeof router.prefetch>[1]);
+      // The calendar is not prefetched here: its copy would carry the view from before the person last changed it.
+      // Its link fetches on pointer down instead, when the view cookie is read (Cal 1e).
+      for (const it of ITEMS) if (it.href !== pathname && it.href !== "/calendar") router.prefetch(it.href, { kind: "full" } as Parameters<typeof router.prefetch>[1]);
     };
     t = window.setTimeout(later, 2500);
     return () => window.clearTimeout(t);
