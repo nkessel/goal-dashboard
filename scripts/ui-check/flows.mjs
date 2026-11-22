@@ -1559,9 +1559,16 @@ export const FLOWS = [
       }
       await h.check("week");
       // CAL-1 (owner, Nov 22): in days too narrow for words, cards are icons; a tap shows what one is.
-      const icon = h.page.locator("[data-icon-only] .cal-chip").first();
-      if (await icon.count()) {
-        await icon.click().catch(() => {});
+      // One in view (the week keeps days on either side, out of sight), tapped where it is.
+      const spot = await h.page.evaluate(() => {
+        for (const el of document.querySelectorAll("[data-icon-only] .cal-chip")) {
+          const r = el.getBoundingClientRect();
+          if (r.width > 8 && r.left >= 0 && r.right <= innerWidth && r.top >= 80 && r.bottom <= innerHeight - 120) return { x: r.left + r.width / 2, y: r.top + Math.min(12, r.height / 2) };
+        }
+        return null;
+      });
+      if (spot) {
+        await h.page.mouse.click(spot.x, spot.y);
         await h.settle(400);
         await h.check("week: an icon's name shown");
         await h.page.mouse.click(5, 5).catch(() => {});

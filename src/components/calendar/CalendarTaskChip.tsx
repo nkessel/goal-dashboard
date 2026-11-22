@@ -43,7 +43,10 @@ export function CalendarTaskChip({
   portrait = false,
   box,
   show = { art: true, time: true, xp: true, coins: true },
+  iconOnly = false,
 }: {
+  /** A week too narrow for words: only the portrait (or its check) shows (owner, Nov 22 CAL-1). */
+  iconOnly?: boolean;
   /** Which parts the card shows (calendar gear › Display › Quest cards show). */
   show?: CardShow;
   /** The card's size on the grid. With it, Adventure draws a picture-book quest card. */
@@ -101,8 +104,9 @@ export function CalendarTaskChip({
           tint={tint}
           portrait={portrait}
           show={show}
+          iconOnly={iconOnly}
           onOpen={() => setEditing(true)}
-          onComplete={complete}
+          onComplete={iconOnly ? undefined : complete}
         />
         {editing && <EditTaskModal task={task} theme={theme} onClose={() => setEditing(false)} />}
       </>
@@ -272,9 +276,11 @@ function QuestCard({
   tint,
   portrait,
   show,
+  iconOnly = false,
   onOpen,
   onComplete,
 }: {
+  iconOnly?: boolean;
   onComplete?: () => void;
   show: CardShow;
   task: Task;
@@ -383,12 +389,14 @@ function QuestCard({
   const extraH = [doneNote, payLine, placeLine, timeLine].filter(Boolean).length * smallLine;
   const wantLines = Math.min(3, Math.max(1, Math.ceil((task.title.length * titlePx * 0.5) / Math.max(1, w - 8))));
   const stackArt = (keep: number) => Math.max(0, Math.min(w - 10, h - chrome - 3 - extraH - Math.ceil(lineH * keep), 64 * big));
-  const artPx = line
+  const artPx = iconOnly
+    ? Math.max(0, Math.min(24, w - 4, h - 6))
+    : line
     ? Math.max(0, Math.min(h - 6, 22))
     : stack
       ? stackArt(wantLines) >= 30 ? stackArt(wantLines) : stackArt(Math.min(wantLines, 2)) >= 18 ? stackArt(Math.min(wantLines, 2)) : stackArt(1)
       : Math.max(0, Math.min(h - chrome, (h >= 80 ? 64 : 52) * big, w < 130 ? w * 0.3 : w * 0.38));
-  const showArt = show.art && artPx >= 16;
+  const showArt = (show.art || iconOnly) && artPx >= 16;
   const sealPx = Math.min(artPx, (stack ? 24 : 26) * big);
   const payInline = pays && line && w >= 120;
   // Narrow cards (a week on a phone): the XP line shrinks to the card's width, or steps aside when it can't be read.
