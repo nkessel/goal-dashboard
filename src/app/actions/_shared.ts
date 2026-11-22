@@ -5,7 +5,7 @@ import * as tasksData from "@/lib/data/tasks";
 import { updateCalendarEvent, createCalendarEvent } from "@/lib/google-calendar";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import type { Task } from "@/lib/data/types";
-import type { CalCardLook } from "./rest";
+import type { CalCardLook } from "./evening";
 
 export async function requireProfileId(): Promise<string> {
   const session = await auth();

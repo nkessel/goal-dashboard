@@ -20,7 +20,8 @@ import * as tomorrowData from "@/lib/data/tomorrow";
 import * as xp from "@/lib/data/xp";
 import * as ritesData from "@/lib/data/rites";
 import { requireIdentity, requireProfileId, readExtras, assertDay } from "./_shared";
-import { tickRiteStepAction, completeRiteAction, uncompleteRiteAction } from "./rest";
+import { tickRiteStepAction } from "./rest";
+import { completeRiteAction, uncompleteRiteAction } from "./evening";
 
 // Social: friend directory, requests, invite links (Priority #7)
 export async function sendFriendRequestAction(addresseeId: string) {

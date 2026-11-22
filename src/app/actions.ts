@@ -8,4 +8,5 @@ export * from "./actions/social";
 export * from "./actions/profile";
 export * from "./actions/art";
 export * from "./actions/rewards";
+export * from "./actions/evening";
 export * from "./actions/rest";
