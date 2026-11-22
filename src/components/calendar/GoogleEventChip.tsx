@@ -124,7 +124,7 @@ export function GoogleEventChip({
     }
   }
 
-  if (hidden || (converted && !creating)) return null;
+  if (hidden) return null;
 
   function hideEvent() {
     hideEventId(event.id);
@@ -154,10 +154,12 @@ export function GoogleEventChip({
   function onQuestCreated(id?: string) {
     // Remembered on the account: its event stays when the quest is removed, and a repeating event's quests
     // share one look (owner, Nov 18).
+    // The page leaves out events that have a quest, so the event goes once the editor's own refresh lands
+    // (one refresh, not two). Until then it stays where it is, faded, so its slot doesn't empty and fill again
+    // (owner, Nov 19 0906359c: "a lot of refreshing and visual bugs"). Not hidden in this browser for good:
+    // the event must come back if the quest is removed.
     if (id) void recordEventQuestAction(id, event.id, event.recurringEventId ?? null).catch(() => {});
-    hideEventId(event.id);
     setConverted(true);
-    router.refresh();
   }
 
   const durationMin = Math.max(0, Math.round((new Date(event.end).getTime() - new Date(event.start).getTime()) / 60000));
@@ -186,8 +188,9 @@ export function GoogleEventChip({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        className={`cal-chip ${tentative ? "cal-tentative" : ""} flex h-full w-full overflow-hidden rounded-md text-left ${compact ? "items-start" : "items-center"}`}
+        onClick={() => !converted && setOpen(true)}
+        aria-disabled={converted || undefined}
+        className={`cal-chip ${converted ? "pointer-events-none opacity-40 transition-opacity duration-300" : ""} ${tentative ? "cal-tentative" : ""} flex h-full w-full overflow-hidden rounded-md text-left ${compact ? "items-start" : "items-center"}`}
         title={tentative ? "Tentative (in [brackets])" : unanswered ? "Not answered yet" : answer === "tentative" ? "Maybe" : undefined}
         style={{
           ["--tent-c" as string]: event.color ?? (isAdventure ? "#46688a" : "#7f95d6"),
