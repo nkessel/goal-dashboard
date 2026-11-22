@@ -149,6 +149,16 @@ export function WeekView({
   const H0 = early ? HOUR_START : DAY_FROM;
   const [gripY, setGripY] = useState<number | null>(null);
   const [itemMenu, setItemMenu] = useState<{ x: number; y: number; target: MenuTarget } | null>(null);
+  // Days too narrow for words show each card as its icon; a tap shows what it is beside it (owner, Nov 22, CAL-1).
+  const [peek, setPeek] = useState<string | null>(null);
+  useEffect(() => {
+    if (!peek) return;
+    const off = (e: PointerEvent) => {
+      if (!(e.target as Element | null)?.closest?.("[data-icon-only]")) setPeek(null);
+    };
+    window.addEventListener("pointerdown", off);
+    return () => window.removeEventListener("pointerdown", off);
+  }, [peek]);
   const HOUR_PX = hourPx;
   useEffect(() => {
     if (ui?.zoom) return;
@@ -1526,6 +1536,8 @@ export function WeekView({
           const showNow = nowTop !== null && nowTop > 0 && nowTop < gridMinutes;
           return (
             <div key={`col-${dayIndex}`} className="pointer-events-none relative" style={{ gridColumn: col(dayIndex), gridRow: `2 / ${hourCount + 2}` }}>
+              {/* A hairline between the days (owner, Nov 22, CAL-2). */}
+              {dayIndex > 0 && <span aria-hidden className="cal-day-line absolute inset-y-0 -left-[1.5px] w-px" />}
 
               {daily && hydrated && (
                 <DailyBlocks
@@ -1579,6 +1591,8 @@ export function WeekView({
                 const canDrag = it.kind === "task" || (it.event.editable !== false && !it.event.isAllDay);
                 const isMoving = moving?.key === it.key;
                 const cardW = fan ? colWidth - l.lane * step - 1 : colWidth / l.count - 2;
+                const iconOnly = colWidth > 0 && cardW < 52;
+                const peeking = iconOnly && peek === it.key;
                 // Adventure: a finished quest is a victory, so it keeps its colour; past ones only soften.
                 const fade = !past || isMoving ? undefined : isAdventure && it.kind === "task" ? (it.task.status === "completed" ? undefined : "saturate(.6) brightness(1.03)") : "saturate(.2) contrast(.6) brightness(1.12)";
                 return (
@@ -1590,8 +1604,16 @@ export function WeekView({
                       if (justDragged.current) {
                         e.stopPropagation();
                         e.preventDefault();
+                        return;
+                      }
+                      // Icon only: the first tap shows what it is; the next one opens it as usual.
+                      if (iconOnly && !peeking) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setPeek(it.key);
                       }
                     }}
+                    data-icon-only={iconOnly ? "" : undefined}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       setItemMenu({
@@ -1620,7 +1642,17 @@ export function WeekView({
                     ) : (
                       <CalendarTaskChip task={it.task} theme={theme} compact timeLabel={label} oneLine={oneLine || (portraits && height < 64)} portrait={portraits} show={card} box={colWidth > 0 ? { w: cardW, h: height } : undefined} />
                     )}
-                    {canDrag && height >= 18 && (
+                    {peeking && (
+                      <span
+                        role="tooltip"
+                        className="card-pop-in cal-peek pointer-events-none absolute top-0 z-[45] w-max max-w-[170px] rounded-lg px-2 py-1 text-[12.5px] leading-snug"
+                        style={{ ...(it.dayIndex >= 4 ? { right: "calc(100% + 4px)" } : { left: "calc(100% + 4px)" }) }}
+                      >
+                        <span className="font-display block font-semibold">{it.kind === "task" ? it.task.title : it.event.title}</span>
+                        <span className="block text-[11px] opacity-75">{label}</span>
+                      </span>
+                    )}
+                    {canDrag && height >= 18 && !iconOnly && (
                       <div data-resize aria-hidden title="Drag to change how long it runs" className="cal-resize absolute inset-x-1 bottom-0 h-[7px] cursor-ns-resize" />
                     )}
                   </div>

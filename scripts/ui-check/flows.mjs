@@ -1558,6 +1558,15 @@ export const FLOWS = [
         if (html && (cols > want || cards > 0)) h.record({ kind: "first-picture", severity: "error", target: `calendar ${view}`, detail: `the server's page has ${cols} day columns (want ${want}) and ${cards} cards (want 0: cards are placed in the browser, in its time zone)` });
       }
       await h.check("week");
+      // CAL-1 (owner, Nov 22): in days too narrow for words, cards are icons; a tap shows what one is.
+      const icon = h.page.locator("[data-icon-only] .cal-chip").first();
+      if (await icon.count()) {
+        await icon.click().catch(() => {});
+        await h.settle(400);
+        await h.check("week: an icon's name shown");
+        await h.page.mouse.click(5, 5).catch(() => {});
+        await h.settle(300);
+      }
       // 7 AM–10:30 PM by default, the rest behind a button each (owner, Nov 6), and the day headings pinned once scrolled (Nov 12).
       if (await h.tap((p) => p.locator("[data-hours='early']").first(), "before 7 AM", { optional: true, expectMove: true })) {
         await h.settle(500);

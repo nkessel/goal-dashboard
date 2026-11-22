@@ -3618,3 +3618,11 @@ html[data-tour-feedback] [data-feedback-root].fixed { z-index: 138; }
 .scroll-pull .roller-hair { width: 18px; }
 .scroll-pull-count { gap: 5px; letter-spacing: .1em; }
 .roller-hair { width: 56px; height: 0; border-top: 1px solid rgba(107, 63, 18, .55); border-bottom: 1px solid rgba(255, 244, 205, .7); flex: none; }
+
+/* The calendar week (owner, Nov 22). CAL-2: a hairline between the days. CAL-1: in days too narrow for words,
+   each card shows only its icon (its portrait, its check, its event mark); a tap shows what it is beside it. */
+.cal-day-line { background: rgba(139, 112, 64, 0.2); }
+[data-icon-only] .cal-chip { justify-content: center !important; align-items: flex-start !important; padding: 3px 0 !important; gap: 0 !important; }
+[data-icon-only] .cal-chip > :not(:first-child) { display: none !important; }
+[data-icon-only] .cal-chip > :first-child { display: flex !important; width: min(24px, calc(100% - 4px)) !important; height: min(24px, calc(100% - 4px)) !important; max-width: 24px; }
+.cal-peek { background: linear-gradient(180deg, #fbf3dc, #eedcb3); border: 1px solid #b39a6a; color: #2a1c10; box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3); }
