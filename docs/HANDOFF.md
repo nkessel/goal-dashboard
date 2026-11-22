@@ -37,6 +37,7 @@ Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Rea
 - Streaks and tracked events: keep-away cards like habits, Edit habit, log a tracked event earlier (`review/anti-habits`, Nov 22).
 - The walkthrough's first words (`review/walkthrough-intro`, Nov 22).
 - Renaming a board where its title sits (`review/board-title`, Nov 22).
+- Sub-quest card editor SQ-1..7 and icon-only narrow calendar CAL-1/2 (`review/subquest-calendar`, `review/calendar-icons`, Nov 22).
 - Insights: greyed unset meters, chart beneath the check-in, Wheel of Time Done (`review/insights-nov21`, Nov 22).
 - Insights on one graph for every metric (owner, Nov 16): not built. The toucan offering habits: on hold (both in WAITING).
 - Merging Daily Habits and Today's Quests on Today: brainstorm with him first.
