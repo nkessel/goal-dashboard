@@ -4,7 +4,7 @@ import { useHiddenEvents } from "@/lib/hidden-events";
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { daySummary, useWeatherRange } from "@/lib/use-weather";
 import { useRouter } from "next/navigation";
-import { scheduleTaskAction, updateGoogleEventAction } from "@/app/actions";
+import { scheduleStepAction, scheduleTaskAction, updateGoogleEventAction } from "@/app/actions";
 import { saveDayHold } from "@/lib/day-holds";
 import { DailyEventEditor, useDailySettings } from "./DailyEvents";
 import { carryQuest, useCarried, QUEST_DRAG_TYPE, registerCalendarDrop, type Carried } from "@/lib/schedule-carry";
@@ -28,6 +28,7 @@ import { CalendarItemMenu, type MenuTarget } from "./CalendarItemMenu";
 import { CalendarTaskChip, getTaskDisplayWindow, roomyScale } from "./CalendarTaskChip";
 import { holdStill } from "./CalendarNav";
 import { sessionRef, showsOnCalendar } from "@/lib/calendar-task-window";
+import { SubQuestBlock, type ScheduledStep } from "./SubQuestBlock";
 import type { CardShow } from "./CalendarLayers";
 import { GoogleEventChip } from "./GoogleEventChip";
 import type { DailyLayer, EssentialsLook, HabitLook } from "./CalendarLayers";
@@ -90,6 +91,7 @@ const TIME_BG = "linear-gradient(90deg, #f3e6c8 85%, #efe0bd)";
 export function WeekView({
   dayKeys,
   tasks,
+  steps = [],
   events = [],
   theme = "calm",
   portraits = false,
@@ -120,6 +122,8 @@ export function WeekView({
   /** The columns to show (YYYY-MM-DD, read in the viewer's own time zone) — 7 for a week, 1 for a day. */
   dayKeys: string[];
   tasks: Task[];
+  /** Sub-quests with their own slot, drawn as blocks of their own. */
+  steps?: ScheduledStep[];
   events?: GoogleCalendarEvent[];
   theme?: "calm" | "adventure";
 }) {
@@ -969,11 +973,12 @@ export function WeekView({
     to: Span;
     active: boolean;
     timer?: number;
-    item: { kind: "task"; task: Task } | { kind: "event"; event: GoogleCalendarEvent };
+    item: DragItem;
   } | null>(null);
+  type DragItem = { kind: "task"; task: Task } | { kind: "event"; event: GoogleCalendarEvent } | { kind: "step"; step: ScheduledStep };
   const justDragged = useRef(false);
 
-  function startItemDrag(e: React.PointerEvent, key: string, span: Span, item: { kind: "task"; task: Task } | { kind: "event"; event: GoogleCalendarEvent }) {
+  function startItemDrag(e: React.PointerEvent, key: string, span: Span, item: DragItem) {
     if (carried) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
     // A popup opened from this card (the quest editor, a menu) is portalled out of it but its
@@ -1035,7 +1040,7 @@ export function WeekView({
     if (dayIndex === d.from.dayIndex && top === d.from.top && bottom === d.from.bottom) {
       // A finger held still and let go: that's a long press, so open the card's menu (iPhone fires no contextmenu).
       const fromDay = days[d.from.dayIndex];
-      if (d.touch && fromDay) {
+      if (d.touch && fromDay && d.item.kind !== "step") {
         const start = minuteDate(fromDay, d.from.top);
         const end = minuteDate(fromDay, d.from.bottom);
         setItemMenu({
@@ -1055,6 +1060,7 @@ export function WeekView({
     void (async () => {
       try {
         if (d.item.kind === "task") await scheduleTaskAction(sessionRef(d.item.task), start, end);
+        else if (d.item.kind === "step") await scheduleStepAction(d.item.step.id, start, end);
         else await updateGoogleEventAction(d.item.event.id, d.item.event.calendarId ?? "primary", { startISO: start, endISO: end });
         router.refresh();
       } catch (err) {
@@ -1097,7 +1103,8 @@ export function WeekView({
 
   type Item =
     | { kind: "task"; key: string; dayIndex: number; top: number; bottom: number; start: Date; end: Date; task: Task }
-    | { kind: "event"; key: string; dayIndex: number; top: number; bottom: number; start: Date; end: Date; event: GoogleCalendarEvent };
+    | { kind: "event"; key: string; dayIndex: number; top: number; bottom: number; start: Date; end: Date; event: GoogleCalendarEvent }
+    | { kind: "step"; key: string; dayIndex: number; top: number; bottom: number; start: Date; end: Date; step: ScheduledStep };
   const items: Item[] = [];
   for (const event of hydrated ? events : []) {
     if (event.isAllDay || hiddenEvents.has(event.id)) continue;
@@ -1120,6 +1127,17 @@ export function WeekView({
     const minMins = Math.max(20, (30 / HOUR_PX) * 60);
     const top = Math.max(0, Math.min(offset(start, days[dayIndex]), gridMinutes - minMins));
     items.push({ kind: "task", key: `t-${sessionRef(task)}`, dayIndex, top, bottom: Math.max(top + minMins, offset(end, days[dayIndex])), start, end, task });
+  }
+
+  for (const step of hydrated ? steps : []) {
+    if (!step.scheduled_start || !step.scheduled_end) continue;
+    const start = new Date(step.scheduled_start);
+    const end = new Date(step.scheduled_end);
+    const dayIndex = days.findIndex((d) => isSameDay(d, start));
+    if (dayIndex === -1 || outside(start, end, days[dayIndex])) continue;
+    const minMins = Math.max(20, (30 / HOUR_PX) * 60);
+    const top = Math.max(0, Math.min(offset(start, days[dayIndex]), gridMinutes - minMins));
+    items.push({ kind: "step", key: `s-${step.id}`, dayIndex, top, bottom: Math.max(top + minMins, offset(end, days[dayIndex])), start, end, step });
   }
 
   // An item being dragged (or just dropped, until fresh data arrives) shows at its new spot.
@@ -1575,7 +1593,7 @@ export function WeekView({
                 // Too narrow to split (phones, multi-day views): fan out instead.
                 const fan = l.count > 1 && colWidth > 0 && colWidth / l.count < 46;
                 const step = Math.min(8, colWidth / (l.count + 2));
-                const canDrag = it.kind === "task" || (it.event.editable !== false && !it.event.isAllDay);
+                const canDrag = it.kind === "task" || it.kind === "step" || (it.event.editable !== false && !it.event.isAllDay);
                 const isMoving = moving?.key === it.key;
                 const cardW = fan ? colWidth - l.lane * step - 1 : colWidth / l.count - 2;
                 // Adventure: a finished quest is a victory, so it keeps its colour; past ones only soften.
@@ -1583,7 +1601,7 @@ export function WeekView({
                 return (
                   <div
                     key={it.key}
-                    onPointerDownCapture={canDrag ? (e) => startItemDrag(e, it.key, { dayIndex: it.dayIndex, top: it.top, bottom: it.bottom }, it.kind === "task" ? { kind: "task", task: it.task } : { kind: "event", event: it.event }) : undefined}
+                    onPointerDownCapture={canDrag ? (e) => startItemDrag(e, it.key, { dayIndex: it.dayIndex, top: it.top, bottom: it.bottom }, it.kind === "task" ? { kind: "task", task: it.task } : it.kind === "step" ? { kind: "step", step: it.step } : { kind: "event", event: it.event }) : undefined}
                     onClickCapture={(e) => {
                       // The end of a drag isn't a tap on the chip.
                       if (justDragged.current) {
@@ -1593,6 +1611,7 @@ export function WeekView({
                     }}
                     onContextMenu={(e) => {
                       e.preventDefault();
+                      if (it.kind === "step") return;
                       setItemMenu({
                         x: e.clientX,
                         y: e.clientY,
@@ -1605,7 +1624,7 @@ export function WeekView({
                       height,
                       left: fan ? l.lane * step : `${(100 / l.count) * l.lane}%`,
                       width: fan ? `calc(100% - ${l.lane * step + 1}px)` : `calc(${100 / l.count}% - 2px)`,
-                      zIndex: (it.kind === "task" ? 2 : 1) + (fan ? l.lane * 2 : 0),
+                      zIndex: (it.kind === "task" || it.kind === "step" ? 2 : 1) + (fan ? l.lane * 2 : 0),
                       boxShadow: fan && l.lane > 0 ? "-2px 0 4px rgba(60,40,10,.25)" : undefined,
                       borderRadius: 6,
                       // Faded but still opaque, so past items fanned over each other stay legible.
@@ -1614,7 +1633,9 @@ export function WeekView({
                       touchAction: canDrag ? (seamless ? "pan-x pan-y" : "pan-y") : undefined,
                     }}
                   >
-                    {it.kind === "event" ? (
+                    {it.kind === "step" ? (
+                      <SubQuestBlock step={it.step} theme={theme} timeLabel={label} oneLine={oneLine} />
+                    ) : it.kind === "event" ? (
                       <GoogleEventChip event={it.event} theme={theme} compact timeLabel={label} oneLine={oneLine} scale={colWidth > 0 && !oneLine ? roomyScale(cardW, height) : 1} boxH={height} />
                     ) : (
                       <CalendarTaskChip task={it.task} theme={theme} compact timeLabel={label} oneLine={oneLine || (portraits && height < 64)} portrait={portraits} show={card} box={colWidth > 0 ? { w: cardW, h: height } : undefined} />

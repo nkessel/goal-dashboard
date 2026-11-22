@@ -5,6 +5,7 @@ import { MagicCalendarIcon } from "@/components/ui/Icons";
 import { PaintTodayArt } from "./PaintTodayArt";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { Task } from "@/lib/data/types";
+import type { ScheduledStep } from "./SubQuestBlock";
 import type { GoogleCalendarEvent, GoogleCalendarInfo } from "@/lib/google-calendar";
 import { DayView } from "./DayView";
 import { MonthView } from "./MonthView";
@@ -85,6 +86,7 @@ export function CalendarLayers({
   monthKey,
   todayKey,
   tasks,
+  steps = [],
   events,
   calendars,
   theme,
@@ -112,6 +114,8 @@ export function CalendarLayers({
   monthKey: string;
   todayKey: string;
   tasks: Task[];
+  /** Sub-quests with their own calendar slot. */
+  steps?: ScheduledStep[];
   events: GoogleCalendarEvent[];
   calendars: GoogleCalendarInfo[];
   theme: "calm" | "adventure";
@@ -371,8 +375,8 @@ export function CalendarLayers({
         )}
       </div>
 
-      {view === "day" && <DayView dateKey={dayKeys[0]} wideKeys={widen(dayKeys, BUFFER)} buffer={BUFFER} ui={ui} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} card={layers.card} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
-      {(view === "3day" || view === "days" || view === "week" || view === "next7") && <WeekView dayKeys={widen(dayKeys, BUFFER)} visible={dayKeys.length} buffer={BUFFER} ui={ui} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} card={layers.card} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
+      {view === "day" && <DayView dateKey={dayKeys[0]} wideKeys={widen(dayKeys, BUFFER)} buffer={BUFFER} ui={ui} tasks={shownTasks} steps={layers.quests ? steps : []} events={shownEvents} theme={theme} portraits={layers.portraits} card={layers.card} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
+      {(view === "3day" || view === "days" || view === "week" || view === "next7") && <WeekView dayKeys={widen(dayKeys, BUFFER)} visible={dayKeys.length} buffer={BUFFER} ui={ui} tasks={shownTasks} steps={layers.quests ? steps : []} events={shownEvents} theme={theme} portraits={layers.portraits} card={layers.card} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
       {view === "month" && <MonthView monthKey={monthKey} todayKey={todayKey} tasks={shownTasks} events={shownEvents} theme={theme} />}
     </div>
     </AgendaContext.Provider>

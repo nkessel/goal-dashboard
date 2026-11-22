@@ -92,6 +92,8 @@ export function makeFixtures() {
   tasks.push(task("Post the reflection link in the course chat", { board_id: course.id, locked_by_task_id: reading.id }));
   const steps = ["Skim the chapter", "Highlight three ideas", "Write one page", "Post it in the forum"].map((title, i) => ({
     id: randomUUID(), owner_id: OWNER_ID, task_id: reading.id, title, sort_order: i, done: i === 0, done_at: i === 0 ? inHours(-2) : null,
+    // One sub-quest has its own slot on the calendar (a block with the quest's name under it).
+    ...(i === 1 ? { scheduled_start: inHours(1.2), scheduled_end: inHours(1.7), minutes: 30 } : {}),
   }));
 
   const rite = (title, slot, extra = {}) => ({ id: randomUUID(), owner_id: OWNER_ID, title, slot, sort_order: sort++, xp_value: 5, ...extra });

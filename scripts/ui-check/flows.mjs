@@ -1502,6 +1502,10 @@ export const FLOWS = [
         if (html && (cols > want || cards > 0)) h.record({ kind: "first-picture", severity: "error", target: `calendar ${view}`, detail: `the server's page has ${cols} day columns (want ${want}) and ${cards} cards (want 0: cards are placed in the browser, in its time zone)` });
       }
       await h.check("week");
+      // A sub-quest with its own slot is a block of its own, with its quest's name under it.
+      const subBlocks = await h.page.locator("[data-subquest-block]").count();
+      if (subBlocks === 0) h.record({ kind: "missing", severity: "error", target: "calendar", detail: "the scheduled sub-quest (Highlight three ideas) has no block on the week" });
+      else await h.check("week: a sub-quest block");
       // 7 AM–10:30 PM by default, the rest behind a button each (owner, Nov 6), and the day headings pinned once scrolled (Nov 12).
       if (await h.tap((p) => p.locator("[data-hours='early']").first(), "before 7 AM", { optional: true, expectMove: true })) {
         await h.settle(500);
@@ -1698,6 +1702,7 @@ export const FLOWS = [
       await h.page.locator("[title^='Edit \"Goblin']").first().evaluate((el) => el.scrollIntoView({ block: "start" })).catch(() => {});
       await h.settle(400);
       await h.check("day");
+      if ((await h.page.locator("[data-subquest-block]").count()) > 0) await h.check("day: a sub-quest block");
       // A non-negotiable's menu (owner, Nov 4): right-click a meal hold that's on screen for keep / edit / remove.
       {
         const spot = await h.page.evaluate(() => {

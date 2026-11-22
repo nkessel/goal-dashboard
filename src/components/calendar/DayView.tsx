@@ -3,6 +3,7 @@
 import type { CalUi } from "@/lib/cal-ui";
 import Link from "next/link";
 import type { Task } from "@/lib/data/types";
+import type { ScheduledStep } from "./SubQuestBlock";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 import { addDays, formatDateParam, isSameDay, parseDateParam, startOfWeek } from "@/lib/calendar-dates";
 import { WeekView, useNowMinute } from "./WeekView";
@@ -13,6 +14,7 @@ import type { DailyLayer, EssentialsLook, HabitLook } from "./CalendarLayers";
 export function DayView({
   dateKey,
   tasks,
+  steps,
   events = [],
   theme = "calm",
   portraits = false,
@@ -30,6 +32,7 @@ export function DayView({
   habitLook?: HabitLook;
   dateKey: string;
   tasks: Task[];
+  steps?: ScheduledStep[];
   events?: GoogleCalendarEvent[];
   theme?: "calm" | "adventure";
   portraits?: boolean;
@@ -77,7 +80,7 @@ export function DayView({
           );
         })}
       </div>
-      <WeekView dayKeys={wideKeys ?? [dateKey]} visible={1} buffer={wideKeys ? buffer : 0} tasks={tasks} events={events} theme={theme} portraits={portraits} card={card} daily={daily} essentials={essentials} habitLook={habitLook} ui={ui} />
+      <WeekView dayKeys={wideKeys ?? [dateKey]} visible={1} buffer={wideKeys ? buffer : 0} tasks={tasks} steps={steps} events={events} theme={theme} portraits={portraits} card={card} daily={daily} essentials={essentials} habitLook={habitLook} ui={ui} />
     </div>
   );
 }

@@ -167,7 +167,7 @@ export default async function CalendarPage({
     : Promise.resolve([]);
   // The auto-scheduler's sections on top: Today's quests, Additional quests and today's habits (owner, Nov 6).
   const sectionsP = import("@/app/actions").then(({ autoSchedulerSectionsAction }) => autoSchedulerSectionsAction(todayKey())).catch(() => null);
-  const [tasksLoaded, toSchedule, scheduleFolders, googleAll, planToday, interest, interestEvents, schedSections] = await Promise.all([
+  const [tasksLoaded, toSchedule, scheduleFolders, googleAll, planToday, interest, interestEvents, schedSections, scheduledSteps] = await Promise.all([
     listCalendarTasksForOwner(session.user.id, rangeStart, rangeEnd),
     listSchedulingList(session.user.id),
     getSchedulingFolders(session.user.id),
@@ -176,11 +176,14 @@ export default async function CalendarPage({
     interestP,
     interestEventsP,
     sectionsP,
+    // Sub-quests with their own calendar slot draw as blocks of their own.
+    import("@/lib/data/steps").then(({ listScheduledSteps }) => listScheduledSteps(session.user.id, rangeStart.toISOString(), rangeEnd.toISOString())).catch(() => []),
   ]);
+  const stepEventIds = scheduledSteps.map((s) => s.google_calendar_event_id).filter((id): id is string => Boolean(id));
   // Upcoming calendar events become quests when that's switched on (owner, Nov 18); drawn as quests at once.
   let tasks = tasksLoaded;
   if (googleAll) {
-    const linked = new Set(tasksLoaded.map((t) => t.google_calendar_event_id).filter((id): id is string => Boolean(id)));
+    const linked = new Set([...tasksLoaded.map((t) => t.google_calendar_event_id).filter((id): id is string => Boolean(id)), ...stepEventIds]);
     const made = await import("@/lib/data/event-quests").then(({ makeEventQuests }) => makeEventQuests(session.user.id, googleAll.events, googleAll.calendars, linked)).catch(() => []);
     if (made.length) tasks = [...tasksLoaded, ...made];
   }
@@ -206,7 +209,7 @@ export default async function CalendarPage({
   let events: GoogleCalendarEvent[] = [];
   let calendars: GoogleCalendarInfo[] = [];
   if (googleAll) {
-    const importedEventIds = new Set(tasks.map((t) => t.google_calendar_event_id).filter((id): id is string => Boolean(id)));
+    const importedEventIds = new Set([...tasks.map((t) => t.google_calendar_event_id).filter((id): id is string => Boolean(id)), ...stepEventIds]);
     calendars = googleAll.calendars;
     events = googleAll.events.filter((e) => !importedEventIds.has(e.id));
   }
@@ -396,6 +399,7 @@ export default async function CalendarPage({
                 monthKey={formatDateParam(startOfMonth(date))}
                 todayKey={formatDateParam(today)}
                 tasks={tasks}
+                steps={scheduledSteps}
                 events={events}
                 calendars={calendars}
                 theme={theme}
