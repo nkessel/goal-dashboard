@@ -1539,7 +1539,6 @@ export function QuestEditorDialog({
                                 }
                               }
                             }}
-                            onClick={() => { if (!isHolder && !isCompleted) setStepDetail((d) => (d === st.key ? null : st.key)); }}
                             ariaLabel="Step"
                             className={`bare-input min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-[3px] text-[16px] leading-snug focus:outline-none ${st.state ? "line-through" : ""}`}
                             style={st.state === "failed" ? { color: "#b5321f", textDecorationColor: "#b5321f" } : st.state === "skipped" ? { color: "#9a9286", textDecorationColor: "#9a9286" } : { color: "var(--t-ink)" }}
@@ -1572,6 +1571,20 @@ export function QuestEditorDialog({
                               <CoinIcon size={13} />
                             </span>
                           )}
+                          {/* Its ✎ opens its fields (time, XP, stats, make it a quest); nothing shows until then (owner, Nov 22). */}
+                          {!isHolder && !isCompleted && (
+                            <button
+                              type="button"
+                              onClick={() => setStepDetail((d) => (d === st.key ? null : st.key))}
+                              aria-expanded={stepDetail === st.key}
+                              aria-label={`Edit ${st.title}`}
+                              title="Edit this sub-quest"
+                              className="mt-[3px] flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[13px]"
+                              style={{ color: "#a88a3f", background: stepDetail === st.key ? "rgba(217,180,95,.25)" : undefined }}
+                            >
+                              ✎
+                            </button>
+                          )}
                           <span className="relative shrink-0" data-step-menu>
                             <button
                               type="button"
@@ -1596,7 +1609,7 @@ export function QuestEditorDialog({
                                 {(
                                   [
                                     // Order and words from the owner (Nov 4): Skip, then Remove, Failed last, all in black ink.
-                                    ...(!isHolder ? [["detail", "◷", "Time, progress & XP share", "var(--t-ink)"]] : []),
+                                    ...(!isHolder ? [["detail", "✎", "Edit", "var(--t-ink)"]] : []),
                                     ["sub", "＋", "Add a sub-task", "var(--t-ink)"],
                                     ...(!isHolder && !(st.coins ?? 0) ? [["coins", "◎", "Give coins", "var(--t-ink)"]] : []),
                                     ...(st.state || st.done ? [["open", "↺", "Back to open", "var(--t-ink)"]] : []),

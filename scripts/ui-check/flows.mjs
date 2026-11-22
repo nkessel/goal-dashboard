@@ -633,7 +633,9 @@ export const FLOWS = [
           if (await h.tap((p) => p.getByRole("button", { name: /^More for Bring the insurance card$/ }).first(), "a sub-quest's ⋯", { optional: true, expectMove: true })) {
             await h.settle(300);
             await h.check("sub-quests: its ⋯ menu");
-            if (await h.tap((p) => p.getByRole("menuitem", { name: /Time, progress/ }).first(), "time, progress & XP share", { optional: true, expectMove: true })) {
+            await h.tap((p) => p.getByRole("button", { name: /^More for Bring the insurance card$/ }).first(), "a sub-quest's ⋯ closed", { optional: true });
+            // Its fields open from its ✎ only (owner, Nov 22).
+            if (await h.tap((p) => p.getByRole("button", { name: /^Edit Bring the insurance card$/ }).first(), "a sub-quest's ✎", { optional: true, expectMove: true })) {
               await h.settle(400);
               await h.check("sub-quests: its card editor (pills)");
               const card = (name) => (p) => p.locator("[data-step-card-editor]").getByRole("button", { name }).first();
