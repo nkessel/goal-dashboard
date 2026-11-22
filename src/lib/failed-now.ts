@@ -36,6 +36,24 @@ export function clearQuestNow(id: string) {
   if (marks.delete(id)) emit();
 }
 
+/**
+ * Quests whose celebration is on screen: their cards stay open until it closes, so the scene comes first and the
+ * check lands on the card after it (owner, Nov 19: "The completed screen should show before the check goes onto
+ * the quest card").
+ */
+const held = new Set<string>();
+export function holdOpenNow(id: string) {
+  held.add(id);
+  emit();
+}
+export function releaseHoldNow(id: string) {
+  if (held.delete(id)) emit();
+}
+/** The mark a quest has right now ("open" after an Undo), if any. */
+export function questMarkNow(id: string): QuestNow | null {
+  return marks.get(id)?.now ?? null;
+}
+
 export const markDoneNow = (id: string, base?: string) => markQuestNow(id, "done", base);
 export const markFailedNow = (id: string, base?: string) => markQuestNow(id, "failed", base);
 export const markReopenedNow = (id: string, base?: string) => markQuestNow(id, "open", base);
@@ -69,6 +87,7 @@ export function useQuestNow<T extends QuestLike>(task: T | undefined): T | undef
 export function useQuestNow<T extends QuestLike>(task: T | undefined): T | undefined {
   useVersion();
   if (!task) return task;
+  if (held.has(task.id)) return { ...task, status: "open", failed_at: null, completed_at: null };
   const m = markFor(task.id, questSig(task));
   if (!m) return task;
   if (m.now === "open") return { ...task, status: "open", failed_at: null, completed_at: null };

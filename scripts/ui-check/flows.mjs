@@ -1489,6 +1489,32 @@ export const FLOWS = [
     },
   },
   {
+    // Completing a quest from its calendar menu (owner, Nov 19: "The completed screen should show before the check
+    // goes onto the quest card"): the celebration first, the card still open behind it; the check once it closes.
+    name: "calcomplete",
+    async run(h) {
+      await h.goto("/calendar?view=day", { name: "calendar" });
+      await h.settle(1500);
+      const sel = "[data-cal-days] [title^='Edit \"Goblin']";
+      const chip = h.page.locator(sel).first();
+      if (!(await chip.count())) return h.record({ kind: "step-skipped", severity: "info", target: "calcomplete", detail: "no Goblin card on the day view" });
+      await chip.evaluate((el) => el.scrollIntoView({ block: "center" }));
+      await h.settle(300);
+      await chip.click({ button: "right" });
+      await h.settle(400);
+      await h.tap((p) => p.locator("[data-mi='complete']").first(), "Complete quest", { expectMove: true });
+      await h.settle(2500);
+      await h.check("calendar complete: celebration");
+      if (await h.page.locator(`${sel} [aria-label='Completed']`).count())
+        h.record({ kind: "early-check", severity: "error", target: "calendar complete", detail: "the card shows its check while the celebration is still up" });
+      await h.tap((p) => p.getByRole("button", { name: /^continue your journey$/i }).first(), "Continue Your Journey", { optional: true });
+      await h.settle(1200);
+      if (!(await h.page.locator(`${sel} [aria-label='Completed']`).count()))
+        h.record({ kind: "no-check", severity: "error", target: "calendar complete", detail: "Goblin's card shows no check after the celebration closed" });
+      await h.check("calendar complete: checked");
+    },
+  },
+  {
     // The calendar (owner, Nov 3: "beautiful like the mockup"): week and day, quests and mini-quests for their duration.
     name: "calendar",
     async run(h) {
