@@ -194,7 +194,10 @@ export function EventLog({ notes, zone }: { notes: Note[]; zone?: string }) {
 
   return (
     <div className="relative z-[1] flex flex-col gap-2">
-      <TrackedEvents onLogged={() => router.refresh()} />
+      {/* Its words take the parchment's ink (the "+ Add tracked event" pill was cream on cream here). */}
+      <div style={{ color: INK }}>
+        <TrackedEvents onLogged={() => router.refresh()} />
+      </div>
       {feltNote && <FeltInline key={feltNote} target={{ kind: "note", id: feltNote }} onClose={closeFeltNote} />}
       {!open ? (
         <button type="button" onClick={() => setOpen(true)} className="hover-glow flex h-10 items-center justify-center gap-1.5 self-start rounded-full px-4 text-[14px] font-bold" style={chip(true)}>

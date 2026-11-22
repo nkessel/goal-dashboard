@@ -166,6 +166,9 @@ export function makeFixtures() {
             ],
           },
           rituals: [{ id: "r1", name: "Couples covenant", done: [day(-12), day(-40)] }],
+          // A keep-away streak and two tracked events (Insights › Streaks; the check-in's event pills).
+          streaks: [{ id: "s-sugar", name: "No late sugar", word: "sugar", since: inHours(-24 * 20) }],
+          trackedEvents: ["Late sugar", "Doomscrolling"],
           questSeries: { [gym1.id]: "g:ev-gym", [gym2.id]: "g:ev-gym" },
           eventQuests: { on: false, made: { "ev-gym-1": gym1.id, "ev-gym-2": gym2.id } },
           // Per-quest extras kept in the catch-all until they move to columns (split plan, S2): a place, a driving time,

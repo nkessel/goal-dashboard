@@ -20,7 +20,8 @@ import { Streaks } from "@/components/insights/Streaks";
 import { Rituals } from "@/components/insights/Rituals";
 import { cleanRituals } from "@/lib/rituals";
 import { slipMatcher } from "@/lib/streaks";
-import { listRites, listCompletionsFor, listHabitSkips } from "@/lib/data/rites";
+import { listRites, listCompletionsFor, listHabitSkips, cleanRiteSteps } from "@/lib/data/rites";
+import { cleanRepeat } from "@/lib/habit-repeat";
 import { WheelOfTime } from "@/components/insights/WheelOfTime";
 import { cleanWheel } from "@/lib/wheel-of-time";
 
@@ -73,6 +74,8 @@ export default async function InsightsPage() {
     icon: h.icon_source ? (h.icon_key ?? null) : null,
     done: habitDone.filter((c) => c.rite_id === h.id).map((c) => c.day),
     skipped: habitSkipped.filter((c) => c.rite_id === h.id).map((c) => c.day),
+    // What the habit editor needs, so its card's ⋯ › Edit habit opens the same editor as Today (owner, Nov 9).
+    view: { id: h.id, title: h.title, description: h.description, is_core: h.is_core, xp_value: h.xp_value, slot: "day", days: (h.days as number[] | null) ?? null, due_time: h.due_time ?? null, window_to: h.window_to ?? null, kind: h.kind ?? null, icon_key: h.icon_source ? h.icon_key : null, icon_source: h.icon_source ?? null, coin_value: h.coin_value ?? null, estimate_minutes: h.estimate_minutes ?? null, steps: cleanRiteSteps(h.steps), repeat: cleanRepeat(h.repeat) },
   }));
   // The life wheel's readings are kept apart from the chart's metrics.
   const WHEEL = "◎ ";

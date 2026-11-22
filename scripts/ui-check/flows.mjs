@@ -1235,6 +1235,46 @@ export const FLOWS = [
         await h.tap((p) => p.locator("[data-checkin-log] button[aria-expanded]").first(), "check-in log range again", { optional: true, expectMove: true });
         await h.tap((p) => p.locator("[data-checkin-log] [role=radio]", { hasText: "Today" }).first(), "today", { optional: true, expectMove: true });
       }
+      // Streaks (owner, Nov 9): keep-away streaks look like habits (Log it · Another time…), and habits have ⋯ › Edit habit.
+      {
+        const sec = h.page.locator("section[aria-label='Streaks']").first();
+        if (await sec.count()) {
+          await sec.scrollIntoViewIfNeeded().catch(() => {});
+          await h.settle(300);
+          await h.check("streaks");
+          if (await h.tap((p) => p.getByRole("button", { name: /^another time…$/i }).first(), "streak: another time", { optional: true, expectMove: true })) {
+            await h.settle(300);
+            await h.check("streaks: another time");
+            await h.tap((p) => p.getByRole("button", { name: /^another time…$/i }).first(), "streak: another time closes", { optional: true });
+          }
+          if (await h.tap((p) => p.locator("[aria-label^='More for'][aria-haspopup=menu]").last(), "habit streak ⋯", { optional: true, expectMove: true })) {
+            await h.settle(300);
+            await h.check("streaks: habit menu");
+            if (await h.tap((p) => p.locator("[data-menu=habit-streak] [role=menuitem]").first(), "edit habit from streaks", { optional: true, expectMove: true })) {
+              await h.settle(700);
+              await h.check("streaks: habit editor");
+              await h.page.keyboard.press("Escape");
+              await h.settle(400);
+            }
+          }
+          await h.page.evaluate(() => window.scrollTo(0, 0));
+        } else h.record({ kind: "streaks", severity: "error", target: "streaks", detail: "No Streaks section on Insights (the fixtures have a streak)" });
+      }
+      // A tracked event's options (owner, Nov 9): right-click a pill for the wheels and Stop tracking.
+      {
+        const pill = h.page.getByRole("button", { name: /^◉?\s*Late sugar$/ }).first();
+        if (await pill.count()) {
+          await pill.scrollIntoViewIfNeeded().catch(() => {});
+          await pill.click({ button: "right" }).catch(() => {});
+          await h.settle(500);
+          if (!(await h.page.locator("[data-tracked-options]").first().isVisible().catch(() => false))) h.record({ kind: "tracked-options", severity: "error", target: "tracked event", detail: "Right-clicking a tracked event didn't open its options" });
+          await h.check("tracked event: options");
+          // Cancel folds its own options away (a plain click: the tap check would read the fold closing as the button jumping).
+          await h.page.locator("[data-tracked-options] button", { hasText: /^Cancel$/ }).first().click().catch(() => {});
+          await h.settle(500);
+          if (await h.page.locator("[data-tracked-options]").first().isVisible().catch(() => false)) h.record({ kind: "tracked-options", severity: "error", target: "tracked event", detail: "Cancel didn't fold a tracked event's options away" });
+        }
+      }
       // The chart waits behind a plain button (owner, Nov 9).
       if (await h.tap(/show insights chart/i, "show the chart", { optional: true })) {
         await h.settle(500);

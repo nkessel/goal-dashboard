@@ -34,10 +34,25 @@ function LeafIcon() {
   );
 }
 
+/** A time picked on the wheels (minutes after midnight) as a moment: a time later than now means that time yesterday. */
+function atFromWheels(m: number): Date | undefined {
+  const at = new Date();
+  const now = at.getHours() * 60 + at.getMinutes();
+  if (m === now) return undefined;
+  at.setHours(Math.floor(m / 60), m % 60, 0, 0);
+  if (m > now + 1) at.setDate(at.getDate() - 1);
+  return at;
+}
+const nowMinutes = () => {
+  const d = new Date();
+  return d.getHours() * 60 + d.getMinutes();
+};
+
 /**
  * Tracked events (owner, Nov 4: anti-habits as "events, but ones that I want to track, with timing recorded"):
  * named pills under the event field; a tap logs one right now (with Undo), "+ Add tracked event" names a new
- * one in place, right-click or hold a pill to remove it. Kept on the account, so phone and laptop share them.
+ * one in place. Right-click or hold a pill for its options (owner, Nov 9): log it at another time on the
+ * wheels (earlier today, or last night), or stop tracking it. Kept on the account, so phone and laptop share them.
  */
 export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
   const [names, setNames] = useState<string[] | null>(null);
@@ -47,8 +62,18 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
   // "How do you feel?" under the event just logged (owner, Nov 19).
   const [feltNote, setFeltNote] = useState<string | null>(null);
   const closeFeltNote = useCallback(() => setFeltNote(null), []);
-  const [removing, setRemoving] = useState<string | null>(null);
+  // The pill whose options are open, and the time on its wheels.
+  const [opts, setOpts] = useState<{ name: string; m: number } | null>(null);
+  const [sure, setSure] = useState(false);
+  const [justAdded, setJustAdded] = useState(false);
   const hold = useRef<number | null>(null);
+  // A hold that opened the options doesn't also log it on release.
+  const held = useRef(false);
+  const openOpts = (name: string) => {
+    setSure(false);
+    setJustAdded(false);
+    setOpts({ name, m: nowMinutes() });
+  };
   useEffect(() => {
     trackedEventsAction().then(setNames, () => setNames([]));
   }, []);
@@ -79,7 +104,10 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
   };
   const add = () => {
     const t = draft.trim();
-    if (t && names && !names.some((n) => n.toLowerCase() === t.toLowerCase())) save([...names, t]);
+    if (t && names && !names.some((n) => n.toLowerCase() === t.toLowerCase())) {
+      save([...names, t]);
+      setJustAdded(true);
+    }
     setDraft("");
     setAdding(false);
   };
@@ -90,14 +118,23 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
           <button
             key={n}
             type="button"
-            onClick={() => (removing === n ? setRemoving(null) : void log(n))}
-            onContextMenu={(e) => (e.preventDefault(), setRemoving(n))}
+            onClick={() => {
+              if (held.current) {
+                held.current = false;
+                return;
+              }
+              if (opts?.name === n) return setOpts(null);
+              setJustAdded(false);
+              void log(n);
+            }}
+            onContextMenu={(e) => (e.preventDefault(), openOpts(n))}
             onPointerDown={(e) => {
-              if (e.pointerType !== "mouse") hold.current = window.setTimeout(() => setRemoving(n), 520);
+              if (e.pointerType !== "mouse") hold.current = window.setTimeout(() => ((held.current = true), openOpts(n)), 520);
             }}
             onPointerUp={() => hold.current && clearTimeout(hold.current)}
             onPointerLeave={() => hold.current && clearTimeout(hold.current)}
-            title="Tap to log it now · right-click or hold to remove"
+            aria-expanded={opts?.name === n}
+            title="Tap to log it now · right-click or hold to log it at another time"
             className="hover-glow due-in flex h-8 items-center gap-1 rounded-full px-3 text-[13.5px] font-semibold"
             style={pill}
           >
@@ -152,14 +189,10 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
             <button
               type="button"
               onClick={() => {
-                const at = new Date();
-                const now = at.getHours() * 60 + at.getMinutes();
-                const m = leaf ?? now;
-                at.setHours(Math.floor(m / 60), m % 60, 0, 0);
                 // A time later than now means that time yesterday (nothing is logged in the future).
-                if (m > now + 1) at.setDate(at.getDate() - 1);
+                const at = atFromWheels(leaf ?? nowMinutes());
                 setLeaf(null);
-                void log(LEAF_EVENT, m === now ? undefined : at);
+                void log(LEAF_EVENT, at);
               }}
               // The app's forest-green primary, like the quest editor's Save (owner, Nov 19: the bright green was off).
               className="qe-save h-9 rounded-full px-4 text-[14px] font-semibold"
@@ -172,15 +205,53 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
           </div>
         </div>
       </Fold>
-      <Fold open={!!removing}>
-        <div className="flex items-center gap-2 text-[13px]" style={{ color: "inherit" }}>
-          <span>Stop tracking “{removing}”? (what&apos;s logged stays)</span>
-          <button type="button" onClick={() => (names && save(names.filter((x) => x !== removing)), setRemoving(null))} className="h-7 rounded-full px-2.5 font-semibold" style={{ border: "1px solid #9b2c1a", color: "#9b2c1a" }}>
-            Remove
-          </button>
-          <button type="button" onClick={() => setRemoving(null)} className="h-7 rounded-full px-2.5" style={{ color: "inherit", opacity: 0.8 }}>
-            Keep
-          </button>
+      {/* The added pill's options, said once (owner, Nov 9: "it should show the options"). */}
+      <Fold open={justAdded && !opts}>
+        <p className="m-0 text-[12.5px]" style={{ color: "inherit", opacity: 0.85 }}>
+          Tap it to log it now · hold it (or right-click) to log it at another time, or stop tracking it
+        </p>
+      </Fold>
+      {/* Hold or right-click a pill: log it earlier on the wheels, the leaf's way, or stop tracking it (owner, Nov 9). */}
+      <Fold open={!!opts}>
+        <div data-tracked-options className="flex flex-col gap-1.5 pt-0.5">
+          <span className="text-[13px] font-semibold" style={{ color: "inherit" }}>
+            {opts?.name}: when was it?
+          </span>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <TimeWheels value={opts?.m ?? 0} onChange={(m) => setOpts((o) => (o ? { ...o, m } : o))} />
+            <div className="flex flex-col gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!opts) return;
+                  const { name, m } = opts;
+                  setOpts(null);
+                  void log(name, atFromWheels(m));
+                }}
+                className="qe-save h-9 rounded-full px-4 text-[14px] font-semibold"
+              >
+                Log it
+              </button>
+              <button type="button" onClick={() => setOpts(null)} className="h-7 text-[13px] underline underline-offset-2" style={{ color: "#6b5631" }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+          {sure ? (
+            <div className="flex flex-wrap items-center gap-2 text-[13px]" style={{ color: "inherit" }}>
+              <span>Stop tracking “{opts?.name}”? (what&apos;s logged stays)</span>
+              <button type="button" onClick={() => (names && opts && save(names.filter((x) => x !== opts.name)), setOpts(null))} className="h-7 rounded-full px-2.5 font-semibold" style={{ border: "1px solid #9b2c1a", color: "#9b2c1a" }}>
+                Stop tracking
+              </button>
+              <button type="button" onClick={() => setSure(false)} className="h-7 rounded-full px-2.5" style={{ color: "inherit", opacity: 0.8 }}>
+                Keep it
+              </button>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setSure(true)} className="self-start text-[12.5px] underline underline-offset-2" style={{ color: "inherit", opacity: 0.8 }}>
+              Stop tracking it
+            </button>
+          )}
         </div>
       </Fold>
       {said && (
