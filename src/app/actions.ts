@@ -3,4 +3,5 @@
 // and must hold only re-exports: add new actions to their area file.
 
 export * from "./actions/quests";
+export * from "./actions/calendar";
 export * from "./actions/rest";
