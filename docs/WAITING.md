@@ -48,6 +48,8 @@ Started in the owner's Claude project threads; written here so another account c
 
 ## Open for the next Dev loop 2 run (not claimed)
 
+- **Run 24 (Nov 22, 12:30 UTC):** nothing new on `main` or in notes since run 23; every Run B item is shipped or waiting on his review. Nothing built.
+
 - **Run 23 (Nov 22, 12:00 UTC):** no notes since Nov 21 17:39. Four open notes no doc mentioned yet, all design changes (mockup first, not built): **a9240c31** (calendar, "very very important"): "+ Additional time block for this quest" (`CalendarItemMenu.tsx` line ~94) opens an "Another session" time picker; he wants to stay on the same calendar view with the quest card following the pointer and the hovered time slot outlined to drop it in. a782937f (Today): a way to mark a habit or sub-habit done in the past. 0da6f838 (Insights): a "How was your sleep" faces check-in at the end of the sleep check-in. b55781e2 (Today): "more celebration pls" (unclear which celebration; ask him).
 
 - **Run 21 (Nov 22, 11:20 UTC):** BUILD-PLAN 13 and 16 notes are all marked shipped; 14 and 15 are run 20's. 18 (load speed, measured) can't be done from a cloud session: no signed-in browser for the live app and no Vercel timing logs here; `/api/welcome` already runs its two waits side by side. Needs a session with the owner's browser, or Vercel's function timings. Run 19's claim (bugs, notes) passed 2 hours with nothing pushed; its work is open for the next run.
