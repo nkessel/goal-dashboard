@@ -11,7 +11,7 @@ type Pill = "time" | "xp" | "stats" | "when";
 
 /**
  * The small editor inside a sub-quest's card (owner, Nov 21, option C): the quest editor's own `.qe-fact`
- * pills for this one sub-quest: Time, XP, Stats, When and Make it a quest. They show only while the sub-quest is
+ * pills for this one sub-quest: Time, XP, Stats and When (Make it a quest is in its ⋯). They show only while the sub-quest is
  * being edited (its ✎; owner, Nov 22). A pill opens the app's one pill drawer: it slides down right under the pill
  * row, its point touching that pill (owner, Nov 22: "a drawer sliding down, with a carat pointing to the pill …
  * No floating drawers far away from pills"). When's drawer runs the full width of the sub-quests list, without an
@@ -24,7 +24,6 @@ export function StepCardEditor({
   questStats,
   isAdventure,
   onUpdate,
-  onMakeQuest,
 }: {
   step: StepDraft;
   /** XP this sub-quest brings (its share of the quest's XP plus its own). */
@@ -35,7 +34,6 @@ export function StepCardEditor({
   questStats: boolean;
   isAdventure: boolean;
   onUpdate: (patch: Partial<StepDraft>) => void;
-  onMakeQuest: () => void;
 }) {
   const [pill, setPill] = useState<Pill | null>(null);
   const [busy, setBusy] = useState(false);
@@ -147,13 +145,6 @@ export function StepCardEditor({
           data-open={pill === "when" ? "true" : undefined}
         >
           {whenLabel}
-        </button>
-        <button
-          type="button"
-          className={`${pillCls} ml-auto`}
-          onClick={onMakeQuest}
-        >
-          Make it a quest
         </button>
       </div>
       {pill && (

@@ -1611,6 +1611,7 @@ export function QuestEditorDialog({
                                     // Order and words from the owner (Nov 4): Skip, then Remove, Failed last, all in black ink.
                                     ...(!isHolder ? [["detail", "✎", "Edit", "var(--t-ink)"]] : []),
                                     ["sub", "＋", "Add a sub-task", "var(--t-ink)"],
+                                    ...(!isHolder && !isCompleted ? [["quest", "↗", "Make it a quest", "var(--t-ink)"]] : []),
                                     ...(!isHolder && !(st.coins ?? 0) ? [["coins", "◎", "Give coins", "var(--t-ink)"]] : []),
                                     ...(st.state || st.done ? [["open", "↺", "Back to open", "var(--t-ink)"]] : []),
                                     ...(st.state !== "skipped" ? [["skip", "»", "Skip", "var(--t-ink)"]] : []),
@@ -1625,6 +1626,7 @@ export function QuestEditorDialog({
                                     onClick={() => {
                                       setStepMenu(null);
                                       if (k === "sub") addSubStep(st.key);
+                                      if (k === "quest") void makeStepQuest(st.key);
                                       if (k === "detail") setStepDetail((d) => (d === st.key ? null : st.key));
                                       if (k === "coins") updateStep(st.key, { coins: 1 });
                                       if (k === "skip") updateStep(st.key, { state: "skipped", done: false, progress: 0 });
@@ -1644,8 +1646,8 @@ export function QuestEditorDialog({
                           </span>
                         </div>
                         {!isHolder && !isCompleted && (
-                          <Fold open={stepDetail === st.key}>
-                            {stepDetail === st.key && (
+                          // No Fold here: it would clip When's drawer, which runs to the card's edges.
+                          stepDetail === st.key && (
                               <StepCardEditor
                                 step={st}
                                 xpTotal={Math.round((wOf.get(st.key) ?? 0) * xp) + (st.xp ?? 0)}
@@ -1653,10 +1655,8 @@ export function QuestEditorDialog({
                                 questStats={statTotal > 0}
                                 isAdventure={isAdventure}
                                 onUpdate={(patch) => updateStep(st.key, patch)}
-                                onMakeQuest={() => void makeStepQuest(st.key)}
                               />
-                            )}
-                          </Fold>
+                            )
                         )}
                         </li>
                         );
