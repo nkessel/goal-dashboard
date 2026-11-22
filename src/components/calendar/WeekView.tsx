@@ -1,5 +1,6 @@
 "use client";
 
+import { useHiddenEvents } from "@/lib/hidden-events";
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { daySummary, useWeatherRange } from "@/lib/use-weather";
 import { useRouter } from "next/navigation";
@@ -261,6 +262,7 @@ export function WeekView({
   const timeBg = isAdventure ? TIME_BG : "var(--t-card)";
   const nowMinute = useNowMinute();
   const hydrated = useHydrated();
+  const hiddenEvents = useHiddenEvents();
   // A quest on a shown day that starts before the 10:30 PM fold and ends after it would be cut at the fold: the
   // late hours open by themselves (until you fold them with the button).
   const crossesLate =
@@ -1098,7 +1100,7 @@ export function WeekView({
     | { kind: "event"; key: string; dayIndex: number; top: number; bottom: number; start: Date; end: Date; event: GoogleCalendarEvent };
   const items: Item[] = [];
   for (const event of hydrated ? events : []) {
-    if (event.isAllDay) continue;
+    if (event.isAllDay || hiddenEvents.has(event.id)) continue;
     const start = new Date(event.start);
     const end = new Date(event.end);
     const dayIndex = days.findIndex((d) => isSameDay(d, start));

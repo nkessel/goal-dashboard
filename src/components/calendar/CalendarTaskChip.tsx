@@ -3,7 +3,7 @@
 import { completeQuestNow } from "@/lib/complete-quest-now";
 import { useFailedNow, useQuestNow, useReopenedNow } from "@/lib/failed-now";
 import { isTentativeTitle } from "@/lib/tentative";
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
 /** The quests waiting behind each quest on the calendar, by quest id: its agenda. */
 /** Completed (or failed) in the last 20 seconds: its mark arrives with the slam; older ones just sit there. */
@@ -292,6 +292,20 @@ function QuestCard({
   const reopenedNow = useReopenedNow(task.id);
   const failed = (!!task.failed_at && !reopenedNow) || failedNow;
   const done = (task.status === "completed" && !reopenedNow) || failedNow;
+  // Undone: the check (or ✕) lifts back up off the card before the portrait returns (owner, Nov 19 69ab3c74:
+  // "undoing quest completion should make the checkmark go back up").
+  const [was, setWas] = useState({ done, failed });
+  const [lifting, setLifting] = useState<null | { failed: boolean }>(null);
+  if (was.done !== done || was.failed !== failed) {
+    if (was.done && !done) setLifting({ failed: was.failed });
+    else if (done) setLifting(null);
+    setWas({ done, failed });
+  }
+  useEffect(() => {
+    if (!lifting) return;
+    const t = window.setTimeout(() => setLifting(null), 520);
+    return () => window.clearTimeout(t);
+  }, [lifting]);
   const { w, h } = box;
   // The quests waiting behind it, as an agenda (owner, Nov 3: time with Dad, then what to bring up).
   const agenda = useContext(AgendaContext)[task.id] ?? [];
@@ -398,15 +412,15 @@ function QuestCard({
         ...(warned ? { borderColor: "var(--t-warn)" } : {}),
       }}
     >
-      {done && (showArt || (!show.art && !line && h >= 40)) ? (
+      {(done || lifting) && (showArt || (!show.art && !line && h >= 40)) ? (
         // Done just now: the check (or a failure's ✕) slams onto the card like the celebration's (owner, Nov 12).
         <span
-          className={`quest-seal flex shrink-0 items-center justify-center rounded-full${justDone(task.completed_at) ? " cal-slam" : ""}`}
-          style={{ width: sealPx, height: sealPx, ...(failed ? { background: "radial-gradient(circle at 40% 35%,#d4543f,#8e2414)", boxShadow: "0 0 0 1.5px #6e1a0e" } : {}) }}
-          aria-label={failed ? "Failed" : "Completed"}
+          className={`quest-seal flex shrink-0 items-center justify-center rounded-full${!done && lifting ? " cal-lift" : justDone(task.completed_at) ? " cal-slam" : ""}`}
+          style={{ width: sealPx, height: sealPx, ...((done ? failed : lifting?.failed) ? { background: "radial-gradient(circle at 40% 35%,#d4543f,#8e2414)", boxShadow: "0 0 0 1.5px #6e1a0e" } : {}) }}
+          aria-label={!done ? undefined : failed ? "Failed" : "Completed"}
         >
           <svg width="62%" height="62%" viewBox="0 0 24 24" fill="none" aria-hidden>
-            {failed ? <path d="M7 7l10 10M17 7L7 17" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" /> : <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />}
+            {(done ? failed : lifting?.failed) ? <path d="M7 7l10 10M17 7L7 17" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" /> : <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />}
           </svg>
         </span>
       ) : showArt ? (
