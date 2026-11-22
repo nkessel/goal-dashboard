@@ -34,7 +34,7 @@ Take them in order. Each is the owner's own ask (note id prefix in brackets; rea
 12. **Ask the owner before doing anything:** the email to Daniel about his Champion title [13b4b2d4] (sending a message on his behalf needs his OK and wording).
 13. Then `docs/FEEDBACK-OPEN.md` and `docs/REPEAT-ASKS.md`, and section 1 below.
 
-**Needs a real-iPhone look (from Nov 10):** prioritize cards' swipe, the Schedule… window's card drag, sequence fan-out, the welcome feedback button drag, Morning routine title rename, Quest Drop (sound, swipes, the music link opening the music app); opening the Home Screen app right after a deploy (should show the screen once, no reload; Nov 19).
+**Needs a real-iPhone look (from Nov 10):** prioritize cards' swipe, the Schedule… window's card drag, sequence fan-out, the welcome feedback button drag, Morning routine title rename, Quest Drop (sound, swipes, the music link opening the music app); opening the Home Screen app right after a deploy (should show the screen once, no reload; Nov 19); tapping a sub-habit's XP number opens the keyboard, and holding a sub-habit's name drags it to reorder (Nov 22).
 
 ---
 

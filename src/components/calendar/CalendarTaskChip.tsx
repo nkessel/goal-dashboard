@@ -354,10 +354,15 @@ function QuestCard({
   let fit: Fit = { big: 0.8, time: false, place: false, doneNote: false, payLine: false };
   if (line) fit = { big: 1, time: false, place: false, doneNote: false, payLine: false };
   else
-    search: for (let pass = 0; pass <= 5; pass++) {
-      const drop = Math.max(0, pass - 1);
-      for (let s = roomy; s >= (pass === 0 ? 0.9 : 0.8) - 1e-6; s -= 0.05) {
-        const f = fitAt(Math.max(0.8, s), drop, pass === 0);
+    // A done or failed card keeps its whole title before its small print (owner, Nov 19: "make sure the quest card
+    // shows the full title (even when completed or failed)", 3f71730b): it tries the whole title with the place, the
+    // done note and the XP line let go one by one, and only then settles for the title's first line.
+    search: for (const [drop, whole, floor] of [
+      ...(done ? ([[0, true, 0.8], [1, true, 0.8], [2, true, 0.8], [3, true, 0.8], [4, true, 0.8]] as const) : ([[0, true, 0.9]] as const)),
+      [0, false, 0.8], [1, false, 0.8], [2, false, 0.8], [3, false, 0.8], [4, false, 0.8],
+    ] as const) {
+      for (let s = roomy; s >= floor - 1e-6; s -= 0.05) {
+        const f = fitAt(Math.max(0.8, s), drop, whole);
         if (f) {
           fit = f;
           break search;

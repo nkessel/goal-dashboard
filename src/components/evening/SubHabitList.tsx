@@ -130,7 +130,11 @@ function Row({ sub, noun, coins, menuOpen, onMenu, closeMenu, onChange, onRemove
           onKeyDown={hold}
           onPointerDown={hold}
           onMouseDown={hold}
-          onTouchStart={hold}
+          // On a phone the name fills the row, so holding it drags the row (owner, Nov 18: "There's no way to reorder
+          // the sub-habits", 06630eea); a quick tap still types. Once you're typing, a hold selects words instead.
+          onTouchStart={(e) => {
+            if (document.activeElement === e.currentTarget) e.stopPropagation();
+          }}
           aria-label={noun === "sub-habit" ? "Sub-habit" : `Name of this ${noun}`}
           className="bare-input h-8 min-w-0 flex-1 cursor-text border-0 bg-transparent px-1 text-[16px] sm:text-[15px]"
           style={{ color: "var(--t-ink)" }}

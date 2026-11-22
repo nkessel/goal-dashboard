@@ -1571,6 +1571,12 @@ export const FLOWS = [
           await h.check("auto-scheduler: other grouping");
           await h.tap((p) => p.getByRole("button", { name: /by when|folders/i }).first(), "auto-scheduler: grouping back", { optional: true, expectMove: true });
         }
+        // Tap a row's calendar button: the "Tap a time to place …" line shows above the window (owner, Nov 19).
+        if (await h.tap((p) => p.getByRole("button", { name: /^place .+ on the calendar$/i }).first(), "auto-scheduler: carry a quest", { optional: true, expectMove: true })) {
+          await h.settle(300);
+          await h.check("auto-scheduler: tap a time to place");
+          await h.tap((p) => p.getByRole("status").getByRole("button", { name: /^cancel$/i }).first(), "auto-scheduler: carry cancelled", { optional: true });
+        }
         // Closed again: on a phone the window covers the calendar's gear, which the next steps tap.
         await h.tap((p) => p.getByRole("button", { name: /^close the auto-scheduler$/i }).first(), "close the auto-scheduler", { optional: true });
         await h.settle(400);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { flushSync } from "react-dom";
 
 /**
  * A number you edit right where it's written (owner, Nov 4): tap it and type over it, in the same
@@ -20,12 +21,14 @@ export function InlineNumber({ value, onChange, min = 0, max = 100, suffix = "%"
       <button
         type="button"
         onClick={() => {
-          setDraft(String(Math.round(value)));
-          setEditing(true);
-          requestAnimationFrame(() => {
-            ref.current?.focus();
-            ref.current?.select();
+          // Draw the field and focus it inside the tap itself: iPhone only opens the keyboard for a
+          // focus made during the gesture, not one a frame later (owner, Nov 18, 910591c7).
+          flushSync(() => {
+            setDraft(String(Math.round(value)));
+            setEditing(true);
           });
+          ref.current?.focus();
+          ref.current?.select();
         }}
         aria-label={`${label}: ${Math.round(value)}${suffix} — tap to change`}
         title="Tap to change"

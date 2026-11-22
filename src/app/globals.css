@@ -2178,6 +2178,15 @@ svg.toucan-aura { animation: toucan-aura 2.6s ease-in-out infinite; }
     transition-duration: 0.16s;
     transition-timing-function: ease-out;
   }
+  /* A button's words never highlight when dragged across or double-clicked (owner, Nov 19, e74f11c9). */
+  button, [role="button"], [role="tab"], [role="radio"], [role="menuitem"], summary {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  [role="button"] :is(input, textarea, [contenteditable="true"]) {
+    -webkit-user-select: text;
+    user-select: text;
+  }
 }
 .hover-glow:active:not(:disabled) { transform: scale(0.97); }
 /* Cards never squeeze under a finger (owner, Nov 9: they shrank whenever a scroll began on one). */

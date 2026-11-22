@@ -1218,7 +1218,8 @@ export function WeekView({
       {(carried || placing || placeError) && (
         <div
           role="status"
-          className="sticky top-2 z-[30] mb-2 flex items-center gap-2 rounded-xl px-3 py-2 text-[14px] font-semibold"
+          // Above the auto-scheduler's floating window (z 40), so the list never hides it (owner, Nov 19, 0d594111).
+          className="sticky top-2 z-[45] mb-2 flex items-center gap-2 rounded-xl px-3 py-2 text-[14px] font-semibold"
           style={{ background: "radial-gradient(circle at 30% 20%, #f6e3a8, #d9b45f 70%)", border: "1.5px solid #4a3913", color: "#2a1c10", boxShadow: "0 4px 12px rgba(0,0,0,.25)" }}
         >
           <span className="min-w-0 flex-1">
