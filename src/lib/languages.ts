@@ -37,4 +37,6 @@ export const approxNote = (lang: string) => APPROXIMATE[lang.toLowerCase()] || "
 
 export const PHRASE_IDEAS = ["Hello", "Thank you", "How are you?", "Nice to meet you", "Where is the bathroom?", "Peace be with you"];
 
-export type Translation = { language: string; text: string; say?: string; approx?: string };
+/** One word of a translation: as written in that language's script, how to say it, what it means. */
+export type Word = { w: string; say?: string; means?: string };
+export type Translation = { language: string; text: string; say?: string; approx?: string; words?: Word[] };

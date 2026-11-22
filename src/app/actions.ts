@@ -4813,8 +4813,9 @@ export async function translatePhraseAction(phrase: string, languages: string[])
   if (!accountId || !apiToken) return { results: [], error: "Translation isn't set up yet." };
   const system =
     "You are a careful translator and language teacher. Translate the user's phrase into each listed language. " +
-    "Reply ONLY with JSON: an array of objects {\"language\": string, \"text\": string, \"say\": string}. " +
-    "\"text\" is the phrase in that language's own script. \"say\" is a simple English-letters pronunciation guide (always give it). " +
+    "Reply ONLY with JSON: an array of objects {\"language\": string, \"text\": string, \"say\": string, \"words\": [{\"w\": string, \"say\": string, \"means\": string}]}. " +
+    "\"text\" is the phrase in that language's own native script (Japanese in kana/kanji, Russian in Cyrillic, Hindi in Devanagari, Hebrew and Arabic in their letters, and so on), never romanized when the language has its own script. \"say\" is a simple English-letters pronunciation guide (always give it). " +
+    "\"words\" breaks \"text\" up word by word, in order: \"w\" is the word as written in \"text\", \"say\" its pronunciation, \"means\" its English meaning in a few words. " +
     "For reconstructed or sparsely attested languages (e.g. Phoenician, Natick Algonquin / Massachusett), give your best reconstruction from known vocabulary; for Phoenician use Phoenician script if you can, else a Latin transliteration. Never refuse; keep the same order as the list.";
   const user = `Phrase: "${p}"\nLanguages: ${langs.join(", ")}`;
   let raw = "";
@@ -4823,7 +4824,7 @@ export async function translatePhraseAction(phrase: string, languages: string[])
       const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ max_tokens: 1800, temperature: 0.2, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
+        body: JSON.stringify({ max_tokens: 3600, temperature: 0.2, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
       });
       if (!res.ok) continue;
       const json = await res.json();
@@ -4835,7 +4836,7 @@ export async function translatePhraseAction(phrase: string, languages: string[])
     }
   }
   const m = raw.match(/\[[\s\S]*\]/);
-  let rows: { language?: unknown; text?: unknown; say?: unknown }[] = [];
+  let rows: { language?: unknown; text?: unknown; say?: unknown; words?: unknown }[] = [];
   try {
     rows = m ? (JSON.parse(m[0]) as typeof rows) : [];
   } catch {
@@ -4847,7 +4848,11 @@ export async function translatePhraseAction(phrase: string, languages: string[])
     const r = byLang.get(l.toLowerCase()) ?? rows[i] ?? {};
     const text = String(r.text ?? "").trim().slice(0, 300);
     const say = String(r.say ?? "").trim().slice(0, 300);
-    return { language: l, text: text || "—", say: say && say !== text ? say : undefined, approx: approxNote(l) || undefined };
+    const words = (Array.isArray(r.words) ? r.words : [])
+      .slice(0, 30)
+      .map((x: { w?: unknown; say?: unknown; means?: unknown }) => ({ w: String(x?.w ?? "").trim().slice(0, 60), say: String(x?.say ?? "").trim().slice(0, 60) || undefined, means: String(x?.means ?? "").trim().slice(0, 60) || undefined }))
+      .filter((x) => x.w);
+    return { language: l, text: text || "—", say: say && say !== text ? say : undefined, approx: approxNote(l) || undefined, words: words.length > 1 ? words : undefined };
   });
   return { results };
 }

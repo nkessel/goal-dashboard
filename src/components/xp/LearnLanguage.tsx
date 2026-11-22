@@ -2,8 +2,7 @@
 
 import { FloatingWindow } from "@/components/ui/FloatingWindow";
 import { stopKeysButSave } from "@/lib/stop-keys";
-import { useEffect, useRef, useState, useTransition } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef, useState } from "react";
 import { translatePhraseAction } from "@/app/actions";
 import { DEFAULT_LANGUAGES, MORE_LANGUAGES, PHRASE_IDEAS, approxNote, type Translation } from "@/lib/languages";
 import { Fold } from "@/components/ui/Fold";
@@ -50,13 +49,96 @@ function printSheet(phrase: string, rows: Translation[]) {
 
 // The last phrase and its words, kept so the window comes back as you left it.
 const LAST = "learn-language-last";
-function readLast(): { phrase: string; rows: Translation[] | null } {
+type Last = { phrase: string; rows: Translation[] | null };
+function readLast(): Last {
   try {
     const v = JSON.parse(window.localStorage.getItem(LAST) || "null") as { phrase?: string; rows?: Translation[] | null } | null;
     return { phrase: typeof v?.phrase === "string" ? v.phrase : "", rows: Array.isArray(v?.rows) ? v.rows : null };
   } catch {
     return { phrase: "", rows: null };
   }
+}
+function writeLast(v: Last) {
+  try {
+    window.localStorage.setItem(LAST, JSON.stringify(v));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+// Your phrases over time (owner, Nov 12): every learning sheet, newest first, to bring back and study.
+const SHEETS = "learn-language-sheets";
+type Sheet = { phrase: string; rows: Translation[]; at: string };
+function readSheets(): Sheet[] {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(SHEETS) || "[]") as Sheet[];
+    return Array.isArray(v) ? v.filter((x) => x && typeof x.phrase === "string" && Array.isArray(x.rows)) : [];
+  } catch {
+    return [];
+  }
+}
+function writeSheets(v: Sheet[]) {
+  try {
+    window.localStorage.setItem(SHEETS, JSON.stringify(v.slice(0, 60)));
+  } catch {
+    /* storage unavailable */
+  }
+}
+function keepSheet(phrase: string, rows: Translation[]) {
+  const k = phrase.trim().toLowerCase();
+  writeSheets([{ phrase: phrase.trim(), rows, at: new Date().toISOString() }, ...readSheets().filter((x) => x.phrase.trim().toLowerCase() !== k)]);
+}
+function dayLabel(iso: string) {
+  const d = new Date(iso);
+  const t = new Date();
+  const y = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 1);
+  if (d.toDateString() === t.toDateString()) return "Today";
+  if (d.toDateString() === y.toDateString()) return "Yesterday";
+  return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+
+// The idea phrases are yours to change: hold or right-click one to edit it or add a new one.
+const IDEAS = "learn-language-ideas";
+function readIdeas(): string[] {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(IDEAS) || "null") as string[] | null;
+    if (Array.isArray(v)) return v.filter((x) => typeof x === "string");
+  } catch {
+    /* storage unavailable */
+  }
+  return PHRASE_IDEAS;
+}
+function writeIdeas(v: string[]) {
+  try {
+    window.localStorage.setItem(IDEAS, JSON.stringify(v));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+// A translation keeps going when the window is minimized: it lives outside the window and
+// lands in the last sheet, which the window reads again when it opens.
+let pending: string | null = null;
+let pendingError: string | null = null;
+function runLearn(phrase: string, langs: string[]) {
+  pending = phrase;
+  pendingError = null;
+  window.dispatchEvent(new Event("learn-language"));
+  translatePhraseAction(phrase, langs)
+    .then((r) => {
+      if (r.error) pendingError = r.error;
+      if (r.results.length) {
+        writeLast({ phrase, rows: r.results });
+        keepSheet(phrase, r.results);
+      }
+    })
+    .catch(() => {
+      pendingError = "The words didn't come this time. Try again in a moment.";
+    })
+    .finally(() => {
+      pending = null;
+      window.dispatchEvent(new Event("learn-language"));
+    });
 }
 
 // Scripts some computers have no font for (Phoenician on many): a web font fills the gap.
@@ -73,6 +155,32 @@ function useScriptFonts() {
   }, []);
 }
 
+/** Hold (or right-click) for a menu; a plain tap does the tap. */
+function useHold(onHold: (key: string) => void) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const held = useRef(false);
+  return (key: string, onTap: () => void) => ({
+    onClick: () => (held.current ? (held.current = false) : onTap()),
+    onContextMenu: (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onHold(key);
+    },
+    onPointerDown: () => {
+      held.current = false;
+      timer.current = setTimeout(() => {
+        held.current = true;
+        onHold(key);
+      }, 500);
+    },
+    onPointerUp: () => timer.current && clearTimeout(timer.current),
+    onPointerLeave: () => timer.current && clearTimeout(timer.current),
+  });
+}
+
+const GOLD_BTN = { background: "linear-gradient(180deg,#f6dc8e,#d9b45f)", color: "#2a1c10", border: "1px solid #8a6116" } as const;
+const QUIET_BTN = { border: "1px solid rgba(139,112,64,.45)", color: "#5a3d12" } as const;
+
 /** Learn a language: a phrase, the languages you're learning (all on), and the phrase in each. */
 export function LearnLanguage() {
   useScriptFonts();
@@ -82,19 +190,40 @@ export function LearnLanguage() {
   const [adding, setAdding] = useState(false);
   const [newLang, setNewLang] = useState("");
   const [rows, setRows] = useState<Translation[] | null>(last.rows);
+  // Once a phrase is learned, the window is the learning sheet: no ideas, no languages, until "New phrase".
+  const [composing, setComposing] = useState(!last.rows);
+  const [busy, setBusy] = useState(() => pending !== null);
+  const [error, setError] = useState<string | null>(null);
+  const [ideas, setIdeas] = useState(readIdeas);
+  const [ideaEdit, setIdeaEdit] = useState<{ i: number; text: string } | null>(null);
+  const [past, setPast] = useState(false);
+  const [sheets, setSheets] = useState(readSheets);
   // Right-click or long-press a language: it asks to remove it, in place.
   const [asking, setAsking] = useState<string | null>(null);
-  const press = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pressed = useRef(false);
+  const holdLang = useHold((l) => setAsking(l));
+  const holdIdea = useHold((k) => {
+    const i = Number(k);
+    setIdeaEdit({ i, text: ideas[i] ?? "" });
+  });
   useEffect(() => {
-    try {
-      window.localStorage.setItem(LAST, JSON.stringify({ phrase, rows }));
-    } catch {
-      /* storage unavailable */
-    }
+    writeLast({ phrase, rows });
   }, [phrase, rows]);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, start] = useTransition();
+  useEffect(() => {
+    const done = () => {
+      setBusy(pending !== null);
+      if (pending !== null) return;
+      if (pendingError) setError(pendingError);
+      const l = readLast();
+      if (l.rows) {
+        setPhrase(l.phrase);
+        setRows(l.rows);
+        setComposing(false);
+      }
+      setSheets(readSheets());
+    };
+    window.addEventListener("learn-language", done);
+    return () => window.removeEventListener("learn-language", done);
+  }, []);
   const on = saved.langs.filter((l) => !saved.off.includes(l));
   const save = (v: Saved) => (setSaved(v), writeSaved(v));
   const remove = (l: string) => (save({ langs: saved.langs.filter((x) => x !== l), off: saved.off.filter((x) => x !== l) }), setAsking(null));
@@ -108,169 +237,295 @@ export function LearnLanguage() {
     if (saved.langs.some((x) => x.toLowerCase() === known.toLowerCase())) return save({ ...saved, off: saved.off.filter((x) => x.toLowerCase() !== known.toLowerCase()) });
     save({ langs: [...saved.langs, known], off: saved.off });
   };
-  const learn = () =>
-    start(async () => {
-      setError(null);
-      try {
-        const r = await translatePhraseAction(phrase, on);
-        if (r.error) setError(r.error);
-        setRows(r.results.length ? r.results : null);
-      } catch {
-        setError("The words didn't come this time. Try again in a moment.");
-      }
-    });
+  const saveIdeas = (v: string[]) => (setIdeas(v), writeIdeas(v), setIdeaEdit(null));
+  const ideaText = (t: string) => t.replace(/\s+/g, " ").trim().slice(0, 80);
+  const learn = () => {
+    const p = phrase.trim();
+    if (!p || !on.length || busy) return;
+    setError(null);
+    runLearn(p, on);
+  };
+  const openSheet = (s: Sheet) => (setPhrase(s.phrase), setRows(s.rows), setComposing(false), setPast(false), setError(null));
+  const forget = (s: Sheet) => {
+    const next = sheets.filter((x) => x !== s);
+    setSheets(next);
+    writeSheets(next);
+  };
   const listId = "learn-language-list";
+  const showSheet = !composing && !!rows;
+  const pastButton = sheets.length > 0 && (
+    <button type="button" onClick={() => setPast((o) => !o)} aria-expanded={past} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ ...QUIET_BTN, background: past ? "rgba(217,180,95,.3)" : undefined }}>
+      My phrases
+    </button>
+  );
   return (
     <div className="flex w-full flex-col gap-2 text-left">
-      <textarea
-        value={phrase}
-        onChange={(e) => setPhrase(e.target.value.slice(0, 200))}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            if (phrase.trim()) learn();
-          }
-        }}
-        rows={1}
-        placeholder="A phrase to learn…"
-        aria-label="A phrase to learn"
-        className="w-full resize-none rounded-xl px-3 py-2 text-[16px] leading-snug outline-none"
-        style={{ background: "rgba(255,250,238,.75)", border: "1px solid rgba(139,112,64,.4)", color: INK }}
-      />
-      {/* Ideas: one tap fills the phrase. */}
-      <div className="flex flex-wrap gap-1">
-        {PHRASE_IDEAS.map((p) => (
-          <button key={p} type="button" onClick={() => setPhrase(p)} className="h-7 rounded-full px-2.5 text-[12.5px]" style={phrase === p ? chipOn : { border: "1px solid rgba(139,112,64,.3)", color: SOFT }}>
-            {p}
-          </button>
-        ))}
-      </div>
-      {/* Languages: all on until you tap one off; + adds another. */}
-      <div className="flex flex-wrap items-center gap-1">
-        {saved.langs.map((l) => {
-          const isOn = !saved.off.includes(l);
-          return (
-            asking === l ? (
-              <span key={l} className="reveal flex h-7 items-center gap-1 rounded-full pl-2.5 pr-1 text-[12.5px]" style={{ border: "1px solid rgba(163,60,42,.55)", color: INK }}>
-                Remove {l}?
-                <button type="button" onClick={() => remove(l)} className="h-6 rounded-full px-2 font-bold" style={{ color: "#a33c2a" }}>
-                  Remove
+      <Fold open={!showSheet}>
+        <div className="flex flex-col gap-2">
+          <textarea
+            value={phrase}
+            onChange={(e) => setPhrase(e.target.value.slice(0, 200))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                learn();
+              }
+            }}
+            rows={1}
+            placeholder="A phrase to learn…"
+            aria-label="A phrase to learn"
+            className="w-full resize-none rounded-xl px-3 py-2 text-[16px] leading-snug outline-none"
+            style={{ background: "rgba(255,250,238,.75)", border: "1px solid rgba(139,112,64,.4)", color: INK }}
+          />
+          {/* Ideas: one tap fills the phrase; hold or right-click one to edit it or add a new one. */}
+          <div className="flex flex-wrap gap-1">
+            {ideas.map((p, i) =>
+              ideaEdit?.i === i ? (
+                <IdeaEditor
+                  key={`edit-${i}`}
+                  text={ideaEdit.text}
+                  onText={(text) => setIdeaEdit({ i, text })}
+                  onSave={() => (ideaText(ideaEdit.text) ? saveIdeas(ideas.map((x, j) => (j === i ? ideaText(ideaEdit.text) : x))) : setIdeaEdit(null))}
+                  onNew={() => setIdeaEdit({ i: ideas.length, text: "" })}
+                  onRemove={() => saveIdeas(ideas.filter((_, j) => j !== i))}
+                  onCancel={() => setIdeaEdit(null)}
+                />
+              ) : (
+                <button
+                  key={`${i}-${p}`}
+                  type="button"
+                  {...holdIdea(String(i), () => setPhrase(p))}
+                  title="Tap to use · hold or right-click to edit"
+                  className="h-7 select-none rounded-full px-2.5 text-[12.5px] [-webkit-touch-callout:none]"
+                  style={phrase === p ? chipOn : { border: "1px solid rgba(139,112,64,.3)", color: SOFT }}
+                >
+                  {p}
                 </button>
-                <button type="button" onClick={() => setAsking(null)} aria-label="Keep it" className="flex h-6 w-6 items-center justify-center rounded-full" style={{ color: SOFT }}>
-                  <CloseIcon size={10} />
+              ),
+            )}
+            {ideaEdit?.i === ideas.length ? (
+              <IdeaEditor
+                text={ideaEdit.text}
+                onText={(text) => setIdeaEdit({ i: ideas.length, text })}
+                onSave={() => (ideaText(ideaEdit.text) ? saveIdeas([...ideas, ideaText(ideaEdit.text)]) : setIdeaEdit(null))}
+                onCancel={() => setIdeaEdit(null)}
+              />
+            ) : (
+              <button type="button" onClick={() => setIdeaEdit({ i: ideas.length, text: "" })} aria-label="Add a phrase idea" title="Add a phrase idea" className="flex h-7 w-7 items-center justify-center rounded-full text-[15px]" style={{ border: "1px dashed rgba(139,112,64,.45)", color: SOFT }}>
+                +
+              </button>
+            )}
+          </div>
+          {/* Languages: all on until you tap one off; + adds another. */}
+          <div className="flex flex-wrap items-center gap-1">
+            {saved.langs.map((l) => {
+              const isOn = !saved.off.includes(l);
+              return asking === l ? (
+                <span key={l} className="reveal flex h-7 items-center gap-1 rounded-full pl-2.5 pr-1 text-[12.5px]" style={{ border: "1px solid rgba(163,60,42,.55)", color: INK }}>
+                  Remove {l}?
+                  <button type="button" onClick={() => remove(l)} className="h-6 rounded-full px-2 font-bold" style={{ color: "#a33c2a" }}>
+                    Remove
+                  </button>
+                  <button type="button" onClick={() => setAsking(null)} aria-label="Keep it" className="flex h-6 w-6 items-center justify-center rounded-full" style={{ color: SOFT }}>
+                    <CloseIcon size={10} />
+                  </button>
+                </span>
+              ) : (
+                <button
+                  key={l}
+                  type="button"
+                  role="switch"
+                  aria-checked={isOn}
+                  {...holdLang(l, () => toggle(l))}
+                  title={approxNote(l) || "Right-click or hold to remove"}
+                  className="h-7 select-none rounded-full px-2.5 text-[12.5px] font-semibold [-webkit-touch-callout:none]"
+                  style={isOn ? chipOn : chipOff}
+                >
+                  {l}
+                  {approxNote(l) && <span className="ml-0.5 opacity-70">*</span>}
+                </button>
+              );
+            })}
+            {adding ? (
+              <form
+                className="flex items-center"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  addLang(newLang);
+                }}
+              >
+                <input
+                  autoFocus
+                  list={listId}
+                  value={newLang}
+                  onChange={(e) => setNewLang(e.target.value)}
+                  onBlur={() => (newLang.trim() ? addLang(newLang) : setAdding(false))}
+                  placeholder="Language…"
+                  aria-label="Add a language"
+                  className="h-7 w-32 rounded-full bg-transparent px-2.5 text-[16px] outline-none"
+                  style={{ border: "1px solid rgba(160,120,40,.6)", color: INK }}
+                />
+                <datalist id={listId}>
+                  {MORE_LANGUAGES.filter((m) => !saved.langs.includes(m)).map((m) => (
+                    <option key={m} value={m} />
+                  ))}
+                </datalist>
+              </form>
+            ) : (
+              <button type="button" onClick={() => setAdding(true)} aria-label="Add a language" title="Add a language" className="flex h-7 w-7 items-center justify-center rounded-full text-[16px]" style={{ border: "1px solid rgba(160,120,40,.6)", color: "#8a6116" }}>
+                +
+              </button>
+            )}
+          </div>
+        </div>
+      </Fold>
+      {/* The learning sheet: the phrase, then each language with its words one by one. */}
+      <Fold open={showSheet}>
+        <div className="flex flex-col">
+          <h3 className="font-display m-0 pb-1 text-[18px] leading-snug [overflow-wrap:anywhere]" style={{ color: INK }}>
+            {phrase.trim()}
+          </h3>
+          <ul className="m-0 flex list-none flex-col gap-1 p-0">
+            {(rows ?? []).map((r) => (
+              <li key={r.language} className="due-in flex items-baseline gap-2 border-b py-1.5" style={{ borderColor: "rgba(139,112,64,.2)" }}>
+                <span className="w-[30%] shrink-0 text-[12.5px] font-semibold" style={{ color: SOFT }} title={r.approx}>
+                  {r.language}
+                  {r.approx && <span className="ml-1 text-[11px] font-normal italic">approx.</span>}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[17px] leading-snug [overflow-wrap:anywhere]" style={{ color: INK, fontFamily: SCRIPT_STACK }}>
+                    {r.text}
+                  </span>
+                  {r.say && (
+                    <span className="block text-[12.5px] italic" style={{ color: SOFT }}>
+                      {r.say}
+                    </span>
+                  )}
+                  {r.words && (
+                    <span className="mt-1 flex flex-wrap gap-x-2.5 gap-y-1" aria-label={`${r.language}, word by word`}>
+                      {r.words.map((w, i) => (
+                        <span key={i} className="flex flex-col leading-tight">
+                          <span className="text-[14px]" style={{ color: INK, fontFamily: SCRIPT_STACK }}>
+                            {w.w}
+                          </span>
+                          {w.say && w.say !== w.w && (
+                            <span className="text-[11px] italic" style={{ color: SOFT }}>
+                              {w.say}
+                            </span>
+                          )}
+                          {w.means && (
+                            <span className="text-[11px]" style={{ color: "#8a6116" }}>
+                              {w.means}
+                            </span>
+                          )}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {rows?.some((r) => r.approx) && (
+            <p className="m-0 pt-1 text-[11.5px] italic" style={{ color: SOFT }}>
+              * Reconstructed languages: a best guess from old sources.
+            </p>
+          )}
+        </div>
+      </Fold>
+      {/* Your past phrases, by day: one tap brings its sheet back. */}
+      <Fold open={past}>
+        <ul className="m-0 flex list-none flex-col p-0" aria-label="My phrases">
+          {sheets.map((s, i) => (
+            <li key={`${s.at}-${s.phrase}`} className="flex flex-col">
+              {(i === 0 || dayLabel(sheets[i - 1].at) !== dayLabel(s.at)) && (
+                <span className="pt-1 text-[11.5px] font-semibold uppercase tracking-wide" style={{ color: SOFT }}>
+                  {dayLabel(s.at)}
+                </span>
+              )}
+              <span className="flex items-center gap-1">
+                <button type="button" onClick={() => openSheet(s)} className="min-h-8 min-w-0 flex-1 truncate rounded-lg px-1 text-left text-[14px] hover:bg-black/[.04]" style={{ color: INK }}>
+                  {s.phrase}
+                </button>
+                <button type="button" onClick={() => forget(s)} aria-label={`Forget "${s.phrase}"`} title="Forget this one" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ color: SOFT }}>
+                  <CloseIcon size={9} />
                 </button>
               </span>
-            ) : (
-            <button
-              key={l}
-              type="button"
-              role="switch"
-              aria-checked={isOn}
-              onClick={() => (pressed.current ? (pressed.current = false) : toggle(l))}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setAsking(l);
-              }}
-              onPointerDown={() => {
-                pressed.current = false;
-                press.current = setTimeout(() => {
-                  pressed.current = true;
-                  setAsking(l);
-                }, 500);
-              }}
-              onPointerUp={() => press.current && clearTimeout(press.current)}
-              onPointerLeave={() => press.current && clearTimeout(press.current)}
-              title={approxNote(l) || "Right-click or hold to remove"}
-              className="h-7 select-none rounded-full px-2.5 text-[12.5px] font-semibold [-webkit-touch-callout:none]"
-              style={isOn ? chipOn : chipOff}
-            >
-              {l}
-              {approxNote(l) && <span className="ml-0.5 opacity-70">*</span>}
-            </button>
-            )
-          );
-        })}
-        {adding ? (
-          <form
-            className="flex items-center"
-            onSubmit={(e) => {
-              e.preventDefault();
-              addLang(newLang);
-            }}
-          >
-            <input
-              autoFocus
-              list={listId}
-              value={newLang}
-              onChange={(e) => setNewLang(e.target.value)}
-              onBlur={() => (newLang.trim() ? addLang(newLang) : setAdding(false))}
-              placeholder="Language…"
-              aria-label="Add a language"
-              className="h-7 w-32 rounded-full bg-transparent px-2.5 text-[16px] outline-none"
-              style={{ border: "1px solid rgba(160,120,40,.6)", color: INK }}
-            />
-            <datalist id={listId}>
-              {MORE_LANGUAGES.filter((m) => !saved.langs.includes(m)).map((m) => (
-                <option key={m} value={m} />
-              ))}
-            </datalist>
-          </form>
+            </li>
+          ))}
+        </ul>
+      </Fold>
+      {/* The bar: quiet buttons on the left, the main one in the bottom-right corner. */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {pastButton}
+        {showSheet ? (
+          <button type="button" onClick={() => printSheet(phrase.trim(), rows!)} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={QUIET_BTN}>
+            Print
+          </button>
         ) : (
-          <button type="button" onClick={() => setAdding(true)} aria-label="Add a language" title="Add a language" className="flex h-7 w-7 items-center justify-center rounded-full text-[16px]" style={{ border: "1px solid rgba(160,120,40,.6)", color: "#8a6116" }}>
-            +
-          </button>
-        )}
-      </div>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={learn}
-          disabled={!phrase.trim() || !on.length || busy}
-          className="hover-glow h-9 rounded-full px-4 text-[14px] font-semibold disabled:opacity-50"
-          style={{ background: "linear-gradient(180deg,#f6dc8e,#d9b45f)", color: "#2a1c10", border: "1px solid #8a6116" }}
-        >
-          {busy ? "Learning…" : "Learn"}
-        </button>
-        {rows && (
-          <button type="button" onClick={() => printSheet(phrase.trim(), rows)} className="h-9 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px solid rgba(139,112,64,.45)", color: "#5a3d12" }}>
-            🖨 Print
-          </button>
+          rows && (
+            <button type="button" onClick={() => (setComposing(false), setError(null))} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={QUIET_BTN}>
+              Back to the sheet
+            </button>
+          )
         )}
         {error && (
           <span className="text-[12.5px]" style={{ color: "#8b2c1a" }}>
             {error}
           </span>
         )}
-      </div>
-      <Fold open={!!rows}>
-        <ul className="m-0 flex list-none flex-col gap-1 p-0 pt-1">
-          {(rows ?? []).map((r) => (
-            <li key={r.language} className="due-in flex items-baseline gap-2 border-b py-1" style={{ borderColor: "rgba(139,112,64,.2)" }}>
-              <span className="w-[34%] shrink-0 text-[12.5px] font-semibold" style={{ color: SOFT }} title={r.approx}>
-                {r.language}
-                {r.approx && <span className="ml-1 text-[11px] font-normal italic">approx.</span>}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[16px] leading-snug [overflow-wrap:anywhere]" style={{ color: INK, fontFamily: SCRIPT_STACK }}>
-                  {r.text}
-                </span>
-                {r.say && (
-                  <span className="block text-[12.5px] italic" style={{ color: SOFT }}>
-                    {r.say}
-                  </span>
-                )}
-              </span>
-            </li>
-          ))}
-        </ul>
-        {rows?.some((r) => r.approx) && (
-          <p className="m-0 pt-1 text-[11.5px] italic" style={{ color: SOFT }}>
-            * Reconstructed languages: a best guess from old sources.
-          </p>
+        <span className="flex-1" />
+        {showSheet ? (
+          <button type="button" onClick={() => (setComposing(true), setPhrase(""), setPast(false))} className="hover-glow h-9 rounded-full px-4 text-[14px] font-semibold" style={GOLD_BTN}>
+            New phrase
+          </button>
+        ) : (
+          <button type="button" onClick={learn} disabled={!phrase.trim() || !on.length || busy} className="hover-glow h-9 rounded-full px-4 text-[14px] font-semibold disabled:opacity-50" style={GOLD_BTN}>
+            {busy ? "Learning…" : "Learn"}
+          </button>
         )}
-      </Fold>
+      </div>
     </div>
+  );
+}
+
+/** A phrase idea being edited in place: Save, + New (keep this one and add another), Remove. */
+function IdeaEditor({ text, onText, onSave, onNew, onRemove, onCancel }: { text: string; onText: (t: string) => void; onSave: () => void; onNew?: () => void; onRemove?: () => void; onCancel: () => void }) {
+  return (
+    <span className="reveal flex h-8 items-center gap-0.5 rounded-full pl-2 pr-0.5 text-[12.5px]" style={{ border: "1px solid rgba(160,120,40,.75)", background: "rgba(255,250,238,.7)" }}>
+      <input
+        autoFocus
+        value={text}
+        onChange={(e) => onText(e.target.value.slice(0, 80))}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === "Escape") {
+            e.preventDefault();
+            if (e.key === "Enter") onSave();
+            else onCancel();
+          }
+        }}
+        placeholder="A phrase…"
+        aria-label="Phrase idea"
+        className="bare-input w-32 bg-transparent text-[16px] outline-none"
+        style={{ color: INK }}
+      />
+      <button type="button" onClick={onSave} className="h-7 rounded-full px-2 font-bold" style={{ color: "#5a3d12" }}>
+        Save
+      </button>
+      {onNew && (
+        <button type="button" onClick={onNew} className="h-7 rounded-full px-2 font-semibold" style={{ color: "#5a3d12" }}>
+          + New
+        </button>
+      )}
+      {onRemove && (
+        <button type="button" onClick={onRemove} className="h-7 rounded-full px-2 font-semibold" style={{ color: "#a33c2a" }}>
+          Remove
+        </button>
+      )}
+      <button type="button" onClick={onCancel} aria-label="Cancel" className="flex h-7 w-7 items-center justify-center rounded-full" style={{ color: SOFT }}>
+        <CloseIcon size={10} />
+      </button>
+    </span>
   );
 }
 

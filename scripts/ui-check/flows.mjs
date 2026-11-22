@@ -2012,6 +2012,33 @@ export const FLOWS = [
         await h.tap((p) => p.getByRole("dialog", { name: /learn a language/i }).getByRole("button", { name: /^minimize$/i }).first(), "minimize language", { optional: true, expectMove: true });
         await h.check("language chip");
       }
+      // The learning sheet (owner, Nov 12): once a phrase is learned, only the sheet, words one by one,
+      // Learn / New phrase in the bottom-right corner, past phrases behind "My phrases", ideas you can edit.
+      await h.page.evaluate(() => {
+        const rows = [
+          { language: "Japanese", text: "ありがとう", say: "ah-ree-gah-toh", words: [{ w: "あり", say: "ah-ree", means: "exist" }, { w: "がとう", say: "gah-toh", means: "(it is) hard" }] },
+          { language: "Spanish", text: "Muchas gracias", say: "MOO-chahs GRAH-syahs", words: [{ w: "Muchas", say: "MOO-chahs", means: "many" }, { w: "gracias", say: "GRAH-syahs", means: "thanks" }] },
+          { language: "Phoenician", text: "𐤁𐤓𐤊", say: "barak", approx: "Known only from inscriptions: a reconstruction, approximate." },
+        ];
+        localStorage.setItem("learn-language-last", JSON.stringify({ phrase: "Thank you", rows }));
+        const day = (n) => new Date(Date.now() - n * 864e5).toISOString();
+        localStorage.setItem("learn-language-sheets", JSON.stringify([{ phrase: "Thank you", rows, at: day(0) }, { phrase: "Good morning, friend", rows, at: day(1) }, { phrase: "Where is the bathroom?", rows, at: day(3) }]));
+        localStorage.setItem("language-window", "open");
+      });
+      await h.goto("/", { name: "language sheet" });
+      await h.settle(700);
+      if (await h.page.getByRole("dialog", { name: /learn a language/i }).first().isVisible().catch(() => false)) {
+        await h.check("language sheet");
+        await h.tap((p) => p.getByRole("button", { name: /^my phrases$/i }).first(), "my phrases", { optional: true, expectMove: true });
+        await h.check("language: my phrases");
+        await h.tap((p) => p.getByRole("button", { name: /^new phrase$/i }).first(), "new phrase", { optional: true, expectMove: true });
+        await h.settle(400);
+        await h.check("language: new phrase");
+        await h.page.getByRole("button", { name: /^hello$/i }).first().click({ button: "right", timeout: 3000 }).catch(() => {});
+        await h.settle(300);
+        await h.check("language: edit an idea");
+      }
+      await h.page.evaluate(() => ["learn-language-last", "learn-language-sheets", "language-window"].forEach((k) => localStorage.removeItem(k)));
     },
   },
   {

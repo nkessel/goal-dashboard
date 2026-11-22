@@ -100,6 +100,10 @@
     "reason": "The kept target (owner, Nov 19, after 'Keep it' on the toucan's question): a small floating marker you drag anywhere, like the feedback bubble; it can sit over whatever is under it. By design."
   },
   {
+    "match": "^language sheet\\|covered-by-bar\\|<div \\.reveal> \"🗣 Learn a language",
+    "reason": "The open Learn a language window floats over the page by design (owner, Nov 3: moves by its title, minimizes to a chip), so it covers the cards under it until it's moved or minimized."
+  },
+  {
     "match": "\\|(covered-by-bar|floating-overlap)\\|.*🈲 Language",
     "reason": "The Language chip (on main before Nov 20): a floating chip you can drag aside, like the feedback bubble. By design."
   },
