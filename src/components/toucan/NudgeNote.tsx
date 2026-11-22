@@ -1,5 +1,6 @@
 import { ToucanArt } from "./ToucanArt";
 import { talkToToucan } from "./talk";
+import { tomorrowMorning } from "./snooze-store";
 import { Fold } from "@/components/ui/Fold";
 import { CloseIcon } from "@/components/ui/Icons";
 import { TimeToken } from "@/components/xp/NightFields";
@@ -8,14 +9,6 @@ import { useBubbleStyle } from "@/lib/use-bubble-style";
 import { useEscape } from "@/lib/use-escape";
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
-
-/** 9am tomorrow: when a "tomorrow" snooze comes back. */
-export function tomorrowMorning() {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  d.setHours(9, 0, 0, 0);
-  return d.getTime();
-}
 
 export type NoteAction = { label: string; run: () => void };
 
