@@ -6,8 +6,7 @@ import { SnoozeIcon, CloseIcon } from "@/components/ui/Icons";
 import { SwipeActions } from "@/components/ui/SwipeActions";
 import { openPlanMyDay } from "@/components/calendar/PlanMyDay";
 import { HabitOptions, WelcomeHabits } from "@/components/xp/WelcomeHabits";
-
-import { fogOn, liftFog } from "@/lib/welcome-fog";
+import { fogOn } from "@/lib/welcome-fog";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Confirm, NoteButton, WhyBox } from "@/components/toucan/SayingFeedback";
@@ -35,15 +34,8 @@ import { Fold } from "@/components/ui/Fold";
 import { saveOrQueue } from "@/lib/offline";
 import { cleanXp, journalPrompts, type JournalPrompt } from "@/lib/journal-prompts";
 import { DawnPath } from "@/components/dawn/DawnPath";
-import type { WelcomeAward } from "@/components/xp/welcome/types";
-
-
-const CONFETTI_COLORS = ["#f2c94c", "#e2bf63", "#58a04a", "#c0503a", "#4d7fc0", "#f6e6bb"];
-const PIECES = Array.from({ length: 24 }, (_, i) => {
-  const angle = ((i * 360) / 24 + (i % 3) * 9) * (Math.PI / 180);
-  const dist = 140 + ((i * 41) % 90);
-  return { dx: Math.round(Math.cos(angle) * dist), dy: Math.round(Math.sin(angle) * dist * 0.8 - 30), rot: ((i * 97) % 540) - 270, color: CONFETTI_COLORS[i % CONFETTI_COLORS.length], round: i % 4 === 0, delay: (i % 5) * 30 };
-});
+import { type WelcomeAward } from "@/components/xp/welcome/types";
+import { PIECES, SNOOZE_MAIN, snoozeOther, GILT, PILL, readJson, writeJson, greetingSize, REPLY_W, REPLY_SCALE, REPLY_LINE, REPLY_MAX, FIELD, PartKey, ButtonKey, isPartKey, isButtonKey, BUTTON_NAMES, EMPTY, SNOOZE_PARTS_KEY, localDay, readSnoozedParts, revealThroughMist } from "@/components/xp/welcome/shared";
 
 /**
  * The welcome screen: the day's first visit, or "welcome back" after a few
@@ -1497,59 +1489,6 @@ function WelcomeToucan({ fx, quiet = false, onAway, onArrange }: { fx: FxSetting
   );
 }
 
-/** Snooze's first line: soon, or Other… for the rest. */
-const SNOOZE_MAIN: { label: string; ms: number | "tomorrow" }[] = [
-  { label: "15 min", ms: 15 * 60_000 },
-  { label: "30 min", ms: 30 * 60_000 },
-  { label: "1 hr", ms: 3_600_000 },
-  // Tomorrow right on the first line (owner, Nov 9).
-  { label: "Tomorrow", ms: "tomorrow" },
-];
-/** Other…: longer, this evening (when it's a while off), tomorrow, or a number of minutes. */
-function snoozeOther() {
-  const now = new Date();
-  const evening = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18).getTime() - now.getTime();
-  const out: { label: string; ms: number | "tomorrow" }[] = [
-    { label: "2 hrs", ms: 2 * 3_600_000 },
-    { label: "3 hrs", ms: 3 * 3_600_000 },
-  ];
-  if (evening > 3.5 * 3_600_000) out.push({ label: "This evening", ms: evening });
-  return out;
-}
-
-const GILT = { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } as const;
-const PILL = { border: "1.5px solid #b39a6a", color: "#3d2f18", background: "rgba(255,250,238,.7)" } as const;
-
-/** The greeting's size: full for a short one, a little smaller as it grows (it may wrap onto a second line). */
-function readJson<T>(k: string, fallback: T): T {
-  try {
-    const v = JSON.parse(window.localStorage.getItem(k) ?? "null") as T | null;
-    return v ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-function writeJson(k: string, v: unknown) {
-  try {
-    window.localStorage.setItem(k, JSON.stringify(v));
-  } catch {
-    /* storage unavailable */
-  }
-}
-
-const greetingSize = (t: string) => {
-  const n = t.trim().length;
-  return n <= 26 ? 25 : n <= 40 ? 23 : n <= 60 ? 21 : 19;
-};
-
-
-/** A small round thumbs up or down for the day's wise line. */
-/** The toucan's respond line: 168px wide, one 22px line at rest, up to about four lines. */
-const REPLY_W = 184;
-const REPLY_SCALE = 0.8125;
-const REPLY_LINE = 26;
-const REPLY_MAX = 74;
-
 function LineVote({ kind, on, onClick }: { kind: "like" | "dislike"; on: boolean; onClick: () => void }) {
   const like = kind === "like";
   return (
@@ -1568,8 +1507,6 @@ function LineVote({ kind, on, onClick }: { kind: "like" | "dislike"; on: boolean
     </button>
   );
 }
-
-const FIELD = { background: "rgba(255,250,238,.92)", border: "1px solid #b39a6a", color: "#2a1c10" };
 
 /** Your top priorities, in your own words: saved for the day, and kept in mind by the app and the toucan. */
 function TopPriority({ question, register, arranging = false, icon, onFilled }: { last: { text: string; others?: string[]; day: string } | null; question: string; register: (save: () => Promise<boolean>) => void; arranging?: boolean; /** An emoji in place of the target (welcome button editor). */ icon?: string; /** Saved with words in it (for the welcome screen's XP). */ onFilled?: () => void }) {
@@ -1789,16 +1726,6 @@ function CheckinPanel({ fx, metrics, onSaved, submit }: { fx: FxSettings; metric
   );
 }
 
-/** What a part shows when there's nothing in it right now (while arranging). */
-const EMPTY: Partial<Record<WelcomeEl, string>> = {
-  streak: "Shows on the day's first visit, once you have a streak.",
-  bar: "Shows on the day's first visit.",
-  reward: "Shows on the day's first visit.",
-  line: "A new line each day.",
-  reflect: "Add a question with its ✎.",
-  habits: "Pick habits with its ✎.",
-};
-
 /** One of your reflection questions: the same one all day, ‹ › for another. */
 function ReflectLine({ questions }: { questions: string[] }) {
   const [start] = useState(() => questions.indexOf(pickFor(new Date().toDateString(), questions)));
@@ -1827,21 +1754,6 @@ function ReflectLine({ questions }: { questions: string[] }) {
     </div>
   );
 }
-
-/** The mist stays over the page for a breath as the welcome screen goes, then lifts, and Today fades up beneath it. */
-function revealThroughMist() {
-  const e = document.documentElement;
-  fogOn(4000);
-  e.setAttribute("data-mist-reveal", "");
-  window.setTimeout(liftFog, 180);
-  window.setTimeout(() => e.removeAttribute("data-mist-reveal"), 1400);
-}
-
-type PartKey = "checkin" | "sleep" | "focus";
-type ButtonKey = PartKey | "quests" | "habits" | "dawn";
-const isPartKey = (el: string): el is PartKey => el === "checkin" || el === "sleep" || el === "focus";
-const isButtonKey = (el: string): el is ButtonKey => isPartKey(el) || el === "quests" || el === "habits" || el === "dawn";
-const BUTTON_NAMES: Record<ButtonKey, string> = { checkin: "Emotional check-in", sleep: "Sleep check-in", focus: "Journal", quests: "Choose today's quests", habits: "Habits", dawn: "Morning routine" };
 
 /**
  * A welcome part whose button can be shaped in place: right-click it, or hold it on a phone, and its
@@ -2191,20 +2103,4 @@ function JournalPromptsEditor({ fx }: { fx: FxSettings }) {
       </button>
     </div>
   );
-}
-
-const SNOOZE_PARTS_KEY = "welcome-snoozed-parts";
-const localDay = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-};
-/** Parts snoozed today on this device (a new day brings them back). */
-function readSnoozedParts(): string[] {
-  try {
-    if (typeof window === "undefined") return [];
-    const v = JSON.parse(window.localStorage.getItem(SNOOZE_PARTS_KEY) ?? "null") as { day?: string; parts?: string[] } | null;
-    return v?.day === localDay() && Array.isArray(v.parts) ? v.parts : [];
-  } catch {
-    return [];
-  }
 }
