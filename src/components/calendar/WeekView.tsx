@@ -802,7 +802,7 @@ export function WeekView({
   };
   /**
    * A day's heading: weekday, date and its XP on one line ("+ 50XP", owner Nov 12), the weather under it.
-   * The same heading, compressed, stays pinned at the top while you scroll down (`compact`).
+   * The same heading also stays pinned at the top while you scroll down (`compact` draws it smaller, unused now).
    */
   const dayHead = (day: Date, i: number, isToday: boolean, compact: boolean) => {
     const { won, ahead } = dayXp(i);
@@ -873,7 +873,13 @@ export function WeekView({
       const sc = embedded ? h.closest<HTMLElement>("[data-cal-scroller]") : null;
       const top = h.getBoundingClientRect().top - (sc ? sc.getBoundingClientRect().top : 0);
       const gridH = (gridMinutes / 60) * HOUR_PX;
-      setPinShown(top < 0 && top + gridH > 60);
+      // The headings' own top: once they reach the top of the screen the same bar stays there (owner's note
+      // 38bf14ef: "keep the same bar persisting … landing where it currently is once it scrolls back").
+      const days = scrollRef.current?.getBoundingClientRect();
+      const headsAt = (days?.top ?? 0) - (sc ? sc.getBoundingClientRect().top : 0);
+      // Not while the calendar itself is off the screen (Today's calendar tucked away at the side).
+      const onScreen = !!days && days.left < window.innerWidth - 4 && days.right > 4;
+      setPinShown(onScreen && headsAt < -1 && top + gridH > 60);
       const d = new Date();
       const hr = d.getHours() + d.getMinutes() / 60;
       if (hr < H0 || hr > H1) return setNowOff(false);
@@ -885,9 +891,13 @@ export function WeekView({
     const target: HTMLElement | Window = sc ?? window;
     target.addEventListener("scroll", check, { passive: true });
     window.addEventListener("resize", check);
+    // Today's calendar sliding in from the side: look again once it's on screen.
+    const io = typeof IntersectionObserver !== "undefined" ? new IntersectionObserver(() => check(), { threshold: [0, 0.5, 1] }) : null;
+    if (io && scrollRef.current) io.observe(scrollRef.current);
     return () => {
       target.removeEventListener("scroll", check);
       window.removeEventListener("resize", check);
+      io?.disconnect();
     };
   }, [gridMinutes, HOUR_PX, H0, H1, embedded]);
   const todayOff = todayIdx < 0 || (seamless && (todayIdx < firstIdx || todayIdx >= firstIdx + vis)) || nowOff;
@@ -1253,14 +1263,15 @@ export function WeekView({
         </span>
         {seamless && <DaysZoom span={shown} isAdventure={isAdventure} onChange={(s) => (cancelAnimationFrame(zoomAnim.current), zoomDays(s))} onStep={zoomDaysTo} />}
       </div>
-      {/* The day headings, compressed, pinned at the top once the real ones scroll away (owner, Nov 12: "the same bar, just compressed"). */}
+      {/* The day headings stay at the top once they reach it: the same bar, drawn the same way, so it never seems to
+          change (owner's note 38bf14ef, Nov 16; it used to be a compressed copy that faded in). It hands back to the
+          real headings the moment they scroll back to their place. */}
       <div aria-hidden={!pinShown} className="pointer-events-none sticky top-0 z-[33] h-0">
         <div
           data-date-pin
-          className="relative overflow-hidden transition-[opacity,transform] duration-200"
+          className="relative overflow-hidden"
           style={{
-            opacity: pinShown ? 1 : 0,
-            transform: pinShown ? "none" : "translateY(-8px)",
+            visibility: pinShown ? "visible" : "hidden",
             ...(isAdventure ? { backgroundColor: "#ecdab4", backgroundImage: "url(/design/tex-parchment-2.jpg)", backgroundSize: "384px 384px" } : { background: "var(--t-card)" }),
             borderBottom: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
             boxShadow: "0 3px 8px rgba(0,0,0,.18)",
@@ -1276,8 +1287,9 @@ export function WeekView({
           >
             <div />
             {mapDrawn((day, i) => (
-              <div key={`pin-${day.toISOString()}`} className="flex flex-col items-center py-0.5 text-center">
-                {dayHead(day, i, !!now && isSameDay(day, now), true)}
+              <div key={`pin-${day.toISOString()}`} className="relative flex flex-col items-center pb-1.5 text-center" style={{ paddingTop: isAdventure ? 18 : undefined }}>
+                {isAdventure && !!now && isSameDay(day, now) && <TodayCrest />}
+                {dayHead(day, i, !!now && isSameDay(day, now), false)}
               </div>
             ))}
           </div>

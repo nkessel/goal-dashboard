@@ -708,16 +708,19 @@ export function DailyHabits({
                           ★
                         </span>
                       )}
-                      {/* A habit with sub-habits: a small caret after its name opens them in place (owner, Nov 18: idea D). The cleaning habit has none. */}
-                      {h.id !== cleanId && subsOf(h).length > 0 ? (
+                      {/* A habit with sub-habits: tapping its name opens them in place (owner, Nov 18: idea D). No caret until
+                          they're open (owner's note 4b98c409); open, a small up-caret after the name shows they fold back. */}
+                      {h.id !== cleanId && subsOf(h).length > 0 && openSubs.has(h.id) ? (
                         // The caret stays with the name's last word, so it never sits alone on a line.
                         <>
                           {h.title.replace(/\S+$/, "")}
                           <span className="whitespace-nowrap">
                             {h.title.match(/\S+$/)?.[0]}
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden className="ml-1.5 inline-block align-middle opacity-60 transition-transform duration-300" style={{ transform: openSubs.has(h.id) ? "rotate(180deg)" : undefined }}>
-                              <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
+                            <span className="fade-in ml-1.5 inline-block align-middle">
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden className="block opacity-60">
+                                <path d="M5.5 15l6.5-6.5L18.5 15" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            </span>
                           </span>
                         </>
                       ) : (

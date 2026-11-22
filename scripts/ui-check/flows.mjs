@@ -841,6 +841,18 @@ export const FLOWS = [
         if (await h.tap((p) => p.getByRole("button", { name: /^more$/i }).first(), "habit menu", { optional: true, expectMove: true })) {
           await h.check("habit editor: menu");
         }
+        // Leaving with unsaved edits asks first (note b9d04a98): Keep editing · Discard · Save, in the foot.
+        if (!(await h.page.getByRole("dialog", { name: /edit rite/i }).first().isVisible().catch(() => false))) {
+          await h.tap("text=Gym 🏋️", "habit editor for leaving", { optional: true, expectMove: true });
+          await h.settle(500);
+        }
+        await h.page.getByRole("dialog", { name: /edit rite/i }).getByLabel(/^habit$/i).first().fill("Gym and a stretch").catch(() => {});
+        await h.settle(200);
+        if (await h.tap((p) => p.getByRole("dialog", { name: /edit rite/i }).getByRole("button", { name: /^close$/i }).first(), "habit editor: close with edits", { optional: true, expectMove: true })) {
+          await h.check("habit editor: save your changes?");
+          await h.tap((p) => p.getByRole("alertdialog", { name: /save your changes/i }).getByRole("button", { name: /^discard$/i }).first(), "habit editor: discard", { optional: true, expectMove: true });
+          await h.settle(300);
+        }
         await esc(h);
       }
     },

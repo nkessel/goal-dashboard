@@ -44,7 +44,7 @@ export function RiteEditorDialog({
   onClose: () => void;
 }) {
   const isHabit = slot === "day";
-  useEscape(() => close());
+  useEscape(() => requestClose());
   const [title, setTitle] = useState(rite?.title ?? "");
   const [description, setDescription] = useState(rite?.description ?? "");
   const [xp, setXp] = useState(rite?.xp_value ?? 5);
@@ -99,6 +99,16 @@ export function RiteEditorDialog({
     setTimeout(onClose, 180);
   }
 
+  // Leaving with unsaved edits asks Save or Discard first (owner's note b9d04a98).
+  const [askLeave, setAskLeave] = useState(false);
+  const unsaved = rite ? dirty : title.trim().length > 0;
+  function requestClose() {
+    if (closing || isSaving) return;
+    // Asked already: × or Escape again keeps asking (only Discard leaves without saving).
+    if (unsaved) setAskLeave(true);
+    else close();
+  }
+
   function save() {
     setError(null);
     startSaving(async () => {
@@ -141,7 +151,7 @@ export function RiteEditorDialog({
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center p-3 ${closing ? "overlay-fade-out" : "overlay-fade-in"}`}
       style={{ background: "rgba(6,8,22,.65)" }}
-      onClick={close}
+      onClick={requestClose}
     >
       <div
         role="dialog"
@@ -165,7 +175,7 @@ export function RiteEditorDialog({
                 ⋯
               </button>
             )}
-            <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
+            <button type="button" onClick={requestClose} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
               <CloseIcon size={14} />
             </button>
           </span>
@@ -549,6 +559,23 @@ export function RiteEditorDialog({
         )}
 
         <div data-editor-foot className="sticky -bottom-5 z-[2] -mx-5 -mb-5 flex items-center justify-between gap-2 px-5 pb-5 pt-2" style={{ order: 99, background: "linear-gradient(180deg, rgba(240,226,192,0), rgba(240,226,192,.96) 30%)" }}>
+          {askLeave ? (
+            <div role="alertdialog" aria-label="Save your changes?" className="card-pop-in flex min-w-0 flex-1 items-center gap-2 rounded-xl px-3.5 py-2" style={{ background: "rgba(20,14,6,.94)", border: "1px solid rgba(242,210,126,.55)", boxShadow: "0 8px 24px rgba(0,0,0,.45)" }}>
+              <span className="min-w-0 flex-1 text-[14.5px]" style={{ color: "#f6ecd2" }}>
+                Save your changes?
+              </span>
+              <button type="button" onClick={() => setAskLeave(false)} className="h-9 rounded-full px-2 text-[13.5px] underline" style={{ color: "rgba(246,236,210,.8)" }}>
+                Keep editing
+              </button>
+              <button type="button" onClick={close} className="h-9 rounded-full px-2 text-[13.5px] underline" style={{ color: "#f0b8a8" }}>
+                Discard
+              </button>
+              <button type="button" autoFocus onClick={save} disabled={isSaving || !title.trim()} className="h-9 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+                {isSaving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          ) : (
+          <>
           <span />
           <span className="flex gap-2">
 
@@ -563,6 +590,8 @@ export function RiteEditorDialog({
               {isSaving ? "Saving…" : rite ? (dirty ? "Save" : "Close") : isHabit ? "Add habit" : "Add rite"}
             </button>
           </span>
+          </>
+          )}
         </div>
       </div>
     </div>,
