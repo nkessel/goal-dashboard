@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 32 note (Nov 22, 17:30 UTC):** read Run B, PRIORITIES and the open feedback queue (since Nov 19): every remaining item is a design change (needs a review branch) or already parked below (e16f1f7a, 71a6b505, 57f4201a). Nothing built; no claims were open.
+
 - **Dev loop 2 run 28 note (Nov 22):** shipped 367d6ccd (steps tray stale after the editor) and 1873c121 (✕ on every portrait); UI check `today`, `today2` phone morning and evening: 0 errors. Then, on the owner's word ("build unless you have a mock for me to review"), built and shipped 38bf14ef, 4b98c409 and b9d04a98 too (see SHIPPED). BUILD-PLAN: every task is shipped or waiting on his review; nothing left for a lighter run.
 
 - **Dev loop 2 run 26 note (Nov 22):** tablet morning UI check of the 15 flows left in RUN-B-HANDOFF 0(b): 0 errors on a clean re-run. The full run had two errors that did not repeat when `todaycal` and `settings` ran alone (twice): React #185 on `todaycal` after the earlier flows, and a `settings bubble` layout shift (-958px). Treat as flakes unless they show again; if #185 returns on Today, look at the drag-over-calendar step. Tablet evening not run.
