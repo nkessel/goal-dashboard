@@ -84,14 +84,14 @@ ui-check: today.
 pick before painting); Bring from home movable and wider (`FloatingWindow`); the seam is a visible button.
 ui-check: inventory.
 
-### 9. Language window — S
+### 9. Language window — S (built Nov 22 on `review/language-window`, waiting on the owner's review: https://claude.ai/artifact/2RJaybfEsaYxSEWrfjeYkg#l1; next: 11 is shipped, so 12)
 [c084cb95, d6ad55e1, 34a34b07] Read the three notes; `xp/LearnLanguage.tsx`. ui-check: language.
 
 ### 10. Party — S (shipped Nov 14 night)
 Remove a party member (with a confirm inline) [d9a74c0f]; XP confirmation after the emotional check-in [b5b83086].
 ui-check: pages.
 
-### 11. Undo completion problems — O
+### 11. Undo completion problems — O (all three notes marked shipped; nothing left)
 [8f515d40, a8cbfbe4, 013f5984] Read all three; reproduce in the ui-check fake DB first (`today` flow: complete,
 then Undo). Touches `settleCompletion` in `lib/offline.ts`, `reopenTaskAction`, rewards/XP reversal.
 
