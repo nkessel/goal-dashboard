@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 30 (Opus, Nov 22 16:00 UTC):** small clear design notes onto a review branch: 4b98c409 (no caret before the sub-habit tray), b9d04a98 (habit/rite editor asks Save or Discard on leaving). Files: Today habit cards, habit editor.
+
 - **Dev loop 2 run 28 note (Nov 22):** shipped 367d6ccd (steps tray stale after the editor) and 1873c121 (✕ on every portrait); UI check `today`, `today2` phone morning and evening: 0 errors. Looked at, not built (design changes, mockup first): 38bf14ef (calendar: one heading bar that stays as you scroll, instead of the compressed copy pinned at the top, `WeekView.tsx` ~line 1257; the copy was his Nov 12 ask), 4b98c409 (no caret before opening the sub-habit tray), b9d04a98 (habit editor: ask Save or Discard on leaving). BUILD-PLAN: every task is shipped or waiting on his review; nothing left for a lighter run.
 
 - **Dev loop 2 run 26 note (Nov 22):** tablet morning UI check of the 15 flows left in RUN-B-HANDOFF 0(b): 0 errors on a clean re-run. The full run had two errors that did not repeat when `todaycal` and `settings` ran alone (twice): React #185 on `todaycal` after the earlier flows, and a `settings bubble` layout shift (-958px). Treat as flakes unless they show again; if #185 returns on Today, look at the drag-over-calendar step. Tablet evening not run.
