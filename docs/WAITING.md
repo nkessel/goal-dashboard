@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 33 note (Nov 22, 18:25 UTC):** `main` unchanged since run 32; same finding, nothing unclaimed that ships straight to `main`. Nothing built.
+
 - **Dev loop 2 run 32 note (Nov 22, 17:30 UTC):** read Run B, PRIORITIES and the open feedback queue (since Nov 19): every remaining item is a design change (needs a review branch) or already parked below (e16f1f7a, 71a6b505, 57f4201a). Nothing built; no claims were open.
 
 - **Dev loop 2 run 28 note (Nov 22):** shipped 367d6ccd (steps tray stale after the editor) and 1873c121 (✕ on every portrait); UI check `today`, `today2` phone morning and evening: 0 errors. Then, on the owner's word ("build unless you have a mock for me to review"), built and shipped 38bf14ef, 4b98c409 and b9d04a98 too (see SHIPPED). BUILD-PLAN: every task is shipped or waiting on his review; nothing left for a lighter run.
