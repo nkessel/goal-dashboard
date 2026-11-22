@@ -51,7 +51,8 @@ export function WiseLines({ own, alwaysOpen = false, extra, ownBox }: { own: str
           <p className="m-0 px-1.5 text-[12px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
             {ROTATION} lines take turns, and a few new ones join each week. ♡ brings one back often; × deletes it and the next one waiting takes its place.
           </p>
-          <ul className="m-0 flex max-h-[320px] list-none flex-col gap-0.5 overflow-y-auto p-0">
+          {/* No scroll box of its own: inside the scrolling Settings page it barely scrolled on iPhone (owner's note 0821e933). */}
+          <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
             {liked.map(row)}
             {fresh.filter((l) => !liked.includes(l)).map(row)}
           </ul>

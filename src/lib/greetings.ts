@@ -123,11 +123,15 @@ export function rotationFor(dayKey: string, own: string[] = []): { liked: string
   const liked = likedLines();
   const all = [...new Set([...own, ...DAILY_LINES])].filter((l) => !retired.has(l));
   const likedNow = all.filter((l) => liked.has(l));
-  const rest = all.filter((l) => !liked.has(l));
-  if (!rest.length) return { liked: likedNow, fresh: likedNow.length ? [] : DAILY_LINES.slice(0, ROTATION) };
+  // Your own lines are always in rotation (owner's note 59c6b554, "I can't seem to submit my own wise words":
+  // a new one was mixed into the moving window of built-in lines and usually landed outside it, so it never showed).
+  const ownSet = new Set(own);
+  const mine = all.filter((l) => ownSet.has(l) && !liked.has(l));
+  const rest = all.filter((l) => !ownSet.has(l) && !liked.has(l));
+  if (!rest.length) return { liked: likedNow, fresh: mine.length || likedNow.length ? mine : DAILY_LINES.slice(0, ROTATION) };
   const start = (Math.floor(dayNumber(dayKey) / 7) * FRESH_PER_WEEK) % rest.length;
-  const fresh = Array.from({ length: Math.min(ROTATION, rest.length) }, (_, i) => rest[(start + i) % rest.length]);
-  return { liked: likedNow, fresh };
+  const turn = Array.from({ length: Math.min(Math.max(ROTATION - mine.length, 4), rest.length) }, (_, i) => rest[(start + i) % rest.length]);
+  return { liked: likedNow, fresh: [...mine, ...turn] };
 }
 
 /** Today's line (the same all day): liked lines return every few days, fresh ones fill the rest. */

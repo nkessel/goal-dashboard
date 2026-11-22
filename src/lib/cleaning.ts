@@ -284,10 +284,15 @@ export function choreNeed(c: Chore, today: string): number {
   return Math.max(0, Math.round((8 - (8 * left) / span) * 10) / 10);
 }
 
-/** A chore dragged on its bar: near 0 is done today; otherwise (every-N-days chores) it was last done that long ago. */
+/**
+ * A chore dragged on its bar: near 0 is done today; otherwise (every-N-days chores) it was last done that long ago.
+ * Past 8 it is past due (the inverse of `choreNeed`), so dragging it further up moves it up the list
+ * (owner's note 59cbc38f: "I marked the fridge as dirtier, but it didn't go up in priority").
+ */
 export function choreFromNeed(c: Chore, need: number, today: string): Chore {
   if (need <= 0.5) return { ...c, lastDone: today, snoozedUntil: null };
   if (c.weekday != null) return { ...c, snoozedUntil: null };
-  const back = Math.round((Math.min(8, need) / 8) * c.everyDays);
+  const over = need > 8 ? Math.max(1, Math.round(((Math.min(10, need) - 8) / 2) * c.everyDays)) : 0;
+  const back = Math.round((Math.min(8, need) / 8) * c.everyDays) + over;
   return { ...c, lastDone: addDays(today, -back), snoozedUntil: null };
 }

@@ -4,6 +4,8 @@ What has shipped to `main`, newest first. Moved here from `docs/HANDOFF.md` sect
 
 **When you ship:** add one entry at the top of the list below (date, what the user sees, the main files and note ids, what the UI check covered, what's left). Don't put it in HANDOFF.
 
+- Nov 22 (Dev loop 2 run 15, bug fixes): **a chore dragged past due moves up the cleaning list** (59cbc38f, "I marked the fridge as dirtier, but it didn't go up in priority"): `choreFromNeed` (`lib/cleaning.ts`) capped the bar at 8 (due today), so dragging a due chore further up saved the same day and snapped back; past 8 it now sets it that many days past due (the inverse of `choreNeed`). **Your own wise lines always show in rotation** (59c6b554, "I can't seem to submit my own wise words"): `rotationFor` (`lib/greetings.ts`) mixed them into the moving 12-line window of built-in lines, so a new one usually landed outside it and never appeared; they now lead the list (and the day's line takes turns with them). **The wise lines list in Settings scrolls with the page** (0821e933, first half): it had its own 320px scroll box inside the scrolling Settings page, which barely scrolled on iPhone (`settings/LineLists.tsx`). UI check `cleaning` and `settings`, phone morning and evening: 0 errors. Left from 0821e933: a ⋯ menu per line (only me / everyone / delete), new UI, mockup first.
+
 Older history: `docs/archive/HANDOFF-2026-10-21.md`.
 
 ---
