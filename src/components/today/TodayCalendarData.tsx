@@ -15,15 +15,18 @@ export async function TodayCalendarData({ ownerId, token, dayKey, daily, theme }
   const from = addDays(day, -1);
   const to = addDays(day, 2);
   const skip = decodeURIComponent((await cookies()).get("cal-skip")?.value ?? "").split("|").filter(Boolean);
-  const [tasks, google]: [import("@/lib/data/types").Task[], Awaited<ReturnType<typeof listEventsAllCalendars>> | null] = await Promise.all([
+  const [tasks, google, steps]: [import("@/lib/data/types").Task[], Awaited<ReturnType<typeof listEventsAllCalendars>> | null, import("@/components/calendar/SubQuestBlock").ScheduledStep[]] = await Promise.all([
     listCalendarTasksForOwner(ownerId, from, to).catch(() => []),
     token ? listEventsAllCalendars(token, from, to, skip).catch(() => null) : Promise.resolve(null),
+    // Sub-quests with their own slot draw as blocks too.
+    import("@/lib/data/steps").then(({ listScheduledSteps }) => listScheduledSteps(ownerId, from.toISOString(), to.toISOString())).catch(() => []),
   ]);
-  const linked = new Set(tasks.map((t) => t.google_calendar_event_id).filter((id): id is string => Boolean(id)));
+  const stepEventIds = steps.map((s) => s.google_calendar_event_id).filter((id): id is string => Boolean(id));
+  const linked = new Set([...tasks.map((t) => t.google_calendar_event_id).filter((id): id is string => Boolean(id)), ...stepEventIds]);
   // Upcoming events become quests when that's switched on (owner, Nov 18).
   const made = google ? await import("@/lib/data/event-quests").then(({ makeEventQuests }) => makeEventQuests(ownerId, google.events, google.calendars, linked)).catch(() => []) : [];
   if (made.length) tasks.push(...made);
-  const imported = new Set(tasks.map((t) => t.google_calendar_event_id).filter((id): id is string => Boolean(id)));
+  const imported = new Set([...tasks.map((t) => t.google_calendar_event_id).filter((id): id is string => Boolean(id)), ...stepEventIds]);
   const events: GoogleCalendarEvent[] = (google?.events ?? []).filter((e) => !imported.has(e.id));
-  return <TodayDayCalendar dayKey={dayKey} tasks={tasks} events={events} daily={daily} theme={theme} />;
+  return <TodayDayCalendar dayKey={dayKey} tasks={tasks} steps={steps} events={events} daily={daily} theme={theme} />;
 }
