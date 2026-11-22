@@ -4,6 +4,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2, run 10 (Opus, Nov 22 03:00 UTC):** feedback notes 8d2bfa6a (habit gear only when open), 57f4201a (Settings order), 3afc21f4 (editor over the celebration), 71a6b505 first half (portrait picker scrolls). Not the tablet UI check (claimed below).
 - **Dev loop 2 (Opus, Nov 22 01:55 UTC):** UI check, the 15 remaining flows on tablet (RUN-B-HANDOFF item 0 (b)), fixing errors; then small feedback bug fixes.
 - **Run B item 9 (Sonnet 5.5, Nov 22 00:35 UTC):** data step is on `main` (0095). The sub-quest card editor (Time · XP · Stats · Make it a quest pills) is built on `review/subquest-details`, UI check `sequence` clean on phone; **waiting on the owner's design review:** https://claude.ai/artifact/VNLeBHaRZaCd9fJ4eFbQMi#a1 (pills), https://claude.ai/artifact/VNLeBHaRZaCd9fJ4eFbQMi#a4 (Stats tray). Data side of the **When** pill is on `main` (0096, Nov 22). Not built yet: the pill itself, the calendar block (`listScheduledSteps` in `WeekView.tsx`) and the calendar flow check. Free for another run.
 
