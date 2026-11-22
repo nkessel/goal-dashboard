@@ -54,6 +54,8 @@ Started in the owner's Claude project threads; written here so another account c
 
 ## Open for the next Dev loop 2 run (not claimed)
 
+- **Run 29 (Nov 22):** no new feedback notes since run 28; every Run B item is shipped or waiting on his review. Nothing built.
+
 - **Run 25 (Nov 22, 14:10 UTC):** full UI check on `main` @ d49edba, phone, morning and evening, every flow (727 shots): **0 errors**, 113 warnings (the usual ones: owl under the keyboard, the XP-20 corner badge, calendar overlaps). Covers the Duet pay-out move to `lib/data/quest-ops.ts` and the `tasks/editor/` code move: completing a quest still pays XP and the celebration flow is unchanged. No new notes since Nov 21 17:39. Nothing to fix; tablet not re-run.
 
 - **Run 24 (Nov 22, 12:30 UTC):** nothing new on `main` or in notes since run 23; every Run B item is shipped or waiting on his review. Nothing built.
