@@ -106,11 +106,11 @@ ui-check: insights (phone and tablet).
 [aadeefd1] view transitions; [0c79cf53] show the sort being used; [b289b823] past-due filter.
 ui-check: pages, plus a new boards flow.
 
-### 14. Right-click / long-press menus as popups, app-wide — O
+### 14. Right-click / long-press menus as popups, app-wide — O (done: checked Nov 22, every ⋯ / right-click menu already opens as a floating popup; 841971c2 marked)
 [841971c2] Quest card ⋯ / right-click, habits, rites open as a floating popup menu at the pointer, not an inline
 tray. One shared component; then switch each caller. Check every caller with ui-check today, evening, pages.
 
-### 15. Anti-habits and streaks — O
+### 15. Anti-habits and streaks — O (built Nov 22 on `review/anti-habits`, waiting on the owner: https://claude.ai/artifact/6Kj96QUQ8jJmN8dEmkAJbd#s1)
 [b07ee9eb, 3d5ccb0e, 2388f419, 57384f3c] Log without the word "slip", show them like habits, edit the habits in
 Streaks, add one in the past simply, tracked-event options shown. Read all four first; data lives in
 `life_wheel` (tracked events, streaks).

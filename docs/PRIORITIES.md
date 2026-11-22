@@ -21,14 +21,14 @@ Take them in order. Each is the owner's own ask (note id prefix in brackets; rea
 0. **Check-in drawn by the server (done on Insights Nov 21; Today still shifts once, see WAITING):** the saved draft and the "Last night" card come from the browser after load, so Insights and Today move once. Details in `docs/WAITING.md` top section.
 
 1. ~~Bug: adding a quest in "Choose tomorrow's quests" clears the whole list [2664d546, 234f0d70]~~: shipped Nov 14 (see `docs/SHIPPED.md`).
-2. **Right-click menus open as popup menus, not inline trays** [841971c2] (app-wide; quest card ⋯ / right-click, habits, rites).
+2. ~~**Right-click menus open as popup menus, not inline trays** [841971c2]~~: already built (checked Nov 22: quest, habit, rite, streak, notification, board and calendar menus all float over the screen); marked.
 3. **Today's "auto-scheduler"/calendar sheet** [a3fe0686]: movable, the calendars' colours as on the calendar screen, choose which calendars show.
 4. **Sleep check-in**: a sleep-notes field under the faces [d38e5f85]; its Save beside the Sleep quality button, not below [1416c34f].
 5. **Feedback tool**: show the current draft above past feedback, more distinct (on-theme) bubbles for past notes [2cf6858f]; "Cancel" instead of "Keep it as it was" when editing a past note [a5453c54].
 6. **Insights**: a log of today's check-ins with a range drop-down for longer; gears fixed (shape and place: the check-in section's gear vs the Insights page's gear) [388c0f4e]; sleep/wake times and notes on the chart [10a509a0, f3cca214]; thumbs-up a check-in [a4df137c]; the Wheel of Time spun by dragging, no turn count [bb5ca474].
 7. **Toucan Spirit settings** sit with the cage icon [89fd58c4].
 8. **Evening: edit things in Celebrate today's wins** [ef01814f].
-9. **Anti-habits / streaks** (Nov 9 notes): log without saying "slip", show them more like habits [b07ee9eb]; edit the habits shown in Streaks [3d5ccb0e]; add one in the past simply [2388f419]; tracked-event options shown [57384f3c].
+9. **Anti-habits / streaks** (Nov 9 notes; built Nov 22 on `review/anti-habits`, waiting on his review: https://claude.ai/artifact/6Kj96QUQ8jJmN8dEmkAJbd#s1): log without saying "slip", show them more like habits [b07ee9eb]; edit the habits shown in Streaks [3d5ccb0e]; add one in the past simply [2388f419]; tracked-event options shown [57384f3c].
 10. **Smaller Nov 9 notes**: archive asks Fail / Archive (default) / Delete [441501e4]; "Remove from Additional Quests" → Move [2dc2a33d]; move icon = folder [457bea7b]; hold a Due soon quest for its menu [144dcaa0]; less space between Due soon and Habits [6a5acc13]; the auto-schedule button movable [3cec60a1]; journal prompts: drop "Last night's dream", add a custom one, hold to delete [64a404e0]; can't remove all stones [5cd3e891]; "+25" should say XP [89c05f2c]; remove a party member [d9a74c0f]; party: XP confirmation after the emotional check-in [b5b83086]; welcome minus button tilts [d454f537]; swipe left shows only snooze [839ff5d5]; smoother quest reordering [14b894f7].
 11. **Brainstorm, report back first (don't build):** character info at the top of Settings and a character screen [98a2c58f].
 12. **Ask the owner before doing anything:** the email to Daniel about his Champion title [13b4b2d4] (sending a message on his behalf needs his OK and wording).
