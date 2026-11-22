@@ -15,6 +15,7 @@ Read these only when you need them. Don't load them all at the start.
 | `docs/PRIORITIES.md` | Choosing what to build: the owner's top dev priorities (Nov 11), the ranked table, his "Next up" queue, the "Needs a real-iPhone look" list. Some items have shipped since; check `docs/SHIPPED.md` first. |
 | `docs/RUN-B-HANDOFF.md` | **Starting Run B (Sonnet) of the dev plan, on any account:** status, what's in flight, access, the prompt. The dev plans themselves are copied into `docs/plans/`. |
 | `docs/BUILD-PLAN.md` | **Lighter-model sessions work from this, top to bottom.** Next there: task 9 (language window), then 11–16. |
+| `docs/UI-STANDARDS.md` | **Before changing any screen:** the one standard per element (pill → drawer, ✎ editing, menus, no 0%, one surface per popup), with the component to use. |
 | `docs/REPEAT-ASKS.md` | Before work that touches an ask the owner has made 3+ times (see `CLAUDE.md`). |
 | `docs/FEEDBACK-BY-SCREEN.md` | Before changing any screen: its open notes and the `universal` ones (see `CLAUDE.md`). |
 | `docs/FEEDBACK-OPEN.md`, `docs/HIGH-EFFORT.md` | The owner's open notes by area (to Nov 5); bigger asks that need a long, high-effort session. |

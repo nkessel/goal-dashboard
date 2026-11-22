@@ -6,6 +6,8 @@ Read `docs/HANDOFF.md` before doing anything else. It has the current top priori
 
 **Before you change a screen, read its open feedback notes** (and the `universal` ones): every in-app note carries a `screens` tag in the database. The query, the screen keys and how to keep tags right are in `docs/FEEDBACK-BY-SCREEN.md`. Build or respect them in the same push, mark the ones you build, and tag any untagged note you read. The owner shouldn't have to give the same note twice.
 
+Then read `docs/UI-STANDARDS.md` before changing any screen: one way to do each kind of element (pill drawers, ✎, menus, progress, one surface per popup). Follow it, and move what you touch onto it.
+
 Then read `docs/REPEAT-ASKS.md`: the owner's asks that came back 3+ times. Any work touching one of them is done at higher effort, checked on every screen it applies to, and its row updated (count, status) in the same push.
 
 When you ship to `main`, log it in the same push: add an entry at the top of `docs/SHIPPED.md`, update `docs/PRIORITIES.md` and `docs/WAITING.md` for anything finished, new or waiting, and bump "Last updated" in `docs/HANDOFF.md`. Keep `docs/HANDOFF.md` short: it is loaded into every session, so only standing rules and pointers go there (see its "Keeping this file current"). The next session, on any account, picks up from those files.
