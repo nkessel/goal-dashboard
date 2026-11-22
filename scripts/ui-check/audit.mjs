@@ -75,8 +75,10 @@ export function auditPage(opts) {
   // 0. No "0%" progress anywhere (owner, asked 4+ times, Nov 22: "the 0% indicators are demotivating and need to stop").
   //    Settings sliders that set a share (a stat's split, see-through, chance of rain) are not progress: skip inputs' own labels.
   for (const el of shown) {
-    if (!hasOwnText(el) || el.closest("input, [role=slider], [data-allow-zero]")) continue;
-    const own = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join(" ");
+    if (el.closest("input, [role=slider], [data-allow-zero]")) continue;
+    // React splits "{pct}%" into "0" and "%": join the element's own text pieces before looking.
+    const own = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join("");
+    if (own.trim().length < 2) continue;
     if (/(^|[^\d.])0\s?%\s*(done|complete|finished)?(?![\w])/i.test(own) && !/chance|rain|see-through|split|share/i.test(own)) {
       issues.push({ kind: "zero-percent", severity: "error", target: describe(el), detail: `shows "${own.trim().slice(0, 40)}": no 0% progress anywhere (hide it until there's progress)`, rect: rectOf(el) });
     }

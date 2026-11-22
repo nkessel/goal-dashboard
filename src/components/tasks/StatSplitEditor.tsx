@@ -195,7 +195,8 @@ function StatRow({ stat, pct, xp, isAdventure, onPct }: { stat: string; pct: num
         {statAbbr(stat)}
       </span>
       {/* The whole name, wrapping if it must (it was cut off; owner, Nov 5). */}
-      <span className="min-w-0 flex-1 text-[14px] leading-tight [overflow-wrap:anywhere] sm:w-[92px] sm:flex-none sm:shrink-0" style={{ color: "var(--t-ink)" }}>
+      {/* The whole name on one line, never broken mid-word (owner saw "Intellige / nce", Nov 22). */}
+      <span className="min-w-0 flex-1 truncate text-[14px] leading-tight sm:w-[92px] sm:flex-none sm:shrink-0" style={{ color: "var(--t-ink)" }} title={stat}>
         {stat}
       </span>
       <button type="button" onClick={() => onPct(pct - 5)} disabled={pct <= 0} aria-label={`Less XP to ${stat}`} className={step} style={stepStyle}>
@@ -217,7 +218,12 @@ function StatRow({ stat, pct, xp, isAdventure, onPct }: { stat: string; pct: num
         +
       </button>
       <span className="w-[44px] shrink-0 text-right text-[13px] tabular-nums" style={{ color: pct ? "var(--t-ink)" : "var(--t-ink-soft)", fontWeight: pct ? 700 : 400 }}>
-        {pct}%{pct > 0 && <span className="block text-[11px] font-normal" style={{ color: "var(--t-ink-soft)" }}>{xp} XP</span>}
+        {/* Nothing at 0 (owner: "the 0% indicators are demotivating"); the share shows once it's given. */}
+        {pct > 0 && (
+          <>
+            {pct}%<span className="block text-[11px] font-normal" style={{ color: "var(--t-ink-soft)" }}>{xp} XP</span>
+          </>
+        )}
       </span>
     </li>
   );
