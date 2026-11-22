@@ -4,7 +4,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Dev loop 2 runs 33–37 note (Nov 22, 18:25, 18:55, 19:55, 20:55 and 21:56 UTC):** `main` unchanged since run 32; no new feedback notes since Nov 21 17:39; no Postgres errors in the last 24h. Same finding: nothing unclaimed that ships straight to `main`. Nothing built.
+- **Dev loop 2 runs 33–38 note (Nov 22, 18:25 to 22:5x UTC):** `main` unchanged since run 32; no new feedback notes since Nov 21 17:39; no Postgres errors in the last 24h. Same finding: nothing unclaimed that ships straight to `main`. Nothing built.
 
 - **Dev loop 2 run 32 note (Nov 22, 17:30 UTC):** read Run B, PRIORITIES and the open feedback queue (since Nov 19): every remaining item is a design change (needs a review branch) or already parked below (e16f1f7a, 71a6b505, 57f4201a). Nothing built; no claims were open.
 
