@@ -4359,6 +4359,23 @@ export async function findQuestsAction(query: string, exclude: string[] = []) {
   return ((data ?? []) as { id: string; title: string; board_id: string | null; icon_key: string | null }[]).filter((t) => !skip.has(t.id)).slice(0, 12);
 }
 
+/** Boards whose name matches, for the boards list's finder (owner [f6349b0f]: "search for boards in the board screen"). */
+export async function findBoardsAction(query: string) {
+  const ownerId = await requireProfileId();
+  const term = query.replace(/[%,()]/g, " ").trim();
+  if (!term) return [];
+  const db = supabaseAdmin();
+  const { data } = await db.from("boards").select("id, title, parent_board_id").eq("owner_id", ownerId).ilike("title", `%${term}%`).order("sort_order", { ascending: true }).limit(8);
+  const rows = (data ?? []) as { id: string; title: string; parent_board_id: string | null }[];
+  const parentIds = [...new Set(rows.map((r) => r.parent_board_id).filter((x): x is string => !!x))];
+  const parents = new Map<string, string>();
+  if (parentIds.length) {
+    const { data: ps } = await db.from("boards").select("id, title").eq("owner_id", ownerId).in("id", parentIds);
+    for (const p of (ps ?? []) as { id: string; title: string }[]) parents.set(p.id, p.title);
+  }
+  return rows.map((r) => ({ id: r.id, title: r.title, parent: r.parent_board_id ? parents.get(r.parent_board_id) ?? null : null }));
+}
+
 /**
  * Put a quest before or after another in its sequence: an existing quest, or
  * a new one by title (made on the same board). Returns the updated sequence.

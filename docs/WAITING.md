@@ -4,7 +4,6 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Dev loop 2 run 31 (Opus, Nov 22 16:56 UTC):** open feedback notes that are bug fixes or small, clear changes.
 - **Dev loop 2 run 28 note (Nov 22):** shipped 367d6ccd (steps tray stale after the editor) and 1873c121 (✕ on every portrait); UI check `today`, `today2` phone morning and evening: 0 errors. Then, on the owner's word ("build unless you have a mock for me to review"), built and shipped 38bf14ef, 4b98c409 and b9d04a98 too (see SHIPPED). BUILD-PLAN: every task is shipped or waiting on his review; nothing left for a lighter run.
 
 - **Dev loop 2 run 26 note (Nov 22):** tablet morning UI check of the 15 flows left in RUN-B-HANDOFF 0(b): 0 errors on a clean re-run. The full run had two errors that did not repeat when `todaycal` and `settings` ran alone (twice): React #185 on `todaycal` after the earlier flows, and a `settings bubble` layout shift (-958px). Treat as flakes unless they show again; if #185 returns on Today, look at the drag-over-calendar step. Tablet evening not run.
@@ -55,6 +54,7 @@ Started in the owner's Claude project threads; written here so another account c
 
 ## Open for the next Dev loop 2 run (not claimed)
 
+- **Run 31 (Nov 22, 17:30 UTC):** no notes since Nov 21 17:39. Shipped f6349b0f (find boards from the boards list). Three open notes no doc had mentioned, all new UI (mockup first, not built): **637820fc** (habit editor: "add XP to my character stats here", like the quest editor's stat XP under the XP slider), **a5b90b87** (Insights: edit check-in factors and reorder them), **ff84a102** (Insights: "set an exact time for an event"; unclear which event log he means, ask him).
 - **Run 29 (Nov 22):** no new feedback notes since run 28; every Run B item is shipped or waiting on his review. Nothing built.
 
 - **Run 25 (Nov 22, 14:10 UTC):** full UI check on `main` @ d49edba, phone, morning and evening, every flow (727 shots): **0 errors**, 113 warnings (the usual ones: owl under the keyboard, the XP-20 corner badge, calendar overlaps). Covers the Duet pay-out move to `lib/data/quest-ops.ts` and the `tasks/editor/` code move: completing a quest still pays XP and the celebration flow is unchanged. No new notes since Nov 21 17:39. Nothing to fix; tablet not re-run.

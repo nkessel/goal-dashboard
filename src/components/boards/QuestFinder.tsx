@@ -1,32 +1,40 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { findQuestsAction, listArchivedQuestsAction, questForEditAction, restoreArchivedQuestAction } from "@/app/actions";
+import { findBoardsAction, findQuestsAction, listArchivedQuestsAction, questForEditAction, restoreArchivedQuestAction } from "@/app/actions";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { Fold } from "@/components/ui/Fold";
 import type { Task } from "@/lib/data/types";
 
 /**
- * Find a quest from the boards list (owner, Nov 3: "search for quests on the boards list"): type, and the
- * matching open quests show under the box; tap one to open it in its editor.
+ * Find a quest or a board from the boards list (owner, Nov 3: "search for quests on the boards list";
+ * [f6349b0f] "search for boards in the board screen"): type, and matching boards (tap to open the board)
+ * then open quests (tap to open it in its editor) show under the box.
  */
 export function QuestFinder({ isAdventure }: { isAdventure: boolean }) {
   const [q, setQ] = useState("");
   const [found, setFound] = useState<{ id: string; title: string }[]>([]);
+  const [boards, setBoards] = useState<{ id: string; title: string; parent: string | null }[]>([]);
   const [editing, setEditing] = useState<Task | null>(null);
   const router = useRouter();
   const term = q.trim();
   useEffect(() => {
     if (!term) return;
     let live = true;
-    const t = setTimeout(() => findQuestsAction(term).then((r) => live && setFound(r), () => {}), 180);
+    const t = setTimeout(() => {
+      findQuestsAction(term).then((r) => live && setFound(r), () => {});
+      findBoardsAction(term).then((r) => live && setBoards(r), () => {});
+    }, 180);
     return () => {
       live = false;
       clearTimeout(t);
     };
   }, [term]);
   const shown = term ? found : [];
+  const shownBoards = term ? boards : [];
+  const any = shown.length + shownBoards.length > 0;
   return (
     <div className="flex flex-col gap-1.5">
       <label className="flex h-11 items-center gap-2 rounded-full px-4" style={{ background: isAdventure ? "rgba(246,236,210,.92)" : "var(--t-card)", border: `1px solid ${isAdventure ? "#a88a3f" : "var(--t-card-border)"}`, boxShadow: "inset 0 1px 3px rgba(60,40,10,.18)" }}>
@@ -39,17 +47,29 @@ export function QuestFinder({ isAdventure }: { isAdventure: boolean }) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === "Escape" && setQ("")}
-          placeholder="Find a quest…"
-          aria-label="Find a quest"
+          placeholder="Find a quest or board…"
+          aria-label="Find a quest or board"
           className="h-full min-w-0 flex-1 bg-transparent text-[16px] outline-none"
           style={{ color: "#2a1c10" }}
         />
       </label>
-      <Fold open={shown.length > 0 || (!!term && found.length === 0)}>
+      <Fold open={!!term}>
         <ul className="m-0 flex list-none flex-col overflow-hidden rounded-2xl p-1" style={{ background: "rgba(246,236,210,.96)", border: "1px solid #a88a3f" }}>
-          {shown.length === 0 ? (
+          {shownBoards.map((b) => (
+            <li key={`b-${b.id}`} className="due-in">
+              <Link href={`/boards/${b.id}`} className="hover-glow flex min-h-10 w-full items-center gap-2 rounded-xl px-3 text-left text-[15px]" style={{ color: "#2a1c10" }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0" style={{ color: "#8a6a2c" }}>
+                  <rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" strokeWidth="2" />
+                  <path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <span className="truncate font-semibold">{b.title}</span>
+                {b.parent && <span className="shrink-0 truncate text-[12.5px]" style={{ color: "#6b5631", maxWidth: "40%" }}>in {b.parent}</span>}
+              </Link>
+            </li>
+          ))}
+          {!any ? (
             <li className="px-3 py-2 text-[14px] italic" style={{ color: "#6b5631" }}>
-              No open quest by that name.
+              No open quest or board by that name.
             </li>
           ) : (
             shown.map((f) => (

@@ -2270,6 +2270,10 @@ export const FLOWS = [
       await h.page.getByLabel("Find a quest").first().fill("insurance").catch(() => {});
       await h.settle(900);
       await h.check("boards: find a quest");
+      // …and a board by name (owner [f6349b0f]): boards first, a sub-board says which board it's in.
+      await h.page.getByLabel("Find a quest").first().fill("garden").catch(() => {});
+      await h.settle(900);
+      await h.check("boards: find a board");
       // A board's sub-board opens in place like a folder (Nov 6), with "See board ›".
       await h.goto("/boards");
       if (await h.tap((p) => p.locator('[data-fb-name="Sub-board: Garden beds"]').first(), "open a sub-board in place", { optional: true, expectMove: true })) {
