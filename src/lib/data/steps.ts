@@ -25,6 +25,10 @@ export type QuestStep = {
   minutes?: number | null;
   /** Its own stat split (migration 0095); null/absent = it follows its quest's split. */
   stat_split?: StatSplit | null;
+  /** Where it sits on the calendar (migration 0096); null = not placed. */
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
+  google_calendar_event_id?: string | null;
   /** Coins paid when the step is done (0 = none; migration 0088). */
   coins?: number;
   /** Coins this step has paid so far. */
@@ -203,4 +207,30 @@ export async function attachNextSteps<T extends Task>(tasks: T[], ownerId: strin
 /** Record what a step has paid. */
 export async function setStepPaid(stepId: string, ownerId: string, xpPaid: number, coinsPaid?: number): Promise<void> {
   await supabaseAdmin().from("quest_steps").update({ xp_paid: xpPaid, ...(coinsPaid !== undefined ? { coins_paid: coinsPaid } : {}) }).eq("id", stepId).eq("owner_id", ownerId);
+}
+
+/** Put a sub-quest on the calendar (or move it); returns the Google event id it had, if any. */
+export async function setStepSlot(stepId: string, ownerId: string, slot: { start: string; end: string; eventId?: string | null } | null): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("quest_steps")
+    .update(slot ? { scheduled_start: slot.start, scheduled_end: slot.end, ...(slot.eventId !== undefined ? { google_calendar_event_id: slot.eventId } : {}) } : { scheduled_start: null, scheduled_end: null, google_calendar_event_id: null })
+    .eq("id", stepId)
+    .eq("owner_id", ownerId);
+  if (error) throw new Error(`Couldn't place the sub-quest: ${error.message}`);
+}
+
+export async function getStep(stepId: string, ownerId: string): Promise<QuestStep | null> {
+  const { data } = await supabaseAdmin().from("quest_steps").select("*").eq("id", stepId).eq("owner_id", ownerId).maybeSingle();
+  return (data as QuestStep | null) ?? null;
+}
+
+/** Sub-quests placed on the calendar between two times (for the calendar's blocks), with their quest's title. */
+export async function listScheduledSteps(ownerId: string, fromISO: string, toISO: string): Promise<(QuestStep & { quest_title: string })[]> {
+  const db = supabaseAdmin();
+  const { data, error } = await db.from("quest_steps").select("*").eq("owner_id", ownerId).gte("scheduled_end", fromISO).lte("scheduled_start", toISO).order("scheduled_start", { ascending: true });
+  if (error || !data?.length) return [];
+  const ids = [...new Set(data.map((s) => s.task_id as string))];
+  const { data: tasks } = await db.from("tasks").select("id, title").eq("owner_id", ownerId).in("id", ids);
+  const title = new Map((tasks ?? []).map((t) => [t.id as string, t.title as string]));
+  return (data as QuestStep[]).map((s) => ({ ...s, quest_title: title.get(s.task_id) ?? "" }));
 }

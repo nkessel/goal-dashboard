@@ -641,6 +641,43 @@ export async function setTaskProgressAction(taskId: string, progress: number) {
   return { xpEarned: delta, coinsEarned: award?.coinsEarned ?? 0, totalXp: award?.totalXp ?? null };
 }
 
+/**
+ * Puts one sub-quest on the calendar (or moves it): its own block and its own Google event, named
+ * "<sub-quest> · <quest>". Ticking it is the step's own save (saveQuestStepsAction), so XP stays one path.
+ */
+export async function scheduleStepAction(stepId: string, startISO: string, endISO: string) {
+  const { profileId, accessToken } = await requireSessionMaybeGoogle();
+  const start = new Date(startISO);
+  const end = new Date(endISO);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) throw new Error("Pick a time first.");
+  const step = await stepsData.getStep(stepId, profileId);
+  if (!step) throw new Error("That sub-quest isn't here anymore.");
+  const quest = await tasksData.getTask(step.task_id, profileId);
+  let eventId = step.google_calendar_event_id ?? null;
+  if (accessToken) {
+    try {
+      if (eventId) await updateCalendarEvent(accessToken, eventId, { start, end });
+      else eventId = await createCalendarEvent(accessToken, { title: quest ? `${step.title} · ${quest.title}` : step.title, start, end });
+    } catch {
+      /* the app's own calendar still holds it */
+    }
+  }
+  await stepsData.setStepSlot(stepId, profileId, { start: start.toISOString(), end: end.toISOString(), eventId });
+  revalidatePath("/");
+  revalidatePath("/calendar");
+}
+
+/** Takes a sub-quest off the calendar (and its Google event). */
+export async function unscheduleStepAction(stepId: string) {
+  const { profileId, accessToken } = await requireSessionMaybeGoogle();
+  const step = await stepsData.getStep(stepId, profileId);
+  if (!step) return;
+  if (step.google_calendar_event_id && accessToken) await deleteCalendarEvent(accessToken, step.google_calendar_event_id).catch(() => {});
+  await stepsData.setStepSlot(stepId, profileId, null);
+  revalidatePath("/");
+  revalidatePath("/calendar");
+}
+
 /** A quest's steps for the editor; null when steps aren't available yet. */
 export async function listQuestStepsAction(taskId: string) {
   const ownerId = await requireProfileId();
