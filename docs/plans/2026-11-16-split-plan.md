@@ -221,16 +221,38 @@ Add a line to each branch's entry in `docs/WAITING.md` saying so when phase E st
 
 ### Tick list (update as steps ship)
 
-Baselines from S3 (sizes, perf numbers): *to be filled in by S3.*
+Baselines from S3 (Nov 22, `main` at the Cal 3 commit, clean `next build --webpack`):
 
-- [x] S1 (Nov 18, `--snapshot` / `--compare`, see docs/ui-check.md) · [x] S2 (Nov 21, flow `questextras`) · [~] S3 (Nov 22: `today` split into `today` + `today2`; size/perf baselines still to do)
+**First Load JS per route.** Next 16 prints no size table in `next build`, so `node scripts/perf/first-load.mjs` (after a build made against the UI check's fake database) fetches each route's server-drawn page and sums the gzip size of its script tags. Compare each step's numbers against this table.
+
+| Route | gzip | raw | script files |
+|---|---|---|---|
+| `/` | 550 kB | gzip kB | kB |
+| `/calendar` | 416 kB | gzip kB | kB |
+| `/quests` | 300 kB | gzip kB | kB |
+| `/boards` | 387 kB | gzip kB | kB |
+| `/insights` | 385 kB | gzip kB | kB |
+| `/plan` | 379 kB | gzip kB | kB |
+| `/matrix` | 401 kB | gzip kB | kB |
+| `/journal` | 331 kB | gzip kB | kB |
+| `/feed` | 346 kB | gzip kB | kB |
+| `/settings` | 473 kB | gzip kB | kB |
+| `/import` | 335 kB | gzip kB | kB |
+| `/rewards` | 333 kB | gzip kB | kB |
+| `/summit` | 385 kB | gzip kB | kB |
+| `/notifications` | 310 kB | gzip kB | kB |
+| `/power-ups` | 333 kB | gzip kB | kB |
+
+**Tap-cost perf (`npm run perf`) for editor, toucan, calendar, welcome, today: not captured.** This cloud session has no Playwright browser installed (`/opt/pw-browsers` is missing) and browsers may not be installed from a shell, so neither `npm run perf` nor the UI check could run here. To fill in: `PERF_NAMES=1 npx next build --webpack` with the UI check's env, then `node scripts/perf/taps.mjs --only editor,toucan,calendar,welcome,today --throttle 4 --out ui-check-out/baseline/perf.json`, and paste the table here.
+
+- [x] S1 (Nov 18, `--snapshot` / `--compare`, see docs/ui-check.md) · [x] S2 (Nov 21, flow `questextras`) · [~] S3 (Nov 22: `today` split into `today` + `today2`; size table done; perf numbers still to do, needs a session with a browser)
 - [x] L1 (Nov 21) · [x] L2 (Nov 22) · [ ] L3
 - [ ] T1 · [ ] T2 · [ ] T3 · [ ] T4 · [ ] T5 · [ ] T6 · [ ] T7
 - [ ] W1 · [ ] W2 · [ ] W3 · [ ] W4 · [ ] W5
 - [ ] I1 · [ ] I2 · [ ] I3 · [ ] I4 · [ ] I5 · [ ] I6
 - [ ] E1 · [ ] E2 · [ ] E3 · [ ] E4 · [ ] E5 · [ ] E6 · [ ] E7 · [ ] E8 · [ ] E9
 - [ ] C1 · [ ] C2 · [ ] C3 · [ ] C4
-- [ ] D0 · [ ] D1 · [ ] D2 · [ ] D3 · [ ] D4 · [ ] D5
+- [x] D0 (Nov 21) · [x] D1 (Nov 21) · [ ] D2 · [ ] D3 · [ ] D4 · [ ] D5
 
 By model: Haiku 5.5 takes 8 steps, Sonnet 5.5 takes 24, Opus 5.5 takes 11. None needs Fable.
 

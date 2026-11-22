@@ -37,7 +37,7 @@ The Run B list from the dev plan, updated with what has happened since it was wr
 
 Waiting on the owner's review, **don't merge** without his OK: `review/boards-nov18` (contains `review/calendar-nov18`) (**except** "Calendar events as quests": shipped to `main` on its own Nov 19 with XP by the event's length, `lib/data/event-quests.ts`, `lib/event-quest-xp.ts`, `EventQuestsSwitch.tsx`; when that branch merges, keep `main`'s versions of those files and drop the branch's `questSeries`/series-look writes from `makeEventQuests` unless the series look is approved too), `review/subquests-sequence`, `review/insights-nov19`. Their entries in `docs/WAITING.md` list the notes to mark when he says OK.
 
-**2. S2, S3** (split plan, `docs/plans/2026-11-16-split-plan.md`): fixtures, baselines, and splitting the UI check's too-long `today` flow (Light 8). S1 (`--snapshot` / `--compare`) is done; use it around every move.
+**2. S2, S3** (split plan, `docs/plans/2026-11-16-split-plan.md`): fixtures, baselines, and splitting the UI check's too-long `today` flow (Light 8). **S2 done; S3 done except the `npm run perf` numbers (Nov 22: size table and `today` split done, no browser in that session; run the command in section 10 of the plan from a session that has one).** S1 (`--snapshot` / `--compare`) is done; use it around every move.
 
 **3. L1, L2:** the toucan's and the quest editor's small exports get their own files. Write down how much Today's and the import page's code shrink. **L2 touches the quest editor, which the pointer-tray thread is changing right now (section 4): do L2 after that lands on `main`.**
 
