@@ -331,8 +331,9 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
             {state.hindrances.map((n) => pressButton("hindrance", n))}
           </div>
         </div>
-        <button type="button" onClick={() => setEditing((v) => !v)} aria-expanded={editing} className="mx-auto h-8 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px solid rgba(217,180,95,.6)" }}>
-          {editing ? "Done" : "⚙ Edit what's on the wheel"}
+        {/* The button keeps its words; Done sits at the end of the lists it closes (owner, Nov 20, c63a6861). */}
+        <button type="button" onClick={() => setEditing((v) => !v)} aria-expanded={editing} className="mx-auto h-8 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px solid rgba(217,180,95,.6)", background: editing ? "rgba(217,180,95,.18)" : undefined }}>
+          ⚙ Edit what&apos;s on the wheel
         </button>
         <Fold open={!!editing}>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -341,6 +342,9 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
             <span className="text-[12px] sm:col-span-2" style={{ color: SOFT }}>
               The number beside each is how many turns one press gives the wheel. Changing it re-turns the wheel for every night it was logged. Nights already logged keep what was checked, even if you rename or remove something here.
             </span>
+            <button type="button" onClick={() => setEditing(false)} className="hover-glow h-8 justify-self-end rounded-full px-4 text-[13px] font-bold sm:col-span-2" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+              Done
+            </button>
           </div>
         </Fold>
         <span className="text-center text-[11.5px]" style={{ color: SOFT }}>

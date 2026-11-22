@@ -1676,6 +1676,14 @@ html[data-fog-lift]::after { animation: fog-lift 0.9s ease forwards; }
   background: radial-gradient(circle at 35% 30%, #fff6d8, #d9b45f 60%, #a88a3f);
   border: 2px solid #4a3913;
 }
+/* A meter not set yet (owner, Nov 21): empty track, grey knob. */
+.energy-range::-webkit-slider-thumb { transition: filter 200ms ease, opacity 200ms ease; }
+.energy-range::-moz-range-thumb { transition: filter 200ms ease, opacity 200ms ease; }
+.energy-range[data-unset]::-webkit-slider-runnable-track { background: rgba(140, 128, 104, 0.22); }
+.energy-range[data-unset]::-moz-range-progress { background: transparent; }
+.energy-range[data-unset]::-moz-range-track { background: rgba(140, 128, 104, 0.22); }
+.energy-range[data-unset]::-webkit-slider-thumb { filter: grayscale(1); opacity: 0.7; }
+.energy-range[data-unset]::-moz-range-thumb { filter: grayscale(1); opacity: 0.7; }
 .energy-range:focus-visible {
   outline: 2px solid var(--t-gold);
   outline-offset: 2px;

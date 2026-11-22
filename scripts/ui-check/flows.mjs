@@ -1342,6 +1342,10 @@ export const FLOWS = [
       if (await h.tap((p) => p.getByRole("button", { name: /edit what's on the wheel/i }).first(), "edit the wheel", { optional: true, expectMove: true })) {
         await h.settle(500);
         await h.check("wheel: its lists, dragged to reorder");
+        // Done sits at the end of the lists it closes (owner, Nov 20, c63a6861).
+        await h.page.getByRole("button", { name: /^done$/i }).first().scrollIntoViewIfNeeded().catch(() => {});
+        await h.settle(300);
+        await h.check("wheel: Done at the end of the lists");
         await h.tap((p) => p.getByRole("button", { name: /^done$/i }).first(), "wheel lists done", { optional: true, expectMove: true });
       }
       await h.toggle(/last night/i, "last night", {});

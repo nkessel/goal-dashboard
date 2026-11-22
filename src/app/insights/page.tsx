@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { CreateFab } from "@/components/create/CreateFab";
 import { InsightsView } from "@/components/insights/InsightsView";
 import { ScreenArrange } from "@/components/ui/ScreenArrange";
-import { CheckInHub } from "@/components/insights/CheckInHub";
+import { CheckInHub, InsightsChart } from "@/components/insights/CheckInHub";
 import { getProfileById } from "@/lib/data/profiles";
 import { getCheckMetrics, listCheckInsSince, listCheckNotesSince, listEnergySince } from "@/lib/data/energy";
 import { appDayKey, appTimeZone } from "@/lib/data/tomorrow";
@@ -127,10 +127,16 @@ export default async function InsightsPage() {
                 </h2>
                 {/* A fresh check-in each visit; today's earlier ones are listed under it, with the chart. */}
                 <EnergyCheck full sleepLink={false} today={null} init={buildCheckInInit(profile?.life_wheel, appDayKey(), (await cookies()).get(DRAFT_COOKIE)?.value)} metrics={metrics} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))} />
-                <CheckInHub zone={appTimeZone()} readings={readings} metrics={["Energy", ...metrics]} wins={chartWins} starred={marks.star ?? []} nights={cleanWheel((profile?.life_wheel as Record<string, unknown> | null | undefined)?.wheelOfTime).log} />
+                <CheckInHub zone={appTimeZone()} readings={readings} metrics={["Energy", ...metrics]} starred={marks.star ?? []} />
                 </div>
               </section>
               ),
+            },
+            {
+              key: "chart",
+              label: "Insights chart",
+              hint: "Your check-ins, quests and events over time",
+              node: <InsightsChart readings={readings} metrics={["Energy", ...metrics]} wins={chartWins} nights={cleanWheel((profile?.life_wheel as Record<string, unknown> | null | undefined)?.wheelOfTime).log} />,
             },
             {
               key: "wheel",

@@ -576,21 +576,22 @@ export function EnergyCheck({
     </div>
   ) : null;
   // On the welcome screen each slider has its own − and + right beside it, for an exact value.
-  const slider = (v: number, onChange: (n: number) => void, aria: string, color: string) =>
+  // A meter not set yet this time sits greyed (owner, Nov 21, 6ea34408): no fill, a grey knob, until it's moved.
+  const slider = (v: number, onChange: (n: number) => void, aria: string, color: string, unset = false) =>
     simple ? (
       <span className="flex min-w-0 flex-1 items-center gap-1">
         <button type="button" onClick={() => onChange(Math.max(1, Math.round((v - sliderStep) * 10) / 10))} aria-label={`${aria}: less`} className="ec-step relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[15px] leading-none">
           −
         </button>
-        {rawSlider(v, onChange, aria, color)}
+        {rawSlider(v, onChange, aria, color, unset)}
         <button type="button" onClick={() => onChange(Math.min(10, Math.round((v + sliderStep) * 10) / 10))} aria-label={`${aria}: more`} className="ec-step relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[15px] leading-none">
           +
         </button>
       </span>
     ) : (
-      rawSlider(v, onChange, aria, color)
+      rawSlider(v, onChange, aria, color, unset)
     );
-  const rawSlider = (v: number, onChange: (n: number) => void, aria: string, color: string) => (
+  const rawSlider = (v: number, onChange: (n: number) => void, aria: string, color: string, unset = false) => (
     <input
       type="range"
       min={1}
@@ -599,6 +600,7 @@ export function EnergyCheck({
       value={v}
       onChange={(e) => onChange(Math.round(snapTo(Number(e.target.value), sliderStep) * 10) / 10)}
       aria-label={aria}
+      data-unset={unset || undefined}
       className="energy-range min-w-0 flex-1"
       style={{ "--energy-pct": `${((v - 1) / 9) * 100}%`, "--energy-color": color } as React.CSSProperties}
     />
@@ -627,7 +629,7 @@ export function EnergyCheck({
                 <span className={`${label} transition-opacity`} style={{ color: "var(--t-cream)", opacity: energySet ? 1 : 0.6 }}>
                   Energy
                 </span>
-                {slider(value, setValue, "Energy level, 1 to 10", `hsl(${hue} 60% 48%)`)}
+                {slider(value, setValue, "Energy level, 1 to 10", `hsl(${hue} 60% 48%)`, !energySet)}
                 <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums transition-opacity" style={{ color: `hsl(${hue} 70% var(--ec-l, 68%))`, opacity: energySet ? 1 : 0.6 }}>
                   {energySet ? fmt(value) : "–"}
                 </span>
@@ -652,13 +654,13 @@ export function EnergyCheck({
                   const set = vals[m] !== undefined;
                   const v = vals[m] ?? 5.5;
                   return (
-                    // Untouched metrics aren't saved (their name and value sit faded, the slider stays bright); moving one counts it.
+                    // Untouched metrics aren't saved (their name, value and meter sit greyed); moving one counts it.
                     <div key={m} className="flex items-center gap-2">
                       {!(simple && full) && <span aria-hidden className="w-5 shrink-0" />}
                       <span className={`${label} transition-opacity`} style={{ color: "var(--t-cream)", opacity: set ? 1 : 0.6 }} title={m === DAY_METRIC ? "How was your day? (optional)" : m}>
                         {simple ? m.charAt(0).toUpperCase() + m.slice(1) : m}
                       </span>
-                      {slider(v, (n) => setVals((o) => ({ ...o, [m]: n })), m === DAY_METRIC ? "How was your day, 1 to 10 (optional)" : `${m}, 1 to 10`, "#c9a24a")}
+                      {slider(v, (n) => setVals((o) => ({ ...o, [m]: n })), m === DAY_METRIC ? "How was your day, 1 to 10 (optional)" : `${m}, 1 to 10`, "#c9a24a", !set)}
                       <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums transition-opacity" style={{ color: "var(--ec-value, #f2d58a)", opacity: set ? 1 : 0.6 }}>
                         {set ? fmt(v) : "–"}
                       </span>

@@ -41,9 +41,24 @@ function groupCheckIns(readings: Reading[]): { at: string; items: Reading[] }[] 
  */
 const CHART_KEY = "insights-chart";
 
-export function CheckInHub({ zone, readings, metrics, wins, starred = [], nights }: { zone?: string; readings: Reading[]; metrics: string[]; wins: WinLite[]; starred?: string[]; nights?: Record<string, { bed: string | null; wake: string | null }> }) {
-  const [adding, setAdding] = useState(false);
+export function CheckInHub({ zone, readings, metrics, starred = [] }: { zone?: string; readings: Reading[]; metrics: string[]; starred?: string[] }) {
   const [editing, setEditing] = useState<{ at: string; items: Reading[] } | null>(null);
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Drawn by the server too, so the page doesn't jump when it arrives (UI check, Nov 20). */}
+      <CheckInLog zone={zone} readings={readings} metrics={metrics} starred={starred} onEdit={setEditing} />
+      {editing && <AddEntry metrics={metrics} edit={editing} onClose={() => setEditing(null)} />}
+    </div>
+  );
+}
+
+/**
+ * The insights chart, its own part of the screen beneath the check-in so it runs full width
+ * (owner, Nov 21, 5cf0051d). It still waits behind a plain button (owner, Nov 9): it slides open,
+ * and stays open on this device once you've chosen it.
+ */
+export function InsightsChart({ readings, metrics, wins, nights }: { readings: Reading[]; metrics: string[]; wins: WinLite[]; nights?: Record<string, { bed: string | null; wake: string | null }> }) {
+  const [adding, setAdding] = useState(false);
   const [chartPick, setChartPick] = useState<boolean | null>(null);
   const savedChart = useSyncExternalStore(noop, () => {
     try {
@@ -61,16 +76,13 @@ export function CheckInHub({ zone, readings, metrics, wins, starred = [], nights
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* Drawn by the server too, so the page doesn't jump when it arrives (UI check, Nov 20). */}
-      <CheckInLog zone={zone} readings={readings} metrics={metrics} starred={starred} onEdit={setEditing} />
-      {/* The chart waits behind a plain button (owner, Nov 9): it slides open, and stays open on this device once you've chosen it. */}
+    <section aria-label="Insights chart" className="flex flex-col gap-3">
       <button
         type="button"
         onClick={() => showChart(!chart)}
         aria-expanded={chart}
-        className="hover-glow mx-auto flex h-10 items-center gap-2 rounded-full px-4 text-[14.5px] font-semibold"
-        style={{ border: "1.5px solid var(--ec-line, rgba(217,180,95,.45))", color: "var(--t-cream)", background: chart ? "rgba(217,180,95,.18)" : "var(--ec-chip, rgba(0,0,0,.2))" }}
+        className="hover-glow parchment mx-auto flex h-10 items-center gap-2 rounded-full px-4 text-[14.5px] font-semibold"
+        style={{ border: "1.5px solid rgba(139,112,64,.45)", color: "var(--t-ink)", background: chart ? "rgba(217,180,95,.35)" : undefined }}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
           <path d="M4 19h16M6 15l4-5 3 3 5-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -86,8 +98,7 @@ export function CheckInHub({ zone, readings, metrics, wins, starred = [], nights
         </div>
       </Fold>
       {adding && <AddEntry metrics={metrics} onClose={() => setAdding(false)} />}
-      {editing && <AddEntry metrics={metrics} edit={editing} onClose={() => setEditing(null)} />}
-    </div>
+    </section>
   );
 }
 
