@@ -69,6 +69,8 @@ Say OK, give notes, or drop each of these, so the splits don't have to work arou
 
 ## Run D · Sonnet 5.5 · the big filing jobs
 
+**Status Nov 22 (first Run D session):** done: actions.ts split, T1, T5, W2, C1, E1, E2 (tags only), D2, D3. Not done (ran long): E2 Stats/Template/BoardTray, E3, E5, E8, I1-I6, Light 5 and 7 (the two Light items need `npm run perf` to measure and to prove nothing changes on screen).
+
 1. **The `actions.ts` split**, done the way Run A planned it, one area per commit. This goes first because every later session reads that file.
 2. **T1, T5:** the toucan's stores and chat sheet (T1 holds module state: one copy only).
 3. **W2:** the welcome toucan.

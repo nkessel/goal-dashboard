@@ -247,12 +247,12 @@ Baselines from S3 (Nov 22, `main` at the Cal 3 commit, clean `next build --webpa
 
 - [x] S1 (Nov 18, `--snapshot` / `--compare`, see docs/ui-check.md) · [x] S2 (Nov 21, flow `questextras`) · [~] S3 (Nov 22: `today` split into `today` + `today2`; size table done; perf numbers still to do, needs a session with a browser)
 - [x] L1 (Nov 21) · [x] L2 (Nov 22) · [x] L3 (Nov 22, Run C)
-- [ ] T1 · [x] T2 · [x] T3 · [x] T4 (Nov 22, Run C; `tomorrowMorning` moved into `NudgeNote.tsx` for now, T1 moves it to `snooze-store.ts`) · [ ] T5 · [ ] T6 · [ ] T7
-- [x] W1 (Nov 22, Run C; `CONFETTI_COLORS` moved with `PIECES`) · [ ] W2 · [x] W3 (Nov 22, Run C) · [ ] W4 · [ ] W5
+- [x] T1 (Nov 22, Run D) · [x] T2 · [x] T3 · [x] T4 (Nov 22, Run C; `tomorrowMorning` moved into `NudgeNote.tsx` for now, T1 moves it to `snooze-store.ts`) · [x] T5 (Nov 22, Run D) · [ ] T6 · [ ] T7
+- [x] W1 (Nov 22, Run C; `CONFETTI_COLORS` moved with `PIECES`) · [x] W2 (Nov 22, Run D) · [x] W3 (Nov 22, Run C) · [ ] W4 · [ ] W5
 - [ ] I1 · [ ] I2 · [ ] I3 · [ ] I4 · [ ] I5 · [ ] I6
-- [ ] E1 · [ ] E2 · [ ] E3 · [ ] E4 · [ ] E5 · [ ] E6 · [ ] E7 · [ ] E8 · [ ] E9
-- [ ] C1 · [ ] C2 · [ ] C3 · [ ] C4
-- [x] D0 (Nov 21) · [x] D1 (Nov 21) · [ ] D2 · [ ] D3 · [ ] D4 · [ ] D5
+- [x] E1 (Nov 22, Run D) · [~] E2 (Nov 22, Run D: `EditorTags` done; Stats, Template, BoardTray left) · [ ] E3 · [ ] E4 · [ ] E5 · [ ] E6 · [ ] E7 · [ ] E8 · [ ] E9
+- [x] C1 (Nov 22, Run D) · [ ] C2 · [ ] C3 · [ ] C4
+- [x] D0 (Nov 21) · [x] D1 (Nov 21) · [x] D2 (Nov 22, Run D: migration 0099) · [x] D3 (Nov 22, Run D) · [ ] D4 · [ ] D5
 
 By model: Haiku 5.5 takes 8 steps, Sonnet 5.5 takes 24, Opus 5.5 takes 11. None needs Fable.
 
