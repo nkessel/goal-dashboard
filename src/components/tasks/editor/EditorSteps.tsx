@@ -94,10 +94,10 @@ export function EditorSteps({ subPillRef, steps, stepXpPop, stepsTotal, isAdvent
           )}
         </span>
       )}
-                  {steps === null && (stepsTotal ?? 0) > 0 ? (
+                  {steps === null && stepsTotal > 0 ? (
                     // Loading: hold the steps' place so the editor doesn't jump when they arrive.
                     <ul className="m-0 flex list-none flex-col p-0" aria-busy="true" aria-label="Loading sub-quests">
-                      {Array.from({ length: stepsTotal ?? 0 }).map((_, i) => (
+                      {Array.from({ length: stepsTotal }).map((_, i) => (
                         <li key={i} className="flex items-center gap-2 py-[5px] pl-1">
                           <span className="h-[18px] w-[18px] shrink-0 rounded-[5px]" style={{ border: `1.5px solid ${isAdventure ? "#8a6c2c" : "var(--t-card-border)"}`, opacity: 0.5 }} />
                           <span className="step-skeleton h-[14px] rounded" style={{ width: `${55 + ((i * 17) % 35)}%` }} />
