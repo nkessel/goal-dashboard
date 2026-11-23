@@ -13,7 +13,7 @@ import type { FileRef } from "@/lib/file-refs";
 import { LinkOuts } from "@/components/ui/Linked";
 import { TimeWheels } from "@/components/ui/TimeWheels";
 import { CloseIcon } from "@/components/ui/Icons";
-import { Fragment, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, useTransition } from "react";
+import { Fragment, memo, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
@@ -1863,13 +1863,15 @@ export function QuestEditorDialog({
 export { IconScale } from "./IconScale";
 
 /** The + (or −) on the editor's add-on pills: drawn, so it sits exactly on the text's middle (owner, Nov 20). */
-function PlusMark({ minus = false }: { minus?: boolean }) {
+function PlusMarkBase({ minus = false }: { minus?: boolean }) {
   return (
     <svg aria-hidden width="9" height="9" viewBox="0 0 10 10" className="shrink-0 opacity-70" style={{ marginRight: 1 }}>
       <path d={minus ? "M1.5 5h7" : "M1.5 5h7M5 1.5v7"} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }
+
+const PlusMark = memo(PlusMarkBase);
 
 /** The + pills' icons, flat lines in the pill's ink (owner's picks, Nov 20). */
 const PILL_ICONS: Record<string, string> = {
@@ -1886,7 +1888,7 @@ const PILL_ICONS: Record<string, string> = {
   // Color: the card's own colour, filled (drawn below).
   color: "",
 };
-function PillIcon({ k, color }: { k: string; color?: string | null }) {
+function PillIconBase({ k, color }: { k: string; color?: string | null }) {
   if (k === "color")
     return <span aria-hidden className="h-3.5 w-3.5 shrink-0 rounded-full" style={{ border: "1.4px solid #8a6116", background: color ?? "linear-gradient(180deg, #fbf3dc, #e6cf98)" }} />;
   return (
@@ -1901,6 +1903,8 @@ function PillIcon({ k, color }: { k: string; color?: string | null }) {
     </svg>
   );
 }
+
+const PillIcon = memo(PillIconBase);
 
 /** YYYY-MM-DD for the day `n` days back, on this device. */
 function dayKeyAgo(n: number) {

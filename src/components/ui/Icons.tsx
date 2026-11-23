@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 /**
  * Hand-drawn treasure icons in the Adventure palette: a minted gold coin, a
  * cut diamond (rewards), and a treasure chest (rewards in menus).
@@ -83,7 +85,7 @@ export function BoltIcon({ size = 22 }: { size?: number }) {
 }
 
 /** The one settings gear used across the app (beside a section, in a chat, on a card). */
-export function GearIcon({ size = 16 }: { size?: number }) {
+function GearIconBase({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
@@ -96,6 +98,8 @@ export function GearIcon({ size = 16 }: { size?: number }) {
     </svg>
   );
 }
+
+export const GearIcon = memo(GearIconBase);
 
 /** Snooze, the same everywhere in the app: a little timer with a "z" (owner, Nov 2: not a moon). */
 export function SnoozeIcon({ size = 15 }: { size?: number }) {
@@ -110,13 +114,15 @@ export function SnoozeIcon({ size = 15 }: { size?: number }) {
 }
 
 /** A close ✕ drawn as two strokes, so it sits dead centre in its circle (a typed × rides off-centre in most fonts; owner, Nov 4). */
-export function CloseIcon({ size = 14, strokeWidth = 2.4 }: { size?: number; strokeWidth?: number }) {
+function CloseIconBase({ size = 14, strokeWidth = 2.4 }: { size?: number; strokeWidth?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden style={{ display: "block", margin: "0 auto", flexShrink: 0 }}>
       <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" />
     </svg>
   );
 }
+
+export const CloseIcon = memo(CloseIconBase);
 
 /** The magic calendar (owner's pick, Nov 9: "Bd"): a calendar with a star and a dot of time. For Auto-schedule and Plan my day. */
 export function MagicCalendarIcon({ size = 16 }: { size?: number }) {
