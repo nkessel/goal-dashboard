@@ -38,6 +38,8 @@ import { DEFAULT_HOUR_PX, savedCalHour, ADVENTURE_HOUR_PX, MIN_HOUR_PX, MAX_HOUR
 import { DaysZoom, HoursButton, GoToday, TodayCrest } from "./week/controls";
 import { RainPct, RainCloud } from "./week/weather";
 import { holdMenuAt, DailyBlocks } from "./week/DailyBlocks";
+import { laneLayout, placeOnGrid, type GridItem } from "./week/lanes";
+import { calendarItems } from "@/lib/calendar-items";
 
 /**
  * Whether this is the browser, after hydration. The server's clock is in another time zone than the person's,
@@ -736,8 +738,6 @@ export function WeekView({
     x.setHours(H0, 0, 0, 0);
     return x.getTime();
   };
-  /** Whether something lies wholly before or after the hours shown (those wait behind the Earlier/Later buttons). */
-  const hidden = { early: 0, late: 0 };
   // The hour's label, with its temperature beneath it when one day is on screen (owner, Nov 12: "put the temperature beneath/next to the times").
   const hourLabel = (row: number) => {
     const w = single ? weather?.[dayKeys[seamless ? Math.max(0, Math.min(days.length - 1, firstIdx)) : 0]]?.[H0 + row] : undefined;
@@ -912,13 +912,6 @@ export function WeekView({
     ro.observe(box);
     return () => ro.disconnect();
   }, [seamless, early, late]);
-  const outside = (start: Date, end: Date, day: Date) => {
-    const a = (start.getTime() - gridStart(day)) / 60_000;
-    const b = (end.getTime() - gridStart(day)) / 60_000;
-    if (b <= 0) hidden.early++;
-    else if (a >= gridMinutes) hidden.late++;
-    return b <= 0 || a >= gridMinutes;
-  };
   /** Minutes from the top of the grid, clamped to it. */
   const offset = (d: Date, day: Date) => Math.min(gridMinutes, Math.max(0, (d.getTime() - gridStart(day)) / 60_000));
 
@@ -1070,32 +1063,12 @@ export function WeekView({
     };
   }, []);
 
-  type Item =
-    | { kind: "task"; key: string; dayIndex: number; top: number; bottom: number; start: Date; end: Date; task: Task }
-    | { kind: "event"; key: string; dayIndex: number; top: number; bottom: number; start: Date; end: Date; event: GoogleCalendarEvent };
-  const items: Item[] = [];
-  for (const event of hydrated ? events : []) {
-    if (event.isAllDay || hiddenEvents.has(event.id)) continue;
-    const start = new Date(event.start);
-    const end = new Date(event.end);
-    const dayIndex = days.findIndex((d) => isSameDay(d, start));
-    if (dayIndex === -1) continue;
-    if (outside(start, end, days[dayIndex])) continue;
-    const top = offset(start, days[dayIndex]);
-    items.push({ kind: "event", key: `e-${event.id}`, dayIndex, top, bottom: Math.max(top + 20, offset(end, days[dayIndex])), start, end, event });
-  }
-  for (const task of hydrated ? tasks : []) {
-    if (!showsOnCalendar(task)) continue;
-    const { start, end } = getTaskDisplayWindow(task);
-    const dayIndex = days.findIndex((d) => isSameDay(d, start));
-    if (dayIndex === -1) continue;
-    if (outside(start, end, days[dayIndex])) continue;
-    // A short quest (a 15-minute mini-quest) still gets room for its card: at least ~30px tall. One that starts
-    // late at night moves up just enough that its card stays inside the grid, not cut at the bottom.
-    const minMins = Math.max(20, (30 / HOUR_PX) * 60);
-    const top = Math.max(0, Math.min(offset(start, days[dayIndex]), gridMinutes - minMins));
-    items.push({ kind: "task", key: `t-${sessionRef(task)}`, dayIndex, top, bottom: Math.max(top + minMins, offset(end, days[dayIndex])), start, end, task });
-  }
+  // One list of what's on the calendar (planner step 4, `lib/calendar-items.ts`), laid out on the grid
+  // (`week/lanes.ts`, split plan C2). Cards are drawn only in the browser (see `useHydrated`).
+  const placed = placeOnGrid(calendarItems(hydrated ? tasks : [], hydrated ? events : [], { hiddenEvents }), { days, h0: H0, gridMinutes, hourPx: HOUR_PX });
+  const hidden = placed.hidden;
+  type Item = GridItem;
+  const items: Item[] = placed.items;
 
   // An item being dragged (or just dropped, until fresh data arrives) shows at its new spot.
   for (let i = 0; i < items.length; i++) {
@@ -1106,27 +1079,7 @@ export function WeekView({
   }
 
   // Side-by-side lanes for overlapping items on the same day.
-  const lanes = new Map<string, { lane: number; count: number }>();
-  for (let d = 0; d < days.length; d++) {
-    const dayItems = items.filter((x) => x.dayIndex === d).sort((a, b) => a.top - b.top || b.bottom - a.bottom);
-    let cluster: { it: Item; lane: number }[] = [];
-    let clusterEnd = -1;
-    const flush = () => {
-      const count = Math.max(1, ...cluster.map((c) => c.lane + 1));
-      cluster.forEach((c) => lanes.set(c.it.key, { lane: c.lane, count }));
-      cluster = [];
-    };
-    for (const it of dayItems) {
-      if (it.top >= clusterEnd && cluster.length) flush();
-      const laneEnds: number[] = [];
-      cluster.forEach((c) => (laneEnds[c.lane] = Math.max(laneEnds[c.lane] ?? -1, c.it.bottom)));
-      let lane = laneEnds.findIndex((end) => end <= it.top);
-      if (lane === -1) lane = laneEnds.length;
-      cluster.push({ it, lane });
-      clusterEnd = Math.max(clusterEnd, it.bottom);
-    }
-    if (cluster.length) flush();
-  }
+  const lanes = laneLayout(items, days.length);
 
   // Quest cards dragged in from Today's lists (dnd-kit, finger or mouse) ask here where they'd land.
   function hitAt(x: number, y: number): { dayIndex: number; min: number } | null {
