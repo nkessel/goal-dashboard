@@ -26,9 +26,7 @@ import { Fragment, useEffect, useEffectEvent, useRef, useState, useSyncExternalS
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
-  deleteQuestTemplateAction,
   listQuestTemplatesAction,
-  saveQuestTemplateAction,
   setTaskAlsoOnAction,
   completeTaskAction,
   createBoardFromEditorAction,
@@ -85,6 +83,7 @@ import { localDate, localTime, shortTime, slotWords, planByIn, dueIso, dueChipLa
 import { PinGlyph, FactCaret } from "./editor/glyphs";
 import { AutoGrowText } from "./editor/AutoGrowText";
 import { EditorTags } from "./editor/EditorTags";
+import { EditorSaveTemplate, TemplateList } from "./editor/EditorTemplates";
 import { LABEL_CLS, chipBorderFor, fieldStyleFor, smallBtnClass } from "./editor/style";
 
 export type { QuestDraft, QuestEditorMode };
@@ -335,7 +334,6 @@ export function QuestEditorDialog({
   // Quest templates: ready-made quests to start from (new quests), and saving one (existing quests).
   const [templates, setTemplates] = useState<QuestTemplate[] | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
-  const [templateNote, setTemplateNote] = useState<string | null>(null);
   function applyTemplate(t: QuestTemplate) {
     setTitle(t.title);
     setDescription(t.description ?? "");
@@ -349,9 +347,8 @@ export function QuestEditorDialog({
     setStepsDirty(true);
     setShowTemplates(false);
   }
-  function saveAsTemplate() {
-    setTemplateNote(null);
-    const tpl = {
+  function buildTemplate(): QuestTemplate {
+    return {
       id: `t${crypto.randomUUID().slice(0, 8)}`,
       name: title.trim(),
       title: title.trim(),
@@ -364,13 +361,6 @@ export function QuestEditorDialog({
       effort,
       steps: (steps ?? []).map((st) => st.title.trim()).filter(Boolean),
     };
-    saveQuestTemplateAction(tpl).then(
-      (list) => {
-        setTemplates(list);
-        setTemplateNote("Saved as a template ✓ — it's in the quest creator now");
-      },
-      (e) => setTemplateNote(e instanceof Error ? e.message : "Couldn't save the template.")
-    );
   }
   const [alsoError, setAlsoError] = useState<string | null>(null);
   function saveAlsoOn(next: string[]) {
@@ -2176,14 +2166,7 @@ export function QuestEditorDialog({
     ),
     template: (
       <>
-              {task && !review && title.trim() && (
-                <div className="flex flex-wrap items-center gap-2 pl-7 text-[13px]">
-                  <button type="button" onClick={saveAsTemplate} className="underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }} title="Keep this quest (with its steps) as a ready-made one in the quest creator">
-                    📜 Save as a template
-                  </button>
-                  {templateNote && <span style={{ color: "var(--t-ink)" }}>{templateNote}</span>}
-                </div>
-              )}
+              {task && !review && title.trim() && <EditorSaveTemplate build={buildTemplate} onSaved={setTemplates} />}
       </>
     ),
   };
@@ -2550,35 +2533,7 @@ export function QuestEditorDialog({
           {/* Templates and quick sets, opened from the 📜 button at the top (new quests only). */}
           {create && !doingNow && showTemplates && (
             <div className="reveal flex flex-col gap-1.5 rounded-xl p-1.5" style={{ background: "rgba(70,50,20,.07)", border: "1px solid rgba(139,112,64,.25)" }}>
-              {templates && templates.length > 0 && (
-                <ul className="m-0 flex list-none flex-col gap-1 p-0">
-                  {templates.map((t) => (
-                    <li key={t.id} className="flex items-center gap-1">
-                      <button type="button" onClick={() => applyTemplate(t)} className="flex min-h-11 min-w-0 flex-1 flex-col items-start rounded-lg px-2.5 py-1.5 text-left hover:bg-black/[.05]">
-                        <span className="truncate text-[15px] font-semibold" style={{ color: "var(--t-ink)" }}>
-                          {t.name}
-                        </span>
-                        <span className="text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
-                          {[t.steps.length ? `${t.steps.length} steps` : null, t.estimateMinutes ? `${t.estimateMinutes} min` : null, t.boardId ? boardOptions?.find((o) => o.id === t.boardId)?.label : null].filter(Boolean).join(" · ")}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTemplates((l) => (l ?? []).filter((x) => x.id !== t.id));
-                          void deleteQuestTemplateAction(t.id).catch(() => {});
-                        }}
-                        aria-label={`Delete the ${t.name} template`}
-                        title="Delete this template"
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[17px] leading-none hover:bg-black/[.06]"
-                        style={{ color: "var(--t-ink-soft)" }}
-                      >
-                        <CloseIcon size={10} />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              {templates && templates.length > 0 && <TemplateList templates={templates} setTemplates={setTemplates} onApply={applyTemplate} boardOptions={boardOptions} />}
           {/* Presets: one tap sets several attributes at once (new quests only). */}
           {(
             <div className="flex flex-wrap items-center gap-1.5 px-1 pt-1" role="group" aria-label="Quest presets">
