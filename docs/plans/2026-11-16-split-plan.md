@@ -249,8 +249,8 @@ Baselines from S3 (Nov 22, `main` at the Cal 3 commit, clean `next build --webpa
 - [x] L1 (Nov 21) · [x] L2 (Nov 22) · [x] L3 (Nov 22, Run C)
 - [x] T1 (Nov 22, Run D) · [x] T2 · [x] T3 · [x] T4 (Nov 22, Run C; `tomorrowMorning` moved into `NudgeNote.tsx` for now, T1 moves it to `snooze-store.ts`) · [x] T5 (Nov 22, Run D) · [ ] T6 · [ ] T7
 - [x] W1 (Nov 22, Run C; `CONFETTI_COLORS` moved with `PIECES`) · [x] W2 (Nov 22, Run D) · [x] W3 (Nov 22, Run C) · [ ] W4 · [ ] W5
-- [ ] I1 · [ ] I2 · [ ] I3 · [ ] I4 · [ ] I5 · [ ] I6
-- [x] E1 (Nov 22, Run D) · [~] E2 (Nov 22, Run D: `EditorTags` done; Stats, Template, BoardTray left) · [ ] E3 · [ ] E4 · [ ] E5 · [ ] E6 · [ ] E7 · [ ] E8 · [ ] E9
+- [x] I1 · [x] I2 · [x] I3 · [x] I4 · [x] I5 · [x] I6 (Nov 23, Run D part 2; two extra files: `Ask.tsx` for `Question`, `Choices`, `Choice`, shared by the board step and the wizard, and `OFTEN`, `XP_MAX` live in `types.ts`; the When panel and its helpers sit in `AttrPills.tsx`)
+- [x] E1 (Nov 22, Run D) · [x] E2 (Nov 22-23, Run D: Tags, Template (`TemplateList`, `EditorSaveTemplate`), BoardTray (`EditorStandsFor`, `EditorAlsoOn`); Stats skipped: it has no part of its own, its pill, tray and line sit inside the XP row and `statSplit` is read by Save, so it moved with `EditorXp` as props) · [x] E3 (the place pill and panel only; card look and drive are not pills, drive sits in the place panel, the card look pickers sit in the colour and picture trays) · [ ] E4 · [x] E5 (Xp, Time, ShowsIn, Scales, Matrix, Sequence) · [ ] E6 · [ ] E7 · [~] E8 (Header and Presets done; Portrait and Footer left) · [ ] E9
 - [x] C1 (Nov 22, Run D) · [ ] C2 · [ ] C3 · [ ] C4
 - [x] D0 (Nov 21) · [x] D1 (Nov 21) · [x] D2 (Nov 22, Run D: migration 0099) · [x] D3 (Nov 22, Run D) · [ ] D4 · [ ] D5
 
