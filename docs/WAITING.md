@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Run B thread, Cal 4/5 snapshot compare (Sonnet, Nov 23 02:30 UTC):** `wip/calendar-items` vs `main` with `--snapshot`/`--compare`; merge only on 0 differences.
+
 - **Run B thread, Run G picks (Opus, Nov 23 02:14 UTC):** XP/coin math tests, undo-completion bugs.
 
 - **Dev loop 2 run 43 (Opus, Nov 23 01:58 UTC, takes over run 42's claim, which left nothing):** UI check on `main` for the flows Run C, D and E moved code in (phone, then tablet), fix regressions; then open feedback notes that are bug fixes.
