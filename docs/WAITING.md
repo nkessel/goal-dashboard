@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Run B thread, Run H picks (Sonnet, Nov 23 02:16 UTC):** auto-scheduler counts, marking built feedback.
+
 - **Dev loop 2 run 43 (Opus, Nov 23 01:58 UTC, takes over run 42's claim, which left nothing):** UI check on `main` for the flows Run C, D and E moved code in (phone, then tablet), fix regressions; then open feedback notes that are bug fixes.
 
 - **Dev loop 2 runs 40–41 note (Nov 22, 23:26 and 23:56 UTC):** Run C, then Run D (actions.ts split, live on `main` 23:32 onward) are another session's; no new feedback notes since Nov 21 17:39; everything else is a design change or already parked. Nothing built; UI check left for after Run D's split lands.
