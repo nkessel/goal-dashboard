@@ -17,7 +17,7 @@ import { TimeToken } from "@/components/xp/NightFields";
 import { LinkOuts } from "@/components/ui/Linked";
 import { TimeWheels } from "@/components/ui/TimeWheels";
 import { NumberInput } from "@/components/ui/NumberInput";
-import { GearIcon, CloseIcon } from "@/components/ui/Icons";
+import { CloseIcon } from "@/components/ui/Icons";
 import { Fragment, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -78,6 +78,7 @@ import { EditorTime } from "./editor/EditorTime";
 import { EditorShowsIn } from "./editor/EditorShowsIn";
 import { EditorMatrix } from "./editor/EditorMatrix";
 import { EditorSequence } from "./editor/EditorSequence";
+import { EditorHeader } from "./editor/EditorHeader";
 import { EditorXp } from "./editor/EditorXp";
 import { EditorAlsoOn, EditorStandsFor } from "./editor/EditorBoardTray";
 import { EditorTags } from "./editor/EditorTags";
@@ -1962,33 +1963,7 @@ export function QuestEditorDialog({
           </div>
         )}
         <div className="qe-body relative z-[1] flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4">
-          {/* Stays put while scrolling, small and out of the way. */}
-          <div
-            data-embed-hide
-            className="sticky -top-4 z-20 -mx-4 -mb-1.5 -mt-4 flex items-center justify-between px-4 pb-1 pt-1.5"
-            style={{ background: `linear-gradient(180deg, ${isAdventure ? "var(--t-panel)" : "var(--t-card)"} 70%, transparent)` }}
-          >
-            {/* The quest's own title stays at the top while you scroll. */}
-            <h3 className={`m-0 min-w-0 flex-1 truncate pr-2 text-[15px] ${isAdventure ? "font-display" : "font-bold"}`} style={{ color: "var(--t-ink-soft)" }}>
-              {heading}
-            </h3>
-            {!toolbarHost && toolbarButtons}
-            {/* The gear arranges the editor right here: which parts show, and in what order. */}
-            <button
-              type="button"
-              onClick={() => setArranging((v) => !v)}
-              aria-pressed={arranging}
-              aria-label={arranging ? "Done arranging" : "Arrange the editor"}
-              title={arranging ? "Done arranging" : "Arrange the editor"}
-              className="settings-gear ml-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-black/5"
-              style={{ color: "var(--t-ink-soft)", background: arranging ? "rgba(217,180,95,.3)" : undefined }}
-            >
-              <GearIcon size={18} />
-            </button>
-            <button type="button" onClick={requestClose} aria-label="Close" className="-mr-1.5 flex h-8 w-8 items-center justify-center rounded-full text-[22px] leading-none hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
-              <CloseIcon size={13} />
-            </button>
-          </div>
+          <EditorHeader isAdventure={isAdventure} heading={heading} toolbar={!toolbarHost && toolbarButtons} arranging={arranging} setArranging={setArranging} requestClose={requestClose} />
 
           {altAction && (
             <button type="button" onClick={altAction.onClick} className="-mt-1.5 self-start text-[13.5px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
