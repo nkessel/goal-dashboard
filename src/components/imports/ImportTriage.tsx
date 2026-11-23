@@ -30,6 +30,7 @@ import { NumberInput } from "@/components/ui/NumberInput";
 import type { Task } from "@/lib/data/types";
 import { ScheduleWithin as SchedRate, withinLabel } from "@/components/tasks/ScheduleWithin";
 import { ATTRS, ATTRS_KEY, ATTR_LAYOUT_KEY, ATTR_SHOWN_DEFAULT, AttrKey, Attrs, BoardOpt, BoardsCtx, COIN_DEFAULT, DAY_NAMES, Draft, GOLD, INK, KINDS, KIND_ONE, Kind, OFTEN, SERVER_KIND, SOFT, Step, XP_DEFAULT, addLabel, chip, dayLabel, draftFor, fieldStyle, findBoard, importLabel, importWhere, inDays, keyOf, minutesLabel, nextDow, now, oftenLabel, pickOff, pickOn, planLabel, planOptions, questExtras, rateable, readJSON, tinyAttrs, withAttrs, writeJSON } from "./triage/types";
+import { Choice, Choices, Question } from "./triage/Ask";
 
 /*
  * Sorting imports, one card at a time: Import, Snooze or Skip. Import walks
@@ -1363,36 +1364,6 @@ function ListRow({ card, first, onEdit, onRetag, onRate, attrs, shownAttrs, onAt
       <ImportFoot card={card} small later={more} onLater={() => setMore((v) => !v)} onImport={onImport} onDone={onDone} onDelete={onDelete} />
       <LaterRow open={more} small done={card.kind === "done"} onSnooze={onSnooze} onSkip={onSkip} onDelete={onDelete} onQuick={onQuick} />
     </li>
-  );
-}
-
-function Question({ children, hint }: { children: React.ReactNode; hint?: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <h3 className="m-0 font-display text-[20px]">{children}</h3>
-      {hint && (
-        <span className="text-[13px]" style={{ color: "#6b5631" }}>
-          {hint}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function Choices({ children }: { children: React.ReactNode }) {
-  return <div className="flex flex-wrap gap-2">{children}</div>;
-}
-
-function Choice({ on, onClick, children, note }: { on: boolean; onClick: () => void; children: React.ReactNode; note?: string }) {
-  return (
-    <button type="button" onClick={onClick} aria-pressed={on} className="flex items-center gap-1.5 rounded-full px-4 text-[14.5px] font-semibold" style={chip(on, true)}>
-      {children}
-      {note && (
-        <span className="text-[11.5px] font-normal italic" style={{ color: "#7a6440" }}>
-          {note}
-        </span>
-      )}
-    </button>
   );
 }
 
