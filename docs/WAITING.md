@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Run B thread, Run E (Opus, Nov 23 00:59 UTC):** E4, E6, E7, When 2, When 3, Cal 4, Cal 5, T7, W4, W5, E9, tabs faster loads.
+
 - **Dev loop 2 run 42 (Opus, Nov 23 00:57 UTC):** full UI check on `main` after Run D's split (C, D, I moves), fix any regressions; then open feedback notes that are bug fixes.
 
 - **Dev loop 2 runs 40–41 note (Nov 22, 23:26 and 23:56 UTC):** Run C, then Run D (actions.ts split, live on `main` 23:32 onward) are another session's; no new feedback notes since Nov 21 17:39; everything else is a design change or already parked. Nothing built; UI check left for after Run D's split lands.
