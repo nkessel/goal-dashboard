@@ -343,7 +343,8 @@ function JournalComposer({ feedback = false, isAdventure, onDone }: { feedback?:
           /* storage unavailable */
         }
         setSaved(true);
-        setTimeout(onDone, 900);
+        // A journal entry stays a little longer, so its "See all entries" link can be tapped.
+        setTimeout(onDone, feedback ? 900 : 2200);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't save.");
       }
@@ -366,6 +367,11 @@ function JournalComposer({ feedback = false, isAdventure, onDone }: { feedback?:
         <p className={`m-0 ${isAdventure ? "font-display text-xl" : "text-lg font-bold"}`}>
           {!feedback ? "Written in your journal" : kind === "future" ? "Saved to the future ideas log" : "Feedback sent — it goes into the next update"}
         </p>
+        {!feedback && (
+          <Link href="/journal" onClick={onDone} className="flex min-h-8 items-center text-[13px] underline decoration-[#c9a24a] underline-offset-[3px]" style={{ color: "var(--t-ink-soft)" }}>
+            See all entries
+          </Link>
+        )}
       </div>
     );
   }

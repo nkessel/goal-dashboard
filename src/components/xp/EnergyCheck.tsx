@@ -715,7 +715,16 @@ export function EnergyCheck({
                       </span>
                     )}
                     {suppSaved && <span className="confirm-pop text-[12.5px]" style={{ color: "var(--ec-gold, #f2d27e)" }}>✓ {suppSaved}</span>}
-                    {journalSaved && <span className="confirm-pop text-[12.5px]" style={{ color: "var(--ec-gold, #f2d27e)" }}>✓ In your journal</span>}
+                    {/* Past entries one tap away once it's saved (owner, Nov 20 [61806de0]): a small word, like Edit. It stays (fades in,
+                        not out) so the link can still be tapped; opening the Journal again clears it. */}
+                    {journalSaved && (
+                      <span className="fade-in flex items-baseline gap-2 text-[12.5px]" style={{ color: "var(--ec-gold, #f2d27e)" }}>
+                        ✓ In your journal
+                        <Link href="/journal" className="underline decoration-[#c9a24a] underline-offset-[3px]" style={{ color: "var(--t-cream)", opacity: 0.85 }}>
+                          See all
+                        </Link>
+                      </span>
+                    )}
                   </div>
                 )}
                 <Fold open={supping}>

@@ -981,6 +981,18 @@ export const FLOWS = [
       await h.settle(900);
       if ((await h.page.locator(".create-sheet").count()) === 0) throw new Error("+ sheet closed itself after reopening");
       await h.check("+ sheet reopened");
+      // A journal entry from the + sheet: its "Written in your journal" screen links to past entries (owner, Nov 20 [61806de0]).
+      if (await h.tap((p) => p.locator(".create-sheet button", { hasText: /journal entry/i }).first(), "journal entry", { optional: true, expectMove: true })) {
+        await h.typeIn((p) => p.locator(".create-sheet textarea:visible").first(), "a short journal note");
+        if (await h.tap((p) => p.locator(".create-sheet button", { hasText: /^(save|write it|keep it)/i }).first(), "save journal entry", { optional: true, expectMove: true })) {
+          await h.settle(500);
+          const seeAll = await h.page.locator("a[href='/journal']", { hasText: /see all entries/i }).count();
+          await h.check("journal written: see all entries");
+          if (!seeAll) h.record({ kind: "journal-see-all", severity: "error", target: "journal written", detail: "No See all entries link after writing in the journal" });
+          await h.settle(2400);
+          return;
+        }
+      }
       await esc(h);
     },
   },
@@ -1345,6 +1357,16 @@ export const FLOWS = [
         if (!kept) h.record({ kind: "checkin-draft", severity: "error", target: "check-in draft", detail: "A started check-in wasn't kept after leaving and coming back" });
         await h.check("check-in: kept from earlier");
         await h.tap((p) => p.locator("[data-checkin-draft] button").first(), "start fresh", { optional: true, expectMove: true });
+      }
+      // Saved to the journal: "✓ In your journal" with a See all link to past entries (owner, Nov 20 [61806de0]).
+      if (await h.tap((p) => p.locator("section[aria-label='Check in'] button", { hasText: /^✎ Journal$|^Journal$/ }).first(), "check-in journal again", { optional: true, expectMove: true })) {
+        await h.settle(400);
+        await h.page.locator("[data-checkin-journal] textarea").first().fill("A calm morning").catch(() => {});
+        if (await h.tap((p) => p.getByRole("button", { name: /^save to journal$/i }).first(), "save to journal", { optional: true, expectMove: true })) {
+          await h.settle(600);
+          await h.check("check-in journal saved: see all");
+          if (!(await h.page.locator("a[href='/journal']", { hasText: /^see all$/i }).count())) h.record({ kind: "journal-see-all", severity: "error", target: "check-in journal saved", detail: "No See all link after saving to the journal" });
+        }
       }
       // Spin the Wheel of Time by hand (owner, Nov 9): past halfway it sticks and asks what turned it.
       {
