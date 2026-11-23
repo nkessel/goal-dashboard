@@ -5,10 +5,8 @@ import { XpGuide } from "@/components/tour/XpGuide";
 import { IconScale } from "./IconScale";
 import { sessionRef } from "@/lib/calendar-task-window";
 import { InlineNumber } from "@/components/ui/InlineNumber";
-import { saveQuestPlace, useQuestPlace } from "@/lib/use-quest-places";
-import { DrivePicks } from "./DrivePicks";
 import { CardLookPicker } from "@/components/calendar/CardLookPicker";
-import { driveWords, saveQuestWindow, useQuestDrive, useQuestWindow } from "@/lib/use-quest-cal";
+import { saveQuestWindow, useQuestWindow } from "@/lib/use-quest-cal";
 import { minutesOf, rangeWords } from "@/lib/auto-schedule";
 import { TimeRangePick } from "@/components/ui/TimeRangePick";
 import { useProgressUnit, saveProgressUnit } from "@/lib/use-progress-units";
@@ -78,7 +76,8 @@ import { readEditorLayout, serverEditorLayout, subscribeEditorLayout, type Edito
 import { DateField } from "@/components/ui/DateField";
 import type { QuestDraft, QuestEditorMode } from "./editor/types";
 import { localDate, localTime, shortTime, slotWords, planByIn, dueIso, dueChipLabel, dueQuickPicks, ESTIMATE_PICKS } from "./editor/dates";
-import { PinGlyph, FactCaret } from "./editor/glyphs";
+import { FactCaret } from "./editor/glyphs";
+import { PlacePanel, PlacePill } from "./editor/EditorPlaceLook";
 import { AutoGrowText } from "./editor/AutoGrowText";
 import { EditorAlsoOn, EditorStandsFor } from "./editor/EditorBoardTray";
 import { EditorTags } from "./editor/EditorTags";
@@ -575,8 +574,6 @@ export function QuestEditorDialog({
   const est = estimate.trim() ? Math.max(0, Math.round(Number(estimate))) : null;
   const chunkMinutes = chunk.trim() && Number(chunk) > 0 ? Math.round(Number(chunk)) : null;
   const dueAt = dueIso(dueDate, dueTime);
-  const place = useQuestPlace(task?.id);
-  const drive = useQuestDrive(task?.id);
   // Its own time range for the auto-scheduler ("sometime before 2 PM"; owner, Nov 16).
   const timeWindow = useQuestWindow(task?.id);
 
@@ -2567,39 +2564,11 @@ export function QuestEditorDialog({
                     )}
                     {/* Where it happens: an icon-only pill, last (owner, Nov 3); shown on the card too. */}
                     {task && !doingNow && (
-                      <button type="button" onClick={() => setFactOpen((o) => (o === "place" ? null : "place"))} aria-expanded={factOpen === "place"} aria-label={place ? `Location: ${place}` : "Add a location"} title={place ? `📍 ${place}` : "Where it happens"} className="qe-fact flex h-9 items-center gap-1 rounded-full px-2.5 text-[13.5px] font-semibold" data-open={factOpen === "place" ? "true" : undefined}>
-                        <PinGlyph />
-                        {/* Says what it is when empty (owner, Nov 20: "have this say location"). */}
-                        <span className="max-w-[110px] truncate">{place || "Location"}</span>
-                        {drive && <span className="shrink-0 whitespace-nowrap" style={{ opacity: 0.8 }}>· 🚗 {driveWords(drive)}</span>}
-                      </button>
+                      <PlacePill taskId={task.id} open={factOpen === "place"} onToggle={() => setFactOpen((o) => (o === "place" ? null : "place"))} />
                     )}
 
                   </div>
-                  {factOpen === "place" && task && (
-                    <div key="place" data-pill-tray className="reveal qe-fact-panel pill-tray-box flex flex-col gap-2 rounded-xl p-3">
-                    <div className="flex items-center gap-2">
-                      <PinGlyph />
-                      <input
-                        autoFocus
-                        defaultValue={place ?? ""}
-                        placeholder="Where? (e.g. Natick library)"
-                        aria-label="Where it happens"
-                        onBlur={(e) => void saveQuestPlace(task.id, e.target.value).catch(() => {})}
-                        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), (e.target as HTMLInputElement).blur(), setFactOpen(null))}
-                        className="h-9 min-w-0 flex-1 rounded-lg border px-2 text-[16px]"
-                        style={fieldStyle}
-                      />
-                      {place && (
-                        <button type="button" onClick={() => (void saveQuestPlace(task.id, null).catch(() => {}), setFactOpen(null))} aria-label="No place" className="h-9 w-7 shrink-0 text-[18px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
-                          <CloseIcon size={11} />
-                        </button>
-                      )}
-                    </div>
-                    {/* Driving there and back (owner, Nov 12: "the option for driving time is crucial"): kept free on the calendar. */}
-                    <DrivePicks taskId={task.id} />
-                    </div>
-                  )}
+                  {factOpen === "place" && task && <PlacePanel key="place" taskId={task.id} onClose={() => setFactOpen(null)} fieldStyle={fieldStyle} />}
                   {/* Under the row: the sub-quests drawer (pointing up at its pill) and the sequence's panel. */}
                   {facts.includes("sequence") && partNodes.sequence}
                   {factOpen === "due" && (
