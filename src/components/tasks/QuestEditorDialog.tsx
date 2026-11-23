@@ -62,7 +62,6 @@ import { isNetworkError, isOffline, queueOffline, saveOrQueue } from "@/lib/offl
 import { addOptimisticQuest, markOptimisticQueued, resolveOptimisticQuest } from "@/lib/optimistic-quests";
 import { CoinIcon } from "@/components/ui/Icons";
 import { EditorScale } from "./editor/EditorScales";
-import { QuestPicker, SequenceDialog } from "./Sequence";
 import { coinsForXp } from "@/lib/coins";
 import type { QuestTemplate } from "@/lib/quest-templates";
 import { descendants, parentKeys, stepPayload, stepsShare, stepWeights, treeOrder, type StepDraft } from "@/lib/quest-steps";
@@ -78,6 +77,7 @@ import { AutoGrowText } from "./editor/AutoGrowText";
 import { EditorTime } from "./editor/EditorTime";
 import { EditorShowsIn } from "./editor/EditorShowsIn";
 import { EditorMatrix } from "./editor/EditorMatrix";
+import { EditorSequence } from "./editor/EditorSequence";
 import { EditorXp } from "./editor/EditorXp";
 import { EditorAlsoOn, EditorStandsFor } from "./editor/EditorBoardTray";
 import { EditorTags } from "./editor/EditorTags";
@@ -215,7 +215,6 @@ export function QuestEditorDialog({
     mode.kind === "create" && mode.after ? [{ rel: "after", pick: mode.after }] : []
   );
   const [seqOpen, setSeqOpen] = useState(() => mode.kind === "create" && !!mode.after);
-  const [seqAdding, setSeqAdding] = useState<"after" | "before" | null>(null);
   const [seqDialog, setSeqDialog] = useState(false);
   /** The sequence window opens by adding "Follow-up work" after this quest (and opening it to edit). */
   const [seqFollow, setSeqFollow] = useState(false);
@@ -1620,70 +1619,7 @@ export function QuestEditorDialog({
                       each, no menu of choices. Sequence opens the sequence window (or, on a new quest, its panel here). */}
                   {layout.folded.includes("sequence") && seqPills}
                   {!stepsUnavailable && <Fold open={stepsOpen}>{stepsDrawer}</Fold>}
-                  {!task && seqOpen && (
-                    <div className="reveal flex flex-col gap-2 rounded-xl px-3 py-2.5" style={{ border: "1px dashed rgba(139,112,64,.5)" }}>
-                      <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-                        A quest after another stays stacked out of sight until that one is done.
-                      </p>
-                      {seqLinks.length > 0 && (
-                        <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[14px]">
-                          {seqLinks.map((l, i) => (
-                            <li key={i} className="flex min-h-8 items-center gap-2">
-                              <span className="shrink-0 text-[12.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
-                                {l.rel === "after" ? "Comes after" : "Then"}
-                              </span>
-                              <span className="min-w-0 flex-1 truncate">
-                                {l.pick.id ? "" : "＋ "}
-                                {l.pick.title}
-                              </span>
-                              <button type="button" onClick={() => setSeqLinks((ls) => ls.filter((_, j) => j !== i))} aria-label={`Remove ${l.pick.title}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
-                                <CloseIcon size={9} />
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      {seqAdding ? (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[12.5px] font-semibold">{seqAdding === "after" ? "This quest comes after…" : "After this quest comes…"}</span>
-                          <QuestPicker
-                            autoFocus
-                            exclude={seqLinks.map((l) => l.pick.id).filter(Boolean) as string[]}
-                            onPick={(p) => {
-                              setSeqLinks((ls) => [...ls, { rel: seqAdding, pick: p }]);
-                              setSeqAdding(null);
-                            }}
-                          />
-                          <button type="button" onClick={() => setSeqAdding(null)} className="self-start text-[12.5px] underline" style={{ color: "var(--t-ink-soft)" }}>
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap gap-1.5">
-                          <button type="button" onClick={() => setSeqAdding("after")} className="flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px dashed rgba(139,112,64,.6)" }}>
-                            ↑ Comes after a quest
-                          </button>
-                          <button type="button" onClick={() => setSeqAdding("before")} className="flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px dashed rgba(139,112,64,.6)" }}>
-                            ↓ Add what comes next
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {task && seqDialog && (
-                    <SequenceDialog
-                      taskId={task.id}
-                      title={title}
-                      isAdventure={isAdventure}
-                      addFollowUp={seqFollow}
-                      onClose={() => (setSeqDialog(false), setSeqFollow(false))}
-                      onEditSelf={() => setSeqDialog(false)}
-                      onStepsMoved={() => {
-                        setStepsDirty(false);
-                        setStepsReload((n) => n + 1);
-                      }}
-                    />
-                  )}
+                  <EditorSequence task={task} title={title} isAdventure={isAdventure} seqOpen={seqOpen} seqLinks={seqLinks} setSeqLinks={setSeqLinks} seqDialog={seqDialog} setSeqDialog={setSeqDialog} seqFollow={seqFollow} setSeqFollow={setSeqFollow} setStepsDirty={setStepsDirty} setStepsReload={setStepsReload} />
                 </div>
               )}
       </>
