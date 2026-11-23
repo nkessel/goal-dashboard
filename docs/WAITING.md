@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 49 (Sonnet, Nov 23 07:30 UTC):** runs 46 and 48 hold fresh claims, so this run takes E9 (editor lighter): perf scenario fix, `npm run perf -- --only editor` baseline, then memo on the editor parts (no screen change).
+
 - **Dev loop 2 run 48 (Opus, Nov 23 07:05 UTC):** run 46 (06:00) holds the UI check and bug-fix notes, so this run takes note 61806de0 (a "see all" link to the journal after a check-in journal is saved), a small wording change, on `review/journal-see-all` with a review page.
 
 - **Dev loop 2 run 46 (Opus, Nov 23 06:00 UTC, takes over run 45's claim, 2 hours old with nothing pushed):** UI check on `main` @ b06f56e for the Run E/G/H and Cal 4/5 flows (the "Open for the next Dev loop 2 run" list) plus desktop `todaycal`, phone then tablet; fix regressions straight to `main`; then bug-fix feedback notes.
