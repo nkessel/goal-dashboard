@@ -12,7 +12,7 @@ import * as feedbackData from "@/lib/data/feedback";
 import * as rewardsData from "@/lib/data/rewards";
 import { finishTaskForOwner as finishTask } from "@/lib/data/quest-ops";
 import { requireProfileId, readExtras } from "./_shared";
-import { getOwnWordsAction, getWelcomeLayoutAction } from "./rest";
+import { getOwnWordsAction, getWelcomeLayoutAction } from "./import-cards";
 import { questCalExtrasAction, questPlacesAction } from "./quest-extras";
 import { toucanPrefsAction } from "./coursework";
 

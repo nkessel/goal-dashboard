@@ -14,4 +14,5 @@ export * from "./actions/extras";
 export * from "./actions/quest-extras";
 export * from "./actions/toucan";
 export * from "./actions/coursework";
+export * from "./actions/import-cards";
 export * from "./actions/rest";
