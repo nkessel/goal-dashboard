@@ -1,7 +1,6 @@
 "use client";
 
 import { PillTrays } from "@/components/ui/PillTrays";
-import { IconScale } from "./IconScale";
 import { sessionRef } from "@/lib/calendar-task-window";
 import { InlineNumber } from "@/components/ui/InlineNumber";
 import { CardLookPicker } from "@/components/calendar/CardLookPicker";
@@ -62,7 +61,7 @@ import { freshKey, loadDrafts, removeDraft, saveDraft, type QuestDraftSave } fro
 import { isNetworkError, isOffline, queueOffline, saveOrQueue } from "@/lib/offline";
 import { addOptimisticQuest, markOptimisticQueued, resolveOptimisticQuest } from "@/lib/optimistic-quests";
 import { CoinIcon } from "@/components/ui/Icons";
-import { LevelScales, useScaleStyle, type ScaleItem } from "@/components/ui/LevelScales";
+import { EditorScale } from "./editor/EditorScales";
 import { QuestPicker, SequenceDialog } from "./Sequence";
 import { coinsForXp } from "@/lib/coins";
 import type { QuestTemplate } from "@/lib/quest-templates";
@@ -147,7 +146,6 @@ export function QuestEditorDialog({
   review?: { index: number; total: number; onLater: () => void };
 }) {
   const embedded = useIsEmbedded();
-  const scaleStyle = useScaleStyle();
   // Which quick-detail chip is open (one at a time).
   const [factOpen, setFactOpen] = useState<EditorPart | "due" | "bonus" | "place" | "look" | null>(null);
   const [boardCard, setBoardCard] = useState(false);
@@ -1116,27 +1114,8 @@ export function QuestEditorDialog({
   // Each part of the editor, placed by the layout chosen in Settings (main list, or under Advanced settings).
   // The 0–5 scales: rows of icons, or (by your choice) bars side by side. As bars, neighbouring
   // scales in the layout stand together in one group, drawn where the first of them sits.
-  const SCALES: Record<string, ScaleItem> = {
-    importance: { key: "importance", label: "Importance", icon: "/design/ui-trophy.svg", value: importance, onChange: setImportance },
-    urgency: { key: "urgency", label: "Urgency", icon: "/design/ui-flame-sm.png", value: urgency, onChange: setUrgency },
-    difficulty: { key: "difficulty", label: "Difficulty", icon: "/design/ui-muscle.svg", hint: "How hard it is — how much it takes out of you", value: effort, onChange: setEffort },
-    energy: { key: "energy", label: "Energy boost", icon: "/design/ui-bolt.png", hint: "How much energy finishing it gives you", value: energyGain, onChange: setEnergyGain },
-  };
-  const scaleNode = (k: EditorPart) => {
-    if (doingNow) return null;
-    const run = (() => {
-      if (scaleStyle !== "bars") return [k];
-      const section = layout.folded.includes(k);
-      const list = layout.order.filter((x) => layout.folded.includes(x) === section);
-      const i = list.indexOf(k);
-      if (i > 0 && SCALES[list[i - 1]]) return [];
-      const out: EditorPart[] = [];
-      for (let j = i; j < list.length && SCALES[list[j]]; j++) out.push(list[j]);
-      return out;
-    })();
-    if (!run.length) return null;
-    return <LevelScales items={run.map((x) => SCALES[x])} renderRow={(it) => <IconScale label={it.label} icon={it.icon} hint={it.hint} value={it.value} onChange={it.onChange} />} />;
-  };
+  const scaleNode = (k: EditorPart) =>
+    doingNow ? null : <EditorScale k={k} layout={layout} values={{ importance, urgency, difficulty: effort, energy: energyGain }} setters={{ importance: setImportance, urgency: setUrgency, difficulty: setEffort, energy: setEnergyGain }} />;
   // When to do it, right under when it's due (owner, Nov 7: "make the due date / scheduling tools more
   // integrated"): a time on the calendar picked from the day itself (in place, no popup), another
   // session for a quest that's already placed, and "Schedule within" for the auto-scheduler's list.
