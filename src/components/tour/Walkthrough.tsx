@@ -141,9 +141,9 @@ const STEPS: Record<string, Step> = {
     part: cr(4),
     title: () => "When should it be done?",
     text: () => "Give it a due day. If you like, block out a time for it on your calendar too: a quest with a day is a quest that happens.",
-    press: "Tap Due, pick a day, and “Find a time” for your calendar.",
+    press: "Tap When, pick a day, and “Pick a time” for your calendar.",
     asks: [
-      { find: () => document.querySelector(`${EDITOR} [data-tour="fact-due"]`), say: "Tap Due date|to choose when it's done" },
+      { find: () => document.querySelector(`${EDITOR} [data-tour="fact-due"]`), say: "Tap When|to choose when it's done" },
       { find: () => document.querySelector(`${EDITOR} [data-tour="panel-due"]`), say: "Pick a day|and a time, if you like" },
     ],
     next: "Next",

@@ -45,7 +45,6 @@ import { IconPicker } from "./IconPicker";
 import { CheckMark } from "./TaskRow";
 import { Fold } from "@/components/ui/Fold";
 import { useCalCardLook } from "@/lib/use-quest-cal";
-import { withinLabel } from "./ScheduleWithin";
 import { BoardPicker } from "./BoardPicker";
 import { useEscape } from "@/lib/use-escape";
 import { useEditorToolbar, useIsEmbedded, usePortalTarget } from "@/components/ui/EmbedHost";
@@ -60,7 +59,7 @@ import { EditorArrange } from "./EditorArrange";
 import { readEditorLayout, serverEditorLayout, subscribeEditorLayout, type EditorPart } from "@/lib/quest-editor-layout";
 import { DateField } from "@/components/ui/DateField";
 import type { QuestDraft, QuestEditorMode } from "./editor/types";
-import { localDate, localTime, shortTime, planByIn, dueIso, dueChipLabel, ESTIMATE_PICKS } from "./editor/dates";
+import { localDate, localTime, planByIn, dueIso, ESTIMATE_PICKS } from "./editor/dates";
 import { FactCaret } from "./editor/glyphs";
 import { PlacePanel, PlacePill } from "./editor/EditorPlaceLook";
 import { AutoGrowText } from "./editor/AutoGrowText";
@@ -76,6 +75,7 @@ import { useQuestSteps } from "./editor/use-quest-steps";
 import { EditorSteps } from "./editor/EditorSteps";
 import { useQuestScheduling } from "./editor/use-quest-scheduling";
 import { EditorScheduling } from "./editor/EditorScheduling";
+import { editorWhenFace } from "./editor/when-state";
 import { EditorAlsoOn, EditorStandsFor } from "./editor/EditorBoardTray";
 import { EditorTags } from "./editor/EditorTags";
 import { EditorSaveTemplate, TemplateList } from "./editor/EditorTemplates";
@@ -242,6 +242,8 @@ export function QuestEditorDialog({
   // When to do it: the calendar and the list to schedule (editor/use-quest-scheduling.ts).
   const sched = useQuestScheduling({ task, slot, setSlot, initialSlot, onUnscheduled: () => void (savedSlotStart.current = null) });
   const { planDays } = sched;
+  // The When pill's words read the clock once, when the editor opens.
+  const [nowForFace] = useState(() => new Date());
   const [isPriv, setIsPriv] = useState(!!task?.is_private);
   function changePrivate(v: boolean) {
     setIsPriv(v);
@@ -970,16 +972,9 @@ export function QuestEditorDialog({
   // integrated"): a time on the calendar picked from the day itself (in place, no popup), another
   // session for a quest that's already placed, and "Schedule within" for the auto-scheduler's list.
   const shownSlot = fixedSchedule ? { start: fixedSchedule.startISO, end: fixedSchedule.endISO ?? fixedSchedule.startISO } : slot;
-  // The pill says it all at a glance: "Due Fri · Thu 3pm", "Due today", "Plan: This week".
-  const dueChipWords =
-    [
-      dueDate && `Due ${dueChipLabel(dueDate)}`,
-      shownSlot && `${new Date(shownSlot.start).toLocaleDateString(undefined, { weekday: "short" })} ${shortTime(shownSlot.start).replace(":00", "")}`,
-      !dueDate && !shownSlot && planDays !== null && `Plan: ${withinLabel(planDays)}`,
-      !shownSlot && timeWindow && rangeWords(minutesOf(timeWindow.from), minutesOf(timeWindow.to)),
-    ]
-      .filter(Boolean)
-      .join(" · ") || "Due date";
+  // The When pill says it all at a glance (When 2): "Within a week", "By Fri · Thu 3pm", "Due today" (red).
+  const dueFace = editorWhenFace({ dueDate, dueTime, planDays }, shownSlot, nowForFace);
+  const dueChipWords = [dueFace.words === "When" ? null : dueFace.words, !shownSlot && timeWindow && rangeWords(minutesOf(timeWindow.from), minutesOf(timeWindow.to))].filter(Boolean).join(" · ") || "When";
   /** The sub-quests drawer: out of the "+ Sub-quests" pill, with a caret pointing up at it. */
   const subPillRef = useRef<HTMLButtonElement>(null);
   const cardLook = useCalCardLook(task?.id);
@@ -1550,7 +1545,7 @@ export function QuestEditorDialog({
                       <button type="button" onClick={() => setFactOpen((o) => (o === "due" ? null : "due"))} aria-expanded={factOpen === "due"} className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" data-open={factOpen === "due" ? "true" : undefined} data-tour="fact-due">
                         {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
                         <img src="/design/ui-calendar.png" alt="" width={14} height={14} className="h-3.5 w-3.5 shrink-0" />
-                        <span className="max-w-[210px] truncate">{dueChipWords}</span>
+                        <span className="max-w-[210px] truncate" style={dueFace.late ? { color: "#a8321e" } : undefined}>{dueChipWords}</span>
                         <FactCaret open={factOpen === "due"} />
                       </button>
                     )}

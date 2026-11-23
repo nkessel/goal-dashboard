@@ -331,26 +331,39 @@ export const FLOWS = [
         }
         // The extra pills (no "More" fold): open the scales, then the due panel with scheduling and early bonus.
         if (await h.tap((p) => p.getByRole("button", { name: /importance & effort/i }).first(), "editor: scales pill", { optional: true, expectMove: true })) await h.check("quest editor: scales");
-        // The due pill reads "Due today", "Due Fri · Thu 3pm" or "Due date".
-        if (await h.tap((p) => p.locator("[role=dialog] button.qe-fact", { hasText: /^(Due|Plan:)/ }).first(), "editor: due", { optional: true, expectMove: true })) {
-          await h.check("quest editor: due panel");
-          // Time of day (owner, Nov 16): a range any quest can have, for the auto-scheduler.
+        // The When pill (When 2): "When", "Within a week", "Around Fri", "By Fri · Thu 3pm", "Due today", "Overdue".
+        if (await h.tap((p) => p.locator("[role=dialog] button.qe-fact[data-tour=fact-due]").first(), "editor: when", { optional: true, expectMove: true })) {
+          await h.check("quest editor: when panel");
+          // Complete by: a range (Flexible), the switch, Fixed with its early bonus line, then folded to one pill.
+          const panel = (p) => p.locator("[data-when-panel]").first();
+          if (await h.tap((p) => panel(p).getByRole("button", { name: /^within a week$/i }).first(), "when: within a week", { optional: true, expectMove: true })) {
+            await h.check("quest editor: when, flexible within a week");
+            if (await h.tap((p) => p.locator("[data-when-firm]").getByRole("button", { name: /^fixed$/i }).first(), "when: fixed", { optional: true, expectMove: true })) {
+              await h.check("quest editor: when, fixed");
+              if (await h.tap((p) => p.locator("[data-when-early]").getByRole("button", { name: /early bonus/i }).first(), "when: early bonus", { optional: true, expectMove: true })) await h.check("quest editor: when, early bonus open");
+            }
+            if (await h.tap((p) => p.locator("[data-when-firm]").getByRole("button", { name: /^done$/i }).first(), "when: done picking", { optional: true, expectMove: true })) await h.check("quest editor: when, folded to one pill");
+            await h.tap((p) => p.locator("[data-when-face]").first(), "when: change the date", { optional: true, expectMove: true });
+          }
+          // Other…: the month calendar (owner, Nov 7: "the due date picker isn't working"; it opened off screen in the adventure theme).
+          await h.tap((p) => panel(p).getByRole("button", { name: /^other/i }).first(), "when: other", { optional: true, expectMove: true });
+          if (await h.tap((p) => p.locator('[role=dialog] button[aria-label="Complete by date"]').first(), "editor: complete by calendar", { optional: true, expectMove: true })) {
+            await h.check("quest editor: complete by calendar");
+            const cal = h.page.locator('[role=dialog][aria-label="Complete by date"]').last();
+            const box = await cal.boundingBox().catch(() => null);
+            const vh = h.page.viewportSize()?.height ?? 844;
+            if (!box || box.y < 0 || box.y + box.height > vh + 1) throw new Error(`quest editor: the complete-by calendar isn't on screen (${JSON.stringify(box)})`);
+            await cal.locator("button", { hasText: /^20$/ }).first().click();
+            await h.settle(300);
+          }
+          // Time of day (owner, Nov 16): a range any quest can have, for the auto-scheduler; a quiet link until set.
+          await h.tap((p) => p.locator("[data-quest-window] button", { hasText: /^Time of day$/ }).first(), "editor: time of day", { optional: true, expectMove: true });
           if (await h.tap((p) => p.locator("[data-quest-window] button", { hasText: /^Before$/ }).first(), "editor: time of day, before", { optional: true, expectMove: true })) {
             await h.check("quest editor: sometime before");
             await h.tap((p) => p.locator("[data-quest-window] button", { hasText: /^Any time$/ }).first(), "editor: time of day, any", { optional: true, expectMove: true });
           }
-          // The month calendar (owner, Nov 7: "the due date picker isn't working"; it opened off screen in the adventure theme).
-          if (await h.tap((p) => p.locator('[role=dialog] button[aria-label="Due date"]').first(), "editor: due date calendar", { optional: true, expectMove: true })) {
-            await h.check("quest editor: due date calendar");
-            const cal = h.page.locator('[role=dialog][aria-label="Due date"]').last();
-            const box = await cal.boundingBox().catch(() => null);
-            const vh = h.page.viewportSize()?.height ?? 844;
-            if (!box || box.y < 0 || box.y + box.height > vh + 1) throw new Error(`quest editor: the due date calendar isn't on screen (${JSON.stringify(box)})`);
-            await cal.locator("button", { hasText: /^20$/ }).first().click();
-            await h.settle(300);
-          }
-          // The day drawn in place to find a time (no popup).
-          if (await h.tap((p) => p.locator("[role=dialog] button", { hasText: /^(Find a time|Change)$/ }).first(), "editor: find a time", { optional: true, expectMove: true })) await h.check("quest editor: find a time");
+          // The day drawn in place to pick a time (no popup).
+          if (await h.tap((p) => p.locator("[data-when-slot] button", { hasText: /^(Pick a time|Change)$/ }).first(), "editor: pick a time", { optional: true, expectMove: true })) await h.check("quest editor: pick a time");
         }
         await h.typeIn((p) => p.locator("[role=dialog] input, [role=dialog] textarea").first(), "quest editor title");
         // The portrait picker with the keyboard up: it sits above the keyboard (owner's recording, Nov 3).

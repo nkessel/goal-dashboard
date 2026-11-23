@@ -64,7 +64,7 @@
     "reason": "Owner, Nov 12: the feedback button stays visible above every popup and editor. With the quest editor open it floats at the right edge over whatever the page behind has there; the editor covers that anyway."
   },
   {
-    "match": "popup-behind\\|.*\"Due date\".*underneath <svg>",
+    "match": "popup-behind\\|.*\"(Due date|Complete by date)\".*underneath <svg>",
     "reason": "The <svg> is the feedback button's icon: by the owner's ask (Nov 12) the button sits above every popup, the date picker included; it can be dragged aside and remembers where."
   },
   {
