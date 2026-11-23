@@ -1,18 +1,26 @@
 import "server-only";
-import { attachStepCounts } from "./steps";
+import { attachStepCounts, stepCountsFor, withStepCounts } from "./steps";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { logTaskCompletedActivity } from "./activity";
 import type { Task } from "./types";
+import type { SequenceState } from "./sequences";
 
 /** Stand-ins take their current assignment's dates; quests waiting in a sequence ride behind the front one. */
-async function decorate<T extends Task>(ownerId: string, tasks: T[]) {
-  const [{ applyStandIns }, { attachSequences }] = await Promise.all([import("./standins"), import("./sequences")]);
-  return attachSequences(ownerId, await applyStandIns(ownerId, tasks));
+async function decorate<T extends Task>(ownerId: string, tasks: T[], sequencesP?: Promise<SequenceState>) {
+  const [{ applyStandIns }, { loadSequenceState, applySequences }] = await Promise.all([import("./standins"), import("./sequences")]);
+  // Side by side: who waits behind whom doesn't depend on the stand-ins, nor on the quest list, so a caller may
+  // start it beside its own query (tabs faster loads, Nov 23).
+  const [standIns, sequences] = await Promise.all([applyStandIns(ownerId, tasks), sequencesP ?? loadSequenceState(ownerId)]);
+  return applySequences(standIns, sequences);
 }
+
+/** Starts loading the sequence links now, beside the caller's own query (it never throws). */
+const sequencesEarly = (ownerId: string) => import("./sequences").then(({ loadSequenceState }) => loadSequenceState(ownerId));
 
 
 export async function listOpenTasksForOwner(ownerId: string): Promise<Task[]> {
   const db = supabaseAdmin();
+  const sequencesP = sequencesEarly(ownerId);
   const { data, error } = await db
     .from("tasks")
     .select("*")
@@ -25,7 +33,7 @@ export async function listOpenTasksForOwner(ownerId: string): Promise<Task[]> {
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`Failed to list tasks: ${error.message}`);
-  return decorate(ownerId, (data ?? []) as Task[]);
+  return decorate(ownerId, (data ?? []) as Task[], sequencesP);
 }
 
 export type TaskWithCategory = Task & {
@@ -43,6 +51,7 @@ export type TaskWithCategory = Task & {
  */
 export async function listOpenTasksForOwnerWithCategory(ownerId: string): Promise<TaskWithCategory[]> {
   const db = supabaseAdmin();
+  const sequencesP = sequencesEarly(ownerId);
   const { data, error } = await db
     .from("tasks")
     .select("*")
@@ -60,20 +69,23 @@ export async function listOpenTasksForOwnerWithCategory(ownerId: string): Promis
   // Board titles are looked up separately: an embedded boards(...) select is
   // ambiguous to PostgREST because other tables also link tasks and boards.
   const boardIds = [...new Set(tasks.map((t) => t.board_id).filter((id): id is string => !!id))];
+  // The board titles, the stand-ins and sequences, and the sub-quest counts each need only this list, so they
+  // load side by side (they used to wait on each other: tabs faster loads, Nov 23). Same result as before.
+  const [boards, decorated, counts] = await Promise.all([
+    boardIds.length > 0 ? db.from("boards").select("id, title").in("id", boardIds).then((r) => r.data) : Promise.resolve(null),
+    decorate(ownerId, tasks, sequencesP),
+    stepCountsFor(ownerId, tasks.map((t) => t.id)),
+  ]);
   const titles = new Map<string, string>();
-  if (boardIds.length > 0) {
-    const { data: boards } = await db.from("boards").select("id, title").in("id", boardIds);
-    for (const b of boards ?? []) titles.set(b.id as string, b.title as string);
-  }
-  return attachStepCounts(
-    await decorate(
-      ownerId,
-      tasks.map((task) => ({
-        ...task,
-        categoryLabel: task.board_id ? titles.get(task.board_id) ?? null : null,
-      }))
-    ),
-    ownerId
+  for (const b of boards ?? []) titles.set(b.id as string, b.title as string);
+  // The label goes on from the quest's own board, as before (a stand-in's borrowed dates don't change it).
+  const boardOf = new Map(tasks.map((t) => [t.id, t.board_id]));
+  return withStepCounts(
+    decorated.map((task) => {
+      const b = boardOf.get(task.id) ?? null;
+      return { ...task, categoryLabel: b ? titles.get(b) ?? null : null };
+    }),
+    counts
   );
 }
 
@@ -287,6 +299,7 @@ export async function listOpenTasksWithBoardForOwner(
   ownerId: string
 ): Promise<TaskWithBoard[]> {
   const db = supabaseAdmin();
+  const sequencesP = sequencesEarly(ownerId);
   const { data, error } = await db
     .from("tasks")
     .select("*")
@@ -297,7 +310,7 @@ export async function listOpenTasksWithBoardForOwner(
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`Failed to list tasks: ${error.message}`);
-  return decorate(ownerId, ((data ?? []) as Task[]).map((t) => ({ ...t, board_id: t.board_id ?? null })));
+  return decorate(ownerId, ((data ?? []) as Task[]).map((t) => ({ ...t, board_id: t.board_id ?? null })), sequencesP);
 }
 
 /** A quest board's own quests (open first, then finished). */

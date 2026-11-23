@@ -3,7 +3,7 @@ import { buildCheckInInit, DRAFT_COOKIE } from "@/lib/checkin-init";
 import { requireSession } from "@/lib/session";
 import { listBoardsForOwner } from "@/lib/data/boards";
 import { wheelAreasFrom } from "@/lib/wheel-areas";
-import { AppShell } from "@/components/layout/AppShell";
+import { AppShell, preloadShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { CreateFab } from "@/components/create/CreateFab";
 import { InsightsView } from "@/components/insights/InsightsView";
@@ -26,6 +26,7 @@ import { cleanWheel } from "@/lib/wheel-of-time";
 
 export default async function InsightsPage() {
   const session = await requireSession();
+  preloadShell(session.user.id);
   const since = new Date(Date.now() - 92 * 86_400_000).toISOString();
   // Everything at once (these used to wait one after another).
   const uid = session.user.id;

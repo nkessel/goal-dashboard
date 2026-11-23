@@ -7,7 +7,7 @@ import { RememberView } from "@/components/calendar/RememberView";
 import { ConnectCalendar } from "@/components/calendar/ConnectCalendar";
 import { requireSession } from "@/lib/session";
 import { isAdmin } from "@/lib/data/feedback";
-import { AppShell } from "@/components/layout/AppShell";
+import { AppShell, preloadShell } from "@/components/layout/AppShell";
 import { CreateFab } from "@/components/create/CreateFab";
 import { ScreenArrange } from "@/components/ui/ScreenArrange";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -62,6 +62,7 @@ export default async function CalendarPage({
   searchParams: Promise<{ view?: string; date?: string; n?: string; plan?: string }>;
 }) {
   const session = await requireSession();
+  preloadShell(session.user.id);
   const params = await searchParams;
   // No view in the link: open on the view used last time.
   const remembered = params.view ? null : decodeURIComponent((await cookies()).get(`cal-view-${session.user.id}`)?.value ?? "").split("|");
@@ -75,12 +76,8 @@ export default async function CalendarPage({
   const date = parseDateParam(dateParam ?? todayKey());
   const today = parseDateParam(todayKey());
 
-  // "With Mom" planning is only on the owner's profile.
-  const [profile, rites, withMom] = await Promise.all([getProfileById(session.user.id), listRites(session.user.id).catch(() => null), isAdmin(session.user.id).catch(() => false)]);
-  // Meal time, wind-down and tidy kept free, and habits with a set time, drawn on the grid.
-  const daily = { settings: ((profile as { scheduler?: Record<string, unknown> | null } | null)?.scheduler ?? null), habits: timedHabitsFrom(rites ?? [], cleanRepeat) };
-  const theme = profile?.theme ?? "adventure";
-  const isAdventure = theme === "adventure";
+  // "With Mom" planning is only on the owner's profile. Loaded with everything else below (tabs faster loads, Nov 23).
+  const firstP = Promise.all([getProfileById(session.user.id), listRites(session.user.id).catch(() => null), isAdmin(session.user.id).catch(() => false)]);
 
   let rangeStart: Date;
   let rangeEnd: Date;
@@ -167,8 +164,14 @@ export default async function CalendarPage({
     : Promise.resolve([]);
   // The auto-scheduler's sections on top: Today's quests, Additional quests and today's habits (owner, Nov 6).
   const sectionsP = import("@/app/actions").then(({ autoSchedulerSectionsAction }) => autoSchedulerSectionsAction(todayKey())).catch(() => null);
-  const [tasksLoaded, toSchedule, scheduleFolders, googleAll, planToday, interest, interestEvents, schedSections] = await Promise.all([
-    listCalendarTasksForOwner(session.user.id, rangeStart, rangeEnd),
+  const tasksP = listCalendarTasksForOwner(session.user.id, rangeStart, rangeEnd);
+  // The quests waiting behind each quest on the calendar: its agenda (a visit's to-talk-about list). Asked as soon as
+  // the calendar's quests are in, beside the other loaders (tabs faster loads, Nov 23).
+  const agendaFor = (list: Task[]) => listWaitingBehind(session.user.id, list.filter((t) => t.status !== "completed").map((t) => t.id)).catch(() => ({}));
+  const agendaP = tasksP.then(agendaFor, () => ({}));
+  const [[profile, rites, withMom], tasksLoaded, toSchedule, scheduleFolders, googleAll, planToday, interest, interestEvents, schedSections] = await Promise.all([
+    firstP,
+    tasksP,
     listSchedulingList(session.user.id),
     getSchedulingFolders(session.user.id),
     googleP,
@@ -177,12 +180,18 @@ export default async function CalendarPage({
     interestEventsP,
     sectionsP,
   ]);
+  // Meal time, wind-down and tidy kept free, and habits with a set time, drawn on the grid.
+  const daily = { settings: ((profile as { scheduler?: Record<string, unknown> | null } | null)?.scheduler ?? null), habits: timedHabitsFrom(rites ?? [], cleanRepeat) };
+  const theme = profile?.theme ?? "adventure";
+  const isAdventure = theme === "adventure";
   // Upcoming calendar events become quests when that's switched on (owner, Nov 18); drawn as quests at once.
   let tasks = tasksLoaded;
+  let madeNow: Task[] = [];
   if (googleAll) {
     const linked = new Set(tasksLoaded.map((t) => t.google_calendar_event_id).filter((id): id is string => Boolean(id)));
     const made = await import("@/lib/data/event-quests").then(({ makeEventQuests }) => makeEventQuests(session.user.id, googleAll.events, googleAll.calendars, linked)).catch(() => []);
     if (made.length) tasks = [...tasksLoaded, ...made];
+    madeNow = made;
   }
   // Quests and sessions put on the calendar without Google (from a chat with Claude, or offline) reach it now.
   if (googleAll && session.googleAccessToken) {
@@ -195,8 +204,9 @@ export default async function CalendarPage({
         .catch(() => {})
     );
   }
-  // The quests waiting behind each quest on the calendar: its agenda (a visit's to-talk-about list).
-  const agenda = await listWaitingBehind(session.user.id, tasks.filter((t) => t.status !== "completed").map((t) => t.id)).catch(() => ({}));
+  // The agenda, with the quests just made from calendar events added in.
+  const [agendaLoaded, agendaMade] = await Promise.all([agendaP, madeNow.length ? agendaFor(madeNow) : Promise.resolve({})]);
+  const agenda: Record<string, { id: string; title: string }[]> = { ...agendaLoaded, ...agendaMade };
   const todayHref = `/calendar?view=${view}&date=${formatDateParam(today)}`;
 
   // Real Google Calendar appointments, layered onto the same view — separate

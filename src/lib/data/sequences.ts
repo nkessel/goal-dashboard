@@ -41,19 +41,23 @@ function chainAfter(id: string, rows: Row[]): Behind[] {
   return out;
 }
 
-/**
- * Hide quests that are waiting behind an open quest, and give each front quest
- * the list of quests stacked behind it.
- */
-export async function attachSequences<T extends Task>(ownerId: string, tasks: T[]): Promise<(T & { behind?: Behind[] })[]> {
+/** Who waits behind whom: the open quests in a sequence, and those whose front quest is still open. Needs no quest list, so it loads beside the others. */
+export type SequenceState = { waitingIds: Set<string>; live: Row[] } | null;
+export async function loadSequenceState(ownerId: string): Promise<SequenceState> {
   const rows = await waitingRows(ownerId);
-  if (!rows.length) return tasks;
+  if (!rows.length) return null;
   const waitingIds = new Set(rows.map((r) => r.id));
   // Is the quest each one waits for still open? (Anything not open releases it.)
   const lockers = [...new Set(rows.map((r) => r.locked_by_task_id!))];
   const { data: open } = await supabaseAdmin().from("tasks").select("id").eq("owner_id", ownerId).eq("status", "open").in("id", lockers);
   const openLockers = new Set((open ?? []).map((o) => o.id as string));
-  const live = rows.filter((r) => openLockers.has(r.locked_by_task_id!));
+  return { waitingIds, live: rows.filter((r) => openLockers.has(r.locked_by_task_id!)) };
+}
+
+/** Hide quests that are waiting behind an open quest, and give each front quest the list of quests stacked behind it. */
+export function applySequences<T extends Task>(tasks: T[], state: SequenceState): (T & { behind?: Behind[] })[] {
+  if (!state) return tasks;
+  const { waitingIds, live } = state;
   const hidden = new Set(live.map((r) => r.id));
   return tasks
     .filter((t) => !(waitingIds.has(t.id) && hidden.has(t.id)))
@@ -61,6 +65,14 @@ export async function attachSequences<T extends Task>(ownerId: string, tasks: T[
       const behind = chainAfter(t.id, live);
       return behind.length ? { ...t, behind } : t;
     });
+}
+
+/**
+ * Hide quests that are waiting behind an open quest, and give each front quest
+ * the list of quests stacked behind it.
+ */
+export async function attachSequences<T extends Task>(ownerId: string, tasks: T[]): Promise<(T & { behind?: Behind[] })[]> {
+  return applySequences(tasks, await loadSequenceState(ownerId));
 }
 
 export type SequenceItem = { id: string; title: string; status: "open" | "completed"; board_id: string | null; reward: boolean; /** Portrait (painted or from the library), null for none. */ icon?: string | null; xp?: number; minutes?: number | null };
