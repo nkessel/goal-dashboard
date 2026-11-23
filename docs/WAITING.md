@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Run B S3 perf numbers (Sonnet, scheduled run, Nov 23 01:30 UTC):** `npm run perf` baseline for editor, toucan, calendar, welcome, today into split plan section 10. Docs only.
+
 - **Run B thread, Run E (Opus, Nov 23 00:59 UTC):** E4, E6, E7, When 2, When 3, Cal 4, Cal 5, T7, W4, W5, E9, tabs faster loads.
 
 - **Dev loop 2 run 42 (Opus, Nov 23 00:57 UTC):** full UI check on `main` after Run D's split (C, D, I moves), fix any regressions; then open feedback notes that are bug fixes.
