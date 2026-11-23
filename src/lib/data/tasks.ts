@@ -509,11 +509,16 @@ export async function pinToTopOfToday(taskId: string, ownerId: string): Promise<
  * Mark a task complete, optionally backdated (retroactive completion).
  * Defaults to "now" when no completedAt is supplied.
  */
+/**
+ * Mark a quest done. Only an open (or failed) quest changes, in one step, so of two saves racing each other only
+ * one finishes it and pays: the other gets null (it was already done). A failed quest finished after all stops
+ * being failed, so undoing it later takes its XP back.
+ */
 export async function completeTask(
   taskId: string,
   ownerId: string,
   completedAt?: string
-): Promise<Task> {
+): Promise<Task | null> {
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("tasks")
@@ -522,14 +527,18 @@ export async function completeTask(
       completed_at: completedAt || new Date().toISOString(),
       // When it was recorded (and paid): a quest finished yesterday but logged today counts among today's victories.
       logged_at: new Date().toISOString(),
+      failed_at: null,
+      fail_reason: null,
       is_manual_priority: false, // clears it off the top-3 list once done
     })
     .eq("id", taskId)
     .eq("owner_id", ownerId)
+    .or("status.neq.completed,failed_at.not.is.null")
     .select("*")
-    .single();
+    .maybeSingle<Task>();
 
   if (error) throw new Error(`Failed to complete task: ${error.message}`);
+  if (!data) return null;
 
   // Log an activity event for the friend feed, respecting the owning
   // goal/board's privacy (or the profile default for standalone tasks).
@@ -556,18 +565,26 @@ export async function setTaskPayout(
   if (error) throw new Error(`Failed to save quest progress: ${error.message}`);
 }
 
-export async function reopenTask(taskId: string, ownerId: string): Promise<Task> {
+/**
+ * Reopen a done (or failed) quest. Only a quest that is done changes, in one step, so of two undos racing each
+ * other only one reopens it (and takes its XP back): the other gets null. A quest that isn't there throws.
+ */
+export async function reopenTask(taskId: string, ownerId: string): Promise<Task | null> {
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("tasks")
     .update({ status: "open", completed_at: null, failed_at: null, fail_reason: null })
     .eq("id", taskId)
     .eq("owner_id", ownerId)
+    .eq("status", "completed")
     .select("*")
-    .single();
+    .maybeSingle<Task>();
 
   if (error) throw new Error(`Failed to reopen task: ${error.message}`);
-  return data;
+  if (data) return data;
+  const { data: still } = await db.from("tasks").select("id").eq("id", taskId).eq("owner_id", ownerId).maybeSingle();
+  if (!still) throw new Error("That quest isn't here anymore.");
+  return null;
 }
 
 /** Mark a quest failed: it leaves the open lists like a finished one, pays nothing, and can be reopened. */
