@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 47 (Sonnet, Nov 23 06:30 UTC):** Run E part 2 (When 2 `review/when-panel`, When 3 `review/mini-calendar`): UI check phone, then the review page. Run 46 has the `main` UI check; not touching that.
+
 - **Dev loop 2 run 46 (Opus, Nov 23 06:00 UTC, takes over run 45's claim, 2 hours old with nothing pushed):** UI check on `main` @ b06f56e for the Run E/G/H and Cal 4/5 flows (the "Open for the next Dev loop 2 run" list) plus desktop `todaycal`, phone then tablet; fix regressions straight to `main`; then bug-fix feedback notes.
 
 - **Bug on `main` (found Nov 23, Run B thread):** UI check `todaycal` on desktop shows React error #185 (too many updates) morning and evening; phone and tablet clean. **Likely fixed by Dev loop 2 run 43** (same #185 seen on tablet inside long runs: drag over Today's calendar, see SHIPPED Nov 23); desktop re-check pending, below.
