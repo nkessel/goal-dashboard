@@ -255,3 +255,5 @@ export const fieldStyle: React.CSSProperties = { borderColor: "rgba(139,112,64,.
 export function questExtras(a: Attrs): { xp: number; coins: number; isTiny?: boolean; energyGain?: number; effort?: number } {
   return { xp: a.xp ?? XP_DEFAULT, coins: a.coins ?? COIN_DEFAULT, isTiny: a.tiny || undefined, energyGain: a.energy || undefined, effort: a.effort || undefined };
 }
+
+export const XP_MAX = 350;
