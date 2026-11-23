@@ -4,7 +4,7 @@ import { SnoozeIcon } from "@/components/ui/Icons";
 import { SwipeActions } from "@/components/ui/SwipeActions";
 import { HabitOptions, WelcomeHabits } from "@/components/xp/WelcomeHabits";
 import { fogOn } from "@/lib/welcome-fog";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Confirm, NoteButton, WhyBox } from "@/components/toucan/SayingFeedback";
 import { CoinIcon } from "@/components/ui/Icons";
@@ -24,12 +24,14 @@ import { castleOf } from "./CastleArt";
 import { Fold } from "@/components/ui/Fold";
 import { DawnPath } from "@/components/dawn/DawnPath";
 import { type WelcomeAward } from "@/components/xp/welcome/types";
-import { PIECES, SNOOZE_MAIN, snoozeOther, GILT, PILL, readJson, writeJson, greetingSize, PartKey, ButtonKey, isPartKey, isButtonKey, EMPTY, SNOOZE_PARTS_KEY, localDay, readSnoozedParts, revealThroughMist } from "@/components/xp/welcome/shared";
+import { PIECES, SNOOZE_MAIN, snoozeOther, GILT, PILL, writeJson, greetingSize, PartKey, ButtonKey, isPartKey, isButtonKey, EMPTY, SNOOZE_PARTS_KEY, localDay, readSnoozedParts, revealThroughMist } from "@/components/xp/welcome/shared";
 import { TopPriority } from "@/components/xp/welcome/TopPriority";
 import { WelcomeJournal, JournalPromptsEditor } from "@/components/xp/welcome/WelcomeJournal";
 import { ButtonShell, ButtonEditor } from "@/components/xp/welcome/Buttons";
 import { LineVote, ReflectLine, CheckinPanel } from "@/components/xp/welcome/Lines";
 import { resetToucanFlight, WelcomeToucan } from "./welcome/WelcomeToucan";
+import { useCardPlacement, useHeldScroll, usePinnedPaper } from "./welcome/use-card";
+import { useHeldScreen } from "./welcome/use-held-screen";
 
 /**
  * The welcome screen: the day's first visit, or "welcome back" after a few
@@ -127,61 +129,8 @@ export function WelcomeCard({
   // The greeting is yours to rewrite: tap it, write your own, and choose whether to keep it.
   // The pinned foot's parchment lines up with the card's own (it showed as a different patch of paper).
   const cardRef = useRef<HTMLDivElement>(null);
-  const footRef = useRef<HTMLDivElement>(null);
-  // The pinned cap at the card's top too (the band the toucan perches on and the corner buttons sit in).
-  const capRef = useRef<HTMLDivElement>(null);
-  const alignFoot = () => {
-    const c = cardRef.current;
-    if (!c) return;
-    const cr = c.getBoundingClientRect();
-    for (const f of [footRef.current, capRef.current]) {
-      if (!f) continue;
-      const fr = f.getBoundingClientRect();
-      f.style.backgroundPosition = `${Math.round(cr.left + c.clientLeft - fr.left)}px ${Math.round(cr.top + c.clientTop - fr.top)}px`;
-    }
-  };
-  // Once (it re-ran on every render, measuring the card each time, during the mist's opening).
-  useLayoutEffect(() => {
-    alignFoot();
-    window.addEventListener("resize", alignFoot);
-    const ro = new ResizeObserver(alignFoot);
-    if (cardRef.current) ro.observe(cardRef.current);
-    return () => {
-      window.removeEventListener("resize", alignFoot);
-      ro.disconnect();
-    };
-  }, []);
-  // A part folding shut near the bottom must not pull everything down (the card would scroll back to
-  // fit, moving what you tapped; ui-check, Nov 2): a spacer under the parts holds the scroll still, and
-  // gives the room back as you scroll up.
-  const spacerRef = useRef<HTMLDivElement>(null);
-  const holdScroll = () => {
-    const c = cardRef.current;
-    const sp = spacerRef.current;
-    if (!c || !sp) return;
-    const st = c.scrollTop;
-    if (st <= 0) return;
-    const until = performance.now() + 700;
-    const tick = () => {
-      const max = c.scrollHeight - c.clientHeight;
-      if (max < st - 0.5) {
-        sp.style.height = `${(parseFloat(sp.style.height) || 0) + (st - max)}px`;
-        c.scrollTop = st;
-      }
-      if (performance.now() < until) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  };
-  const lastTop = useRef(0);
-  const giveBack = () => {
-    const c = cardRef.current;
-    const sp = spacerRef.current;
-    if (!c || !sp) return;
-    const h = parseFloat(sp.style.height) || 0;
-    const up = lastTop.current - c.scrollTop;
-    lastTop.current = c.scrollTop;
-    if (h > 0 && up > 0) sp.style.height = `${Math.max(0, h - up)}px`;
-  };
+  const { footRef, capRef, alignFoot } = usePinnedPaper(cardRef);
+  const { spacerRef, holdScroll, giveBack } = useHeldScroll(cardRef);
   const [greeting, setGreeting] = useState(heading);
   // "Good morning!" before it (unless it already speaks of the time of day). Shown only, never saved into the line.
   const [hour] = useState(() => new Date().getHours());
@@ -212,33 +161,7 @@ export function WelcomeCard({
     onMinimize?.(false);
     setMin(false);
   }
-  // Where you've put it, and how wide (kept on this device).
-  const [at, setAt] = useState<{ x: number; y: number }>(() => readJson("welcome-card-at", { x: 0, y: 0 }));
-  const [cardW, setCardW] = useState<number>(() => readJson("welcome-card-w", 500));
-  const moving = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
-  // Never off the screen: a spot (or width) kept from a wider window, or a drag too far, comes back in.
-  useLayoutEffect(() => {
-    // Only a new width counts: the keyboard (and Chrome's toolbar) change the height alone, and the
-    // card's spot mustn't be pulled up for good while a field has focus.
-    let lastW = -1;
-    const fitIn = () => {
-      const c = cardRef.current;
-      if (!c || moving.current || window.innerWidth === lastW) return;
-      lastW = window.innerWidth;
-      const w = c.offsetWidth;
-      const maxX = Math.max(0, (window.innerWidth - w) / 2 - 16);
-      const maxY = Math.max(0, window.innerHeight * 0.4);
-      setAt((a) => {
-        const x = Math.round(Math.max(-maxX, Math.min(maxX, a.x)));
-        const y = Math.round(Math.max(0, Math.min(maxY, a.y)));
-        return x === a.x && y === a.y ? a : { x, y };
-      });
-    };
-    fitIn();
-    window.addEventListener("resize", fitIn);
-    return () => window.removeEventListener("resize", fitIn);
-  }, [cardW]);
-  const sizing = useRef<{ x: number; w: number } | null>(null);
+  const { at, setAt, cardW, setCardW, movingRef, sizingRef } = useCardPlacement(cardRef);
   // One toucan at a time: while this screen is open the perched one and his notes wait (see PerchedOwl, ToucanGuide).
   useEffect(() => {
     if (min) return;
@@ -319,80 +242,7 @@ export function WelcomeCard({
   const [recent] = useState(() => !!lastCheckInAt && Date.now() - Date.parse(lastCheckInAt) < 3_600_000);
   // Ready: into the forest, through the mist, and out onto Today.
   const [leaving, setLeaving] = useState(false);
-  // The screen's height, held still while a phone keyboard is up (or a field has focus), so
-  // opening and closing it (the feedback box, a field here) never resizes or moves the card.
-  const [screenH, setScreenH] = useState<number | null>(null);
-  // Keyboard up over a field low on the card (the toucan's respond line, say): the card glides
-  // up just enough to show it, and back down when the keyboard goes.
-  const [kbLift, setKbLift] = useState(0);
-  // Room added under the card's parts while the keyboard is up, so the card can scroll a low field into view.
-  const [kbRoom, setKbRoom] = useState(0);
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    let raf = 0;
-    const check = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const a = document.activeElement as HTMLElement | null;
-        const inside = !!a?.closest("[data-welcome-root]") && (a instanceof HTMLTextAreaElement || a instanceof HTMLInputElement || !!a?.isContentEditable);
-        // Against the held height: Chrome on iPhone shrinks innerHeight with the keyboard, so innerHeight alone never shows it.
-        const base = Math.max(window.innerHeight, screenRef.current?.h ?? 0);
-        if (!inside || base - vv.height < 120) return setKbLift(0), setKbRoom(0);
-        setKbLift((cur) => {
-          const r = a!.getBoundingClientRect();
-          // Where it would sit without the lift.
-          const bottom = r.bottom + cur;
-          const top = r.top + cur;
-          const need = Math.max(0, Math.round(Math.min(bottom - (vv.offsetTop + vv.height - 14), top - vv.offsetTop - 60)));
-          // Never so far that the toucan perched on the card's top goes off the screen (ui-check, Nov 6: the
-          // Journal's box sits lower): the rest is made up by scrolling the card over a little room at its foot.
-          const cardTop = (cardRef.current?.getBoundingClientRect().top ?? 0) + cur;
-          const most = Math.max(0, Math.round(cardTop - vv.offsetTop - 64));
-          const lift = Math.min(need, most);
-          const rest = need - lift;
-          setKbRoom(rest);
-          if (rest > 0) requestAnimationFrame(() => cardRef.current?.scrollBy({ top: rest, behavior: "smooth" }));
-          return lift;
-        });
-      });
-    };
-    vv.addEventListener("resize", check);
-    vv.addEventListener("scroll", check);
-    document.addEventListener("focusin", check);
-    document.addEventListener("focusout", check);
-    return () => {
-      cancelAnimationFrame(raf);
-      vv.removeEventListener("resize", check);
-      vv.removeEventListener("scroll", check);
-      document.removeEventListener("focusin", check);
-      document.removeEventListener("focusout", check);
-    };
-  }, []);
-  // Measured before the first paint, then again only when the screen's width changes (a turn of the phone):
-  // iPhone's toolbars and keyboard change its height while you scroll or type, and the card must not follow
-  // (that was the bounce while scrolling and the dark band as the keyboard went down; owner's recordings, Nov 2).
-  const screenRef = useRef<{ w: number; h: number } | null>(null);
-  useLayoutEffect(() => {
-    const typing = () => {
-      const a = document.activeElement;
-      return document.documentElement.hasAttribute("data-kb") || a instanceof HTMLTextAreaElement || (a instanceof HTMLInputElement && !["range", "checkbox", "radio", "button"].includes(a.type));
-    };
-    const measure = () => {
-      const w = window.innerWidth;
-      const prev = screenRef.current;
-      if (prev && (prev.w === w || typing())) return;
-      screenRef.current = { w, h: window.innerHeight };
-      setScreenH(window.innerHeight);
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    window.addEventListener("orientationchange", measure);
-    return () => {
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("orientationchange", measure);
-    };
-  }, []);
+  const { screenH, kbLift, kbRoom } = useHeldScreen(cardRef);
   const leave = () => {
     if (leaving) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return (onClose(), toToday?.());
@@ -661,17 +511,17 @@ export function WelcomeCard({
             aria-hidden
             className="absolute -bottom-1 -right-1 z-[3] h-6 w-6 cursor-nwse-resize touch-none"
             onPointerDown={(e) => {
-              sizing.current = { x: e.clientX, w: cardW };
+              sizingRef.current = { x: e.clientX, w: cardW };
               e.currentTarget.setPointerCapture(e.pointerId);
             }}
             onPointerMove={(e) => {
-              const d = sizing.current;
+              const d = sizingRef.current;
               if (!d) return;
               setCardW(Math.round(Math.max(340, Math.min(Math.min(900, window.innerWidth - 24), d.w + (e.clientX - d.x) * 2))));
             }}
             onPointerUp={() => {
-              if (sizing.current) writeJson("welcome-card-w", cardW);
-              sizing.current = null;
+              if (sizingRef.current) writeJson("welcome-card-w", cardW);
+              sizingRef.current = null;
             }}
           />
         )}
@@ -684,11 +534,11 @@ export function WelcomeCard({
             // Drag the heading to move the whole screen (a tap still writes the greeting); a double-click puts it back.
             onPointerDown={(e) => {
               if (writing !== null || (e.target as HTMLElement).closest("button, input, textarea, [contenteditable='true']")) return;
-              moving.current = { x: e.clientX, y: e.clientY, ox: at.x, oy: at.y, moved: false };
+              movingRef.current = { x: e.clientX, y: e.clientY, ox: at.x, oy: at.y, moved: false };
               e.currentTarget.setPointerCapture(e.pointerId);
             }}
             onPointerMove={(e) => {
-              const d = moving.current;
+              const d = movingRef.current;
               if (!d) return;
               if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return;
               d.moved = true;
@@ -696,9 +546,9 @@ export function WelcomeCard({
               setAt({ x: Math.max(-half, Math.min(half, d.ox + e.clientX - d.x)), y: Math.max(0, Math.min(window.innerHeight * 0.4, d.oy + e.clientY - d.y)) });
             }}
             onPointerUp={() => {
-              movedRef.current = !!moving.current?.moved;
-              if (moving.current?.moved) writeJson("welcome-card-at", at);
-              moving.current = null;
+              movedRef.current = !!movingRef.current?.moved;
+              if (movingRef.current?.moved) writeJson("welcome-card-at", at);
+              movingRef.current = null;
             }}
             onClick={(e) => {
               if (movedRef.current || writing !== null || (e.target as HTMLElement).closest("button")) return;
