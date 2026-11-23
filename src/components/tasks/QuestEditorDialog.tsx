@@ -27,7 +27,6 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   listQuestTemplatesAction,
-  setTaskAlsoOnAction,
   completeTaskAction,
   createBoardFromEditorAction,
   createQuestAction,
@@ -51,7 +50,6 @@ import {
   updateTaskAction,
   listTagsAction,
   setTaskTagsAction,
-  setStandsForAction,
 } from "@/app/actions";
 import { celebrateProgress, celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { IconPicker } from "./IconPicker";
@@ -82,6 +80,7 @@ import type { QuestDraft, QuestEditorMode } from "./editor/types";
 import { localDate, localTime, shortTime, slotWords, planByIn, dueIso, dueChipLabel, dueQuickPicks, ESTIMATE_PICKS } from "./editor/dates";
 import { PinGlyph, FactCaret } from "./editor/glyphs";
 import { AutoGrowText } from "./editor/AutoGrowText";
+import { EditorAlsoOn, EditorStandsFor } from "./editor/EditorBoardTray";
 import { EditorTags } from "./editor/EditorTags";
 import { EditorSaveTemplate, TemplateList } from "./editor/EditorTemplates";
 import { LABEL_CLS, chipBorderFor, fieldStyleFor, smallBtnClass } from "./editor/style";
@@ -303,7 +302,6 @@ export function QuestEditorDialog({
   const [boardOptions, setBoardOptions] = useState<{ id: string; label: string }[] | null>(null);
   // The board's own name (the last part of "Parent › Child"), for the avatar's tag.
   const boardLabel = boardId ? (boardOptions?.find((o) => o.id === boardId)?.label.split(" › ").pop() ?? null) : null;
-  const [alsoOn, setAlsoOn] = useState<string[]>(task?.also_on ?? []);
   const [stepMenu, setStepMenu] = useState<string | null>(null);
   /** The sub-quest whose time, progress and XP share are open under its card (from its ⋯). */
   const [stepDetail, setStepDetail] = useState<string | null>(null);
@@ -361,17 +359,6 @@ export function QuestEditorDialog({
       effort,
       steps: (steps ?? []).map((st) => st.title.trim()).filter(Boolean),
     };
-  }
-  const [alsoError, setAlsoError] = useState<string | null>(null);
-  function saveAlsoOn(next: string[]) {
-    if (!task) return;
-    const prev = alsoOn;
-    setAlsoOn(next);
-    setAlsoError(null);
-    setTaskAlsoOnAction(task.id, next).catch((e) => {
-      setAlsoOn(prev);
-      setAlsoError(e instanceof Error ? e.message : "Couldn't save that.");
-    });
   }
   // Completed from this window, waiting for Done to celebrate.
   const [completedNow, setCompletedNow] = useState<{ xp: number; totalXp: number | null; coinsEarned: number } | null>(null);
@@ -482,11 +469,6 @@ export function QuestEditorDialog({
     listTagsAction().then(setKnownTags, () => {});
   }, []);
   // ---- Stand-in: this quest speaks for a board's current assignment.
-  const [standsFor, setStandsFor] = useState<string | null>(task?.stands_for ?? null);
-  function changeStandsFor(b: string | null) {
-    setStandsFor(b);
-    if (task) void setStandsForAction(task.id, b).then(() => router.refresh(), () => setStandsFor(task.stands_for ?? null));
-  }
   const router = useRouter();
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -2095,58 +2077,13 @@ export function QuestEditorDialog({
     standsFor: (
       <>
               {/* A stand-in quest speaks for its board's current assignment. */}
-              {task && !review && (
-                <label className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px]" title="Keeps this quest's name, and takes the due date, priority and next step of whichever quest is up next on the board">
-                  <input type="checkbox" checked={!!standsFor} onChange={(e) => changeStandsFor(e.target.checked ? (boardId ?? null) : null)} disabled={!boardId && !standsFor} />
-                  <span>
-                    Mirror the board&rsquo;s next quest <span className="text-[12px]" style={{ color: "var(--t-ink-soft)" }}>· takes its due date</span>
-                  </span>
-                  {standsFor && (
-                    <select value={standsFor} onChange={(e) => changeStandsFor(e.target.value || null)} aria-label="Which board it follows" className="h-7 max-w-[200px] rounded-full border px-2 text-[13px]" style={{ borderColor: "#b39a6a", background: "transparent", color: "var(--t-ink)" }}>
-                      {(boardOptions ?? []).map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </label>
-              )}
+              {task && !review && <EditorStandsFor taskId={task.id} initial={task.stands_for ?? null} boardId={boardId ?? null} boardOptions={boardOptions} />}
       </>
     ),
     alsoOn: (
       <>
               {/* Also show it on other boards (it still lives on the one above). */}
-              {task && !review && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[13px]">
-                  <span style={{ color: "var(--t-ink-soft)" }}>Also on</span>
-                  {alsoOn.map((id) => (
-                    <span key={id} className="flex h-7 items-center gap-0.5 rounded-full pl-2.5 pr-0.5" style={{ border: "1px solid #b39a6a", color: "var(--t-ink)" }}>
-                      ↗ {boardOptions?.find((o) => o.id === id)?.label ?? "a board"}
-                      <button type="button" onClick={() => saveAlsoOn(alsoOn.filter((x) => x !== id))} aria-label="Unlink from this board" className="flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
-                        <CloseIcon size={9} />
-                      </button>
-                    </span>
-                  ))}
-                  <select
-                    value=""
-                    onChange={(e) => e.target.value && saveAlsoOn([...alsoOn, e.target.value])}
-                    aria-label="Also show it on another board"
-                    className="h-7 max-w-[180px] rounded-full border px-2 text-[13px]"
-                    style={{ borderColor: "#b39a6a", background: "transparent", color: "var(--t-ink)" }}
-                  >
-                    <option value="">+ another board…</option>
-                    {(boardOptions ?? [])
-                      .filter((o) => o.id !== boardId && !alsoOn.includes(o.id))
-                      .map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.label}
-                        </option>
-                      ))}
-                  </select>
-                  {alsoError && <span style={{ color: "var(--t-warn)" }}>{alsoError}</span>}
-                </div>
-              )}
+              {task && !review && <EditorAlsoOn taskId={task.id} initial={task.also_on ?? []} boardId={boardId ?? null} boardOptions={boardOptions} />}
       </>
     ),
     private: (
