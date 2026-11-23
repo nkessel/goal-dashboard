@@ -889,3 +889,30 @@ export async function listWaitingBehind(ownerId: string, ids: string[]): Promise
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Per-quest extras (split plan D3): a place, a calendar card look and a progress count live on the quest's
+// own columns (`tasks.place`, `card_look`, `progress_unit`, migrations D1 and 0099).
+// Every write checks the quest is the owner's.
+// ---------------------------------------------------------------------------
+export type QuestExtrasRow = { id: string; place: string | null; card_look: unknown; progress_unit: unknown };
+
+/** Every quest of this owner that has a place, a card look or a progress count. */
+export async function listQuestExtras(ownerId: string): Promise<QuestExtrasRow[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("tasks")
+    .select("id, place, card_look, progress_unit")
+    .eq("owner_id", ownerId)
+    .or("place.not.is.null,card_look.not.is.null,progress_unit.not.is.null");
+  if (error) throw new Error(`Couldn't read quest extras: ${error.message}`);
+  return (data ?? []) as QuestExtrasRow[];
+}
+
+async function setQuestColumn(ownerId: string, taskId: string, column: "place" | "card_look" | "progress_unit", value: unknown) {
+  const { data, error } = await supabaseAdmin().from("tasks").update({ [column]: value ?? null }).eq("id", taskId).eq("owner_id", ownerId).select("id");
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  if (!data?.length) throw new Error("Unknown quest.");
+}
+export const setQuestPlace = (ownerId: string, taskId: string, place: string | null) => setQuestColumn(ownerId, taskId, "place", place);
+export const setQuestCardLook = (ownerId: string, taskId: string, look: unknown) => setQuestColumn(ownerId, taskId, "card_look", look);
+export const setQuestProgressUnit = (ownerId: string, taskId: string, unit: unknown) => setQuestColumn(ownerId, taskId, "progress_unit", unit);

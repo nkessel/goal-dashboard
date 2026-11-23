@@ -1,6 +1,7 @@
 "use server";
 
 import { writeExtra } from "@/lib/data/extras";
+import { listQuestExtras, setQuestPlace, setQuestCardLook, setQuestProgressUnit } from "@/lib/data/tasks";
 import { mirrorQuestDrive } from "@/lib/data/calendar-planner";
 import { revalidatePath } from "next/cache";
 import { readEventQuestSettings as readEventQuestSettingsOf } from "@/lib/data/event-quests";
@@ -12,7 +13,9 @@ import type { CalCardLook } from "./evening";
 export async function progressUnitsAction() {
   const ownerId = await requireProfileId();
   const { cleanUnits } = await import("@/lib/progress-units");
-  return cleanUnits((await readExtras(ownerId)).progressUnits);
+  const map: Record<string, unknown> = {};
+  for (const r of await listQuestExtras(ownerId)) if (r.progress_unit) map[r.id] = r.progress_unit;
+  return cleanUnits(map);
 }
 
 /** Count a quest's progress in pages (or anything), or back in percent (null). */
@@ -25,6 +28,7 @@ export async function setProgressUnitAction(taskId: string, unit: import("@/lib/
   const u = unit ? cleanUnit(unit) : null;
   if (u) all[taskId] = u;
   else delete all[taskId];
+  await setQuestProgressUnit(ownerId, taskId, u); // the column is read; the old key is kept current for this release (D3)
   const { error } = await writeExtra(ownerId, "progressUnits", all);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return u;
@@ -33,9 +37,8 @@ export async function setProgressUnitAction(taskId: string, unit: import("@/lib/
 /** Where quests happen ("📍 Natick library"), by quest id. */
 export async function questPlacesAction(): Promise<Record<string, string>> {
   const ownerId = await requireProfileId();
-  const raw = (await readExtras(ownerId)).questPlaces;
   const out: Record<string, string> = {};
-  if (raw && typeof raw === "object") for (const [k, v] of Object.entries(raw as Record<string, unknown>)) if (/^[0-9a-f-]{36}$/i.test(k) && typeof v === "string" && v.trim()) out[k] = v.slice(0, 80);
+  for (const r of await listQuestExtras(ownerId)) if (typeof r.place === "string" && r.place.trim()) out[r.id] = r.place.slice(0, 80);
   return out;
 }
 
@@ -47,6 +50,7 @@ export async function setQuestPlaceAction(taskId: string, place: string | null) 
   const p = place?.replace(/\s+/g, " ").trim().slice(0, 80) || null;
   if (p) all[taskId] = p;
   else delete all[taskId];
+  await setQuestPlace(ownerId, taskId, p); // the column is read; the old key is kept current for this release (D3)
   const { error } = await writeExtra(ownerId, "questPlaces", all);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return p;
@@ -94,9 +98,9 @@ export async function questCalExtrasAction(): Promise<{ drives: Record<string, n
   const drives: Record<string, number> = {};
   const looks: Record<string, CalCardLook> = {};
   for (const [k, v] of Object.entries((extras.questDrives as Record<string, unknown> | undefined) ?? {})) if (QUEST_ID.test(k) && typeof v === "number" && v > 0) drives[k] = Math.min(600, Math.round(v));
-  for (const [k, v] of Object.entries((extras.calCardLooks as Record<string, unknown> | undefined) ?? {})) {
-    const l = QUEST_ID.test(k) ? cleanLook(v) : null;
-    if (l) looks[k] = l;
+  for (const r of await listQuestExtras(ownerId)) {
+    const l = r.card_look ? cleanLook(r.card_look) : null;
+    if (l) looks[r.id] = l;
   }
   const windows: Record<string, QuestWindow> = {};
   for (const [k, v] of Object.entries((extras.questWindows as Record<string, unknown> | undefined) ?? {})) {
@@ -129,6 +133,7 @@ export async function setCalCardLookAction(taskId: string, look: CalCardLook | n
   const l = cleanLook(look);
   if (l) all[taskId] = l;
   else delete all[taskId];
+  await setQuestCardLook(ownerId, taskId, l); // the column is read; the old key is kept current for this release (D3)
   const { error } = await writeExtra(ownerId, "calCardLooks", all);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return l;
@@ -242,6 +247,7 @@ export async function applySeriesLookAction(taskId: string, scope: import("@/lib
   looks[key] = withLook(looks[key], look, scope, day);
   const { error } = await writeExtra(ownerId, "seriesLooks", looks);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
+  for (const id of all) await setQuestCardLook(ownerId, id, cards[id] ?? null); // columns are read; the old key is kept current (D3)
   const { error: cardErr } = await writeExtra(ownerId, "calCardLooks", cards);
   if (cardErr) throw new Error(`Couldn't save: ${cardErr.message}`);
   revalidatePath("/calendar");
