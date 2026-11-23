@@ -4,7 +4,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Dev loop 2 run 51 (Opus, Nov 23 09:00 UTC):** UI check on `main` @ d61049a for the quest editor flows after run 49's memo change (`create, sequence, savekeys, questextras`, phone), fix regressions; no new feedback notes since Nov 21.
+- **Dev loop 2 run 51 note (Nov 23, 09:00 to 09:25 UTC):** UI check on `main` @ d61049a (after run 49's editor memo, which shipped without one) for `create, sequence, savekeys, questextras`, phone morning and evening: **0 errors** (7 old warnings). No new feedback notes since Nov 21 17:39; BUILD-PLAN has nothing unclaimed that ships straight. Nothing built.
 
 - **Dev loop 2 run 46 note (Nov 23, 06:00 to 08:10 UTC):** UI check on `main` @ b06f56e (after Run E, G, H and Cal 4/5) for `today, today2, calcomplete, calfail, offline, questextras, create, sequence, savekeys, tour, import, calendar, todaycal, welcome, welcomeoff, settings, toucanask, feedback`: phone morning and evening **0 errors**, tablet morning and evening **0 errors**, desktop `todaycal` **0 errors** (the React #185 bug the Run B thread found is gone: run 43's fix holds). Still open below: the by-hand checks (undo offline, the editor and welcome hand steps, T7 timed nudges) and the snapshot compare, which need a saved baseline. No new feedback notes since Nov 21 17:39 (b55781e2 "more celebration pls" is a design ask). Nothing built.
 
