@@ -37,7 +37,7 @@ The Run B list from the dev plan, updated with what has happened since it was wr
 
 `review/boards-nov18` (with `review/calendar-nov18`) **merged Nov 21** (owner approved); Cal 2a to 2d are on `main`. `review/subquests-sequence` and `review/insights-nov19` were merged Nov 20. Branches still waiting on the owner's review (don't merge without his OK) are listed in `docs/WAITING.md`.
 
-**2. S2, S3** (split plan, `docs/plans/2026-11-16-split-plan.md`): fixtures, baselines, and splitting the UI check's too-long `today` flow (Light 8). **S2 done; S3 done except the `npm run perf` numbers (Nov 22: size table and `today` split done, no browser in that session; run the command in section 10 of the plan from a session that has one).** S1 (`--snapshot` / `--compare`) is done; use it around every move.
+**2. S2, S3** (split plan, `docs/plans/2026-11-16-split-plan.md`): fixtures, baselines, and splitting the UI check's too-long `today` flow (Light 8). **S2 done; S3 done (Nov 23: perf numbers in section 10 of the plan).** S1 (`--snapshot` / `--compare`) is done; use it around every move.
 
 **3. L1, L2:** the toucan's and the quest editor's small exports get their own files. Write down how much Today's and the import page's code shrink. **L2 touches the quest editor, which the pointer-tray thread is changing right now (section 4): do L2 after that lands on `main`.**
 
