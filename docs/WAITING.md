@@ -4,9 +4,11 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Bug on `main` (found Nov 23, Run B thread):** UI check `todaycal` on desktop shows React error #185 (too many updates) morning and evening; phone and tablet clean. Unclaimed.
+- **Bug on `main` (found Nov 23, Run B thread):** UI check `todaycal` on desktop shows React error #185 (too many updates) morning and evening; phone and tablet clean. **Likely fixed by Dev loop 2 run 43** (same #185 seen on tablet inside long runs: drag over Today's calendar, see SHIPPED Nov 23); desktop re-check pending, below.
 
 - **Dev loop 2 run 45 (Opus, Nov 23 04:00 UTC, takes over run 43's claim, 2 hours old with nothing pushed):** UI check on `main` (a browser works in this container) for the flows Run C, D, E, G and H changed (the "Open for the next Dev loop 2 run" list), phone then tablet; fix regressions straight to `main`.
+
+- **Dev loop 2 run 43 note (Nov 23, 02:00 to 04:15 UTC; its claim was taken over by run 45 while the check ran):** UI check on `main` @ 7ef4f98 for the flows Run C, D and E moved code in (`today, today2, welcome, welcomeoff, calendar, todaycal, create, sequence, savekeys, import, tour, questextras, settings, feedback, language, toucanask, pages, insights`): phone morning and evening (579 shots) **0 errors**; tablet morning 0 errors apart from React #185 on `todaycal` (only inside the long run; clean alone). Fix shipped (SHIPPED, Nov 23 run 43). Not done: snapshot compare, tablet evening, Run G/H and Cal 4/5's flows (run 45 has those), and the by-hand checks listed below.
 
 - **Dev loop 2 run 44 note (Nov 23, 03:30 UTC):** Cal 4/5 compare (02:30) and run 43's UI check (01:58) are fresh claims; everything else in Run B/PRIORITIES is shipped, a design change already on a review branch (When 2/3 still need their UI check and review pages; not started here, a longer job for its own run) or parked. Nothing built.
 
