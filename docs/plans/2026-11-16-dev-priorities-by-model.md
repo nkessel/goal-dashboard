@@ -28,7 +28,7 @@ Items marked **(my suggestion)** are mine, not from your notes.
 
 ## Opus 5.5: well-defined features across several files
 
-1. **Undo completion problems** [8f515d40, a8cbfbe4, 013f5984]: still shows checked for a few seconds; XP/reward reversal. Touches the offline queue.
+1. **Undo completion problems** [8f515d40, a8cbfbe4, 013f5984]: still shows checked for a few seconds; XP/reward reversal. Touches the offline queue. **Done Nov 23** (the screen part Nov 19; XP/coin reversal and the offline queue Nov 23, see `docs/SHIPPED.md`).
 2. **Sequence and sub-quests merged in the quest creator** [dafe3364]: you gave it a 👎 for still not being done.
 3. **Screenshot tool** [6134c212 today, 66ed9816, 85ac6c8a]: output doesn't match the screen; let you keep typing while it's taken; drag out an area.
 4. **Right-click / long-press menus as small popups at the pointer, app-wide** [841971c2]: one shared component, then every caller (quest cards, habits, rites).
@@ -41,7 +41,7 @@ Items marked **(my suggestion)** are mine, not from your notes.
 
 11. **Brainstorm: character info at the top of Settings and a character screen** [98a2c58f]. Ideas reported back to you before anything is built; needs taste across the profile, stats and avatar pieces but nothing cross-cutting.
 
-**(my suggestion)** 12. **Tests for the XP and coin math** (complete, undo, sub-quest coins, early bonus, offline replay). Several bugs this month were money/XP reversals; a small test file would catch them before you do.
+**(my suggestion)** 12. **Tests for the XP and coin math** (complete, undo, sub-quest coins, early bonus, offline replay). Several bugs this month were money/XP reversals; a small test file would catch them before you do. **Done Nov 23:** `scripts/test-xp-math.mjs`.
 
 **(my suggestion)** 13. **Widen the UI check** to boards' arrange mode, Treasure Chest editors, the toucan chat and a "Chrome on iPhone" keyboard mode (repeat ask 2, "display bugs I keep finding"). Every screen it covers is one you stop having to QA.
 

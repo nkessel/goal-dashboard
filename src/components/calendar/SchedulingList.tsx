@@ -226,14 +226,19 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme, today 
   };
   if (ui.byWhen) for (const h of HORIZON_ORDER) base[`b:${h}`] = listIds.filter((id) => horizonOf(taskById.get(id)!, now) === h);
   else {
-    base[`f:${LOOSE}`] = listIds.filter((id) => folderOfTask(taskById.get(id)!) === LOOSE);
-    for (const f of folders) base[`f:${f.name}`] = listIds.filter((id) => folderOfTask(taskById.get(id)!) === f.name);
+    // Folders number the soonest first (same order as By when); your own dragging then rules.
+    const soonest = [...listIds].sort((x, y) => rank(horizonOf(taskById.get(x)!, now)) - rank(horizonOf(taskById.get(y)!, now)) || listIds.indexOf(x) - listIds.indexOf(y));
+    base[`f:${LOOSE}`] = soonest.filter((id) => folderOfTask(taskById.get(id)!) === LOOSE);
+    for (const f of folders) base[`f:${f.name}`] = soonest.filter((id) => folderOfTask(taskById.get(id)!) === f.name);
   }
   const boxes = layout ?? base;
   const listKeys = Object.keys(boxes).filter((k) => !k.startsWith("sec:"));
   const flatList = () => listKeys.flatMap((k) => boxes[k]);
   const boxOf = (id: string) => Object.keys(boxes).find((k) => boxes[k].includes(id)) ?? null;
-  const count = listKeys.reduce((n, k) => n + boxes[k].length, 0) + boxes["sec:today"].length;
+  /** Habits still waiting for a time: what the section's count and its ✨ All N both mean. */
+  const waitingHabits = () => boxes["sec:habits"].filter((id) => { const h = habitById.get(id); return !!h && habitPlaceable(h); }).length;
+  /** The list's own count (empty-state words). */
+  const listCount = listKeys.reduce((n, k) => n + boxes[k].length, 0);
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
@@ -493,7 +498,7 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme, today 
     // The list to schedule.
     if (ui.byWhen) {
       const keys = HORIZON_ORDER.map((h) => `b:${h}`).filter((k) => boxes[k]?.length || dragging);
-      if (!keys.length) return empty(count === 0 ? "Nothing waiting. Tick “Add to the scheduling list” in a quest, or sort your imports, to line it up here." : "Nothing waiting.");
+      if (!keys.length) return empty(listCount === 0 ? "Nothing waiting. Tick “Add to the scheduling list” in a quest, or sort your imports, to line it up here." : "Nothing waiting.");
       return keys.map((k) => {
         const h = k.slice(2) as HorizonKey;
         const ids = boxes[k] ?? [];
@@ -524,7 +529,7 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme, today 
       <>
         <GroupZone id={`f:${LOOSE}`}>
           {loose.length === 0 ? (
-            empty(count === 0 ? "Nothing waiting. Tick “Add to the scheduling list” in a quest to line it up here." : "Drag a quest here to number it.")
+            empty(listCount === 0 ? "Nothing waiting. Tick “Add to the scheduling list” in a quest to line it up here." : "Drag a quest here to number it.")
           ) : (
             <SortableContext items={loose} strategy={verticalListSortingStrategy}>
               <ol className="m-0 flex list-none flex-col gap-1 p-0">{loose.map((id, i) => taskRow(id, i < NUMBERED ? i + 1 : null, i === NUMBERED, () => remove(id)))}</ol>
@@ -614,9 +619,11 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme, today 
 
   const secTitle = (s: Sec) =>
     s === "today" ? (planDay && planDay.toDateString() !== now.toDateString() ? `${planDay.toLocaleDateString(undefined, { weekday: "long" })}'s quests` : "Today's quests") : s === "additional" ? "Additional quests" : s === "habits" ? "Habits" : "To schedule";
-  const secCount = (s: Sec) => (s === "list" ? flatList().length : boxes[`sec:${s}`].length);
+  const secCount = (s: Sec) => (s === "list" ? flatList().length : s === "habits" ? waitingHabits() : boxes[`sec:${s}`].length);
   // Plain lists (no sections data, e.g. the planning rituals) show only the list.
   const shown = ui.order.filter((s) => sections || today || s === "list").filter((s) => s !== "today" || sections || today).filter((s) => (s !== "additional" && s !== "habits") || sections);
+  // The header's number is the sum of the section numbers shown below it.
+  const count = shown.reduce((n, s) => n + secCount(s), 0);
 
   const panel = (
     <aside

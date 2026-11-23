@@ -31,6 +31,9 @@ export function normalizeSplit(split: StatSplit): StatSplit {
   return out;
 }
 
+/** A stat's part of `xp` at `pct` percent (rounded toward zero, so a reversal mirrors its award). */
+export const statShare = (xp: number, pct: number) => Math.trunc((xp * pct) / 100);
+
 /**
  * Set one stat's share; if the total would pass 100%, the stat chosen most
  * recently gives up the difference, then the one before it (none goes below

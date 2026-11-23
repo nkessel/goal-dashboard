@@ -19,7 +19,8 @@ import { oneStepPerProject } from "@/lib/next-action";
 import * as importCardsData from "@/lib/data/import-cards";
 import { mirrorEssentialDays } from "@/lib/data/calendar-planner";
 import { writeExtra } from "@/lib/data/extras";
-import { requireSessionMaybeGoogle, moveSession, attachCalendarEvent, requireProfileId, readExtras } from "./_shared";
+import { requireSessionMaybeGoogle, attachCalendarEvent, requireProfileId, readExtras, googleSide } from "./_shared";
+import { applyCalendarOps, type CalOp } from "@/lib/data/calendar-ops";
 
 /**
  * Puts one sub-quest on the calendar (or moves it): its own block and its own Google event, named
@@ -102,22 +103,35 @@ export async function scheduleTaskAction(
   endISO: string
 ) {
   const { profileId, accessToken } = await requireSessionMaybeGoogle();
+  // One write path (planner step 5): the app's row first, Google after, and the opposite back for Undo.
   const sid = sessionIdOf(taskId);
-  if (sid) {
-    await moveSession(accessToken, profileId, sid, new Date(startISO), new Date(endISO));
-    revalidatePath("/");
-    revalidatePath("/calendar");
-    return;
+  let counts = true;
+  if (!sid) {
+    const task = await tasksData.getTask(taskId, profileId);
+    if (!task) throw new Error("Task not found");
+    // Same start, new length (a resize, or shortening it to its time): not a reschedule.
+    counts = !task.scheduled_start || new Date(task.scheduled_start).getTime() !== new Date(startISO).getTime();
   }
-
-  const task = await tasksData.getTask(taskId, profileId);
-  if (!task) throw new Error("Task not found");
-
-  // Same start, new length (a resize, or shortening it to its time): not a reschedule.
-  const sameStart = !!task.scheduled_start && new Date(task.scheduled_start).getTime() === new Date(startISO).getTime();
-  await attachCalendarEvent(accessToken, profileId, task, new Date(startISO), new Date(endISO), !sameStart);
+  const res = await applyCalendarOps(profileId, [{ op: "place", ref: sid ? `s:${sid}` : `t:${taskId}`, start: startISO, end: endISO, counts }], { google: googleSide(accessToken, profileId) });
+  if (!res.undo.length && res.skipped.length) throw new Error(sid ? "That session isn't on the calendar anymore." : res.skipped[0]);
+  for (const n of res.google) console.warn(n);
   revalidatePath("/");
   revalidatePath("/calendar");
+  return { undo: res.undo };
+}
+
+/**
+ * Undo for a calendar change (planner step 5): applies the opposites a change gave back. Rows that changed since
+ * are left as they are and named in `skipped`; it hands back the opposite of the undo (Redo).
+ */
+export async function undoCalendarAction(ops: CalOp[]) {
+  const { profileId, accessToken } = await requireSessionMaybeGoogle();
+  if (!Array.isArray(ops) || ops.length > 200 || ops.some((o) => o?.op !== "restore")) throw new Error("That can't be undone.");
+  const res = await applyCalendarOps(profileId, ops, { google: googleSide(accessToken, profileId) });
+  for (const n of res.google) console.warn(n);
+  revalidatePath("/");
+  revalidatePath("/calendar");
+  return { undo: res.undo, skipped: res.skipped };
 }
 
 /**

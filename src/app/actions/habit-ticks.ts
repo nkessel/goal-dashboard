@@ -90,9 +90,11 @@ export async function setHabitXpNowAction(riteId: string, day: string, xpValue: 
   const ticks = cleanHabitTicks(extras.habitTicks);
   const list = [...(ticks.days[day]?.[riteId] ?? [])];
   let delta = 0;
+  let basis = 0;
   if (list.length) {
     // The latest tick was an extra one.
-    delta = next - list[list.length - 1][0];
+    basis = list[list.length - 1][0];
+    delta = next - basis;
     list[list.length - 1] = [next, list[list.length - 1][1]];
     ticks.days[day] = { ...(ticks.days[day] ?? {}), [riteId]: list };
     await saveHabitTicks(ownerId, extras, ticks);
@@ -100,11 +102,13 @@ export async function setHabitXpNowAction(riteId: string, day: string, xpValue: 
     // It was the day's first: the completion itself.
     const { data } = await db.from("rite_completions").select("xp_awarded").eq("owner_id", ownerId).eq("rite_id", riteId).eq("day", day).maybeSingle<{ xp_awarded: number }>();
     if (data) {
-      delta = next - data.xp_awarded;
+      basis = data.xp_awarded;
+      delta = next - basis;
       await db.from("rite_completions").update({ xp_awarded: next }).eq("owner_id", ownerId).eq("rite_id", riteId).eq("day", day);
     }
   }
-  if (delta !== 0) await xp.awardXp(ownerId, delta, "task_completed").catch(() => {});
+  // On the tick's running total, so undoing the tick later takes back exactly the coins it paid.
+  if (delta !== 0) await xp.awardXp(ownerId, delta, "task_completed", undefined, null, { basis }).catch(() => {});
   revalidatePath("/");
   return { xp: next };
 }

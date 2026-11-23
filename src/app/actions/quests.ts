@@ -6,9 +6,8 @@ import { writeExtra } from "@/lib/data/extras";
 import * as goalsData from "@/lib/data/goals";
 import * as tasksData from "@/lib/data/tasks";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { finishTaskForOwner as finishTask, adjustXpForEditForOwner, deleteTaskForOwner, archiveTaskForOwner, archivedOf, restoreArchivedQuestForOwner, reopenTaskForOwner, createQuestForOwner } from "@/lib/data/quest-ops";
+import { finishTaskForOwner as finishTask, adjustXpForEditForOwner, deleteTaskForOwner, archiveTaskForOwner, archivedOf, restoreArchivedQuestForOwner, reopenTaskForOwner, createQuestForOwner, setTaskProgressForOwner, saveQuestStepsForOwner } from "@/lib/data/quest-ops";
 import * as rewardsData from "@/lib/data/rewards";
-import * as xp from "@/lib/data/xp";
 import * as stepsData from "@/lib/data/steps";
 import { auth } from "@/auth";
 import { requireProfileId, readExtras, requireSessionMaybeGoogle, attachCalendarEvent } from "./_shared";
@@ -440,19 +439,7 @@ export async function setEarlyBonusAction(taskId: string, b: { xp: number | null
 
 export async function setTaskProgressAction(taskId: string, progress: number) {
   const ownerId = await requireProfileId();
-  const task = await tasksData.getTask(taskId, ownerId);
-  if (!task) throw new Error("That quest isn't here anymore.");
-  if (typeof task.xp_awarded !== "number") throw new Error("Quest progress needs a quick database update first.");
-  if (task.status === "completed") return { xpEarned: 0, coinsEarned: 0, totalXp: null };
-  const pct = Math.max(0, Math.min(100, Math.round(progress)));
-  const target = Math.round((task.xp_value * pct) / 100);
-  const delta = target - task.xp_awarded;
-  await tasksData.setTaskPayout(taskId, ownerId, { progress: pct, xpAwarded: target });
-  const award = delta !== 0 ? await xp.awardXp(ownerId, delta, "task_completed", taskId) : null;
-  revalidatePath("/");
-  revalidatePath("/matrix");
-  revalidatePath("/boards", "layout");
-  return { xpEarned: delta, coinsEarned: award?.coinsEarned ?? 0, totalXp: award?.totalXp ?? null };
+  return setTaskProgressForOwner(ownerId, taskId, progress);
 }
 
 /** A quest's steps for the editor; null when steps aren't available yet. */
@@ -468,43 +455,7 @@ export async function listQuestStepsAction(taskId: string) {
  */
 export async function saveQuestStepsAction(taskId: string, steps: stepsData.StepInput[]) {
   const ownerId = await requireProfileId();
-  const task = await tasksData.getTask(taskId, ownerId);
-  if (!task) throw new Error("That quest isn't here anymore.");
-  const saved = await stepsData.replaceSteps(taskId, ownerId, steps.slice(0, 50));
-  let delta = 0;
-  let coinDelta = 0;
-  // A sub-quest with its own stat split pays its XP through that split, apart from the rest.
-  const ownSplit: { amount: number; split: Record<string, number> }[] = [];
-  for (const st of saved) {
-    const owed = st.done ? (st.xp ?? 0) : 0;
-    const paid = st.xp_paid ?? 0;
-    // A sub-quest's own coins (owner, Nov 14), paid when ticked and taken back when unticked.
-    const owedC = st.done ? (st.coins ?? 0) : 0;
-    const paidC = st.coins_paid ?? 0;
-    if (owed !== paid || owedC !== paidC) {
-      if (st.stat_split && Object.keys(st.stat_split).length && owed !== paid) ownSplit.push({ amount: owed - paid, split: st.stat_split });
-      else delta += owed - paid;
-      coinDelta += owedC - paidC;
-      await stepsData.setStepPaid(st.id, ownerId, owed, owedC !== paidC ? owedC : undefined);
-    }
-  }
-  let coinsEarned = 0;
-  if (delta !== 0) coinsEarned = (await xp.awardXp(ownerId, delta, "task_completed", taskId)).coinsEarned;
-  for (const o of ownSplit) {
-    coinsEarned += (await xp.awardXp(ownerId, o.amount, "task_completed", taskId, o.split)).coinsEarned;
-    delta += o.amount;
-  }
-  if (coinDelta !== 0) {
-    await rewardsData.addCoins(ownerId, coinDelta).catch(() => {});
-    coinsEarned += coinDelta;
-  }
-  revalidatePath("/");
-  revalidatePath("/boards", "layout");
-  return {
-    steps: saved.map((s) => ({ id: s.id, title: s.title, done: s.done, sort_order: s.sort_order, xp: s.xp ?? 0, coins: s.coins ?? 0, minutes: s.minutes ?? null, stat_split: s.stat_split ?? null, weight: s.weight ?? null, progress: s.progress ?? (s.done ? 100 : 0), state: s.state ?? null, parent_id: s.parent_id ?? null })),
-    xpEarned: delta,
-    coinsEarned,
-  };
+  return saveQuestStepsForOwner(ownerId, taskId, steps);
 }
 
 /** Deletion lives inside the edit dialog, not a separate control. */

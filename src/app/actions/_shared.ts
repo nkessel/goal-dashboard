@@ -2,7 +2,8 @@ import "server-only";
 
 import { auth } from "@/auth";
 import * as tasksData from "@/lib/data/tasks";
-import { updateCalendarEvent, createCalendarEvent } from "@/lib/google-calendar";
+import { updateCalendarEvent, createCalendarEvent, deleteCalendarEvent } from "@/lib/google-calendar";
+import type { GoogleSide } from "@/lib/data/calendar-ops";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import type { Task } from "@/lib/data/types";
 import type { CalCardLook } from "./evening";
@@ -41,7 +42,7 @@ export async function attachCalendarEvent(
   /** False while planning a day: moving a quest around isn't a reschedule. */
   countAsReschedule = true
 ) {
-  let eventId = task.google_calendar_event_id ?? undefined;
+  const eventId = task.google_calendar_event_id ?? undefined;
   if (!accessToken) {
     await tasksData.rescheduleTask(task.id, profileId, start.toISOString(), end.toISOString(), eventId, countAsReschedule);
     return;
@@ -60,6 +61,39 @@ export async function attachCalendarEvent(
     }).catch(() => null);
     if (made) await supabaseAdmin().from("tasks").update({ google_calendar_event_id: made }).eq("id", task.id).eq("owner_id", profileId).is("google_calendar_event_id", null);
   }
+}
+
+/**
+ * Google's side of a calendar change (planner step 5): what `applyCalendarOps` does once the app's rows have
+ * changed. Null when Google Calendar isn't connected. `keepEvent`: an event that stays on Google when its item
+ * comes off (a quest made from someone else's meeting). Calendar blocks aren't sent to Google yet.
+ */
+export function googleSide(accessToken: string | null, profileId: string, opts: { keepEvent?: (eventId: string) => Promise<boolean> } = {}): GoogleSide | null {
+  if (!accessToken) return null;
+  const titleOf = async (table: string, row: Record<string, unknown>) => {
+    if (table === "tasks") return { title: String(row.title ?? ""), description: (row.description as string | null) ?? undefined };
+    const t = await tasksData.getTask(String(row.task_id), profileId);
+    return { title: t?.title ?? "Quest", description: t?.description ?? undefined };
+  };
+  return {
+    async placed(table, row) {
+      if (table === "calendar_blocks") return null;
+      const start = new Date(String(table === "tasks" ? row.scheduled_start : row.starts_at));
+      const end = new Date(String(table === "tasks" ? row.scheduled_end : row.ends_at));
+      const eventId = row.google_calendar_event_id as string | null;
+      if (eventId) {
+        await updateCalendarEvent(accessToken, eventId, { start, end });
+        return null;
+      }
+      return createCalendarEvent(accessToken, { ...(await titleOf(table, row)), start, end });
+    },
+    async removed(table, before) {
+      const eventId = before.google_calendar_event_id as string | null;
+      if (table === "calendar_blocks" || !eventId) return;
+      if (opts.keepEvent && (await opts.keepEvent(eventId))) return;
+      await deleteCalendarEvent(accessToken, eventId);
+    },
+  };
 }
 
 /** Move one of a quest's further sessions (and its Google event; one is made if it had none). */

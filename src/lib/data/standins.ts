@@ -91,3 +91,33 @@ export async function currentAssignment(ownerId: string, task: Task): Promise<st
   const [enriched] = await applyStandIns(ownerId, [task]);
   return (enriched as { stand_in?: StandIn | null }).stand_in?.id ?? null;
 }
+
+/**
+ * The assignment a stand-in quest finished most recently (checking a stand-in off finishes the assignment it
+ * speaks for, and the stand-in stays open), so "Undo quest completion" on the stand-in can reopen that one.
+ * Only a finish in the last half hour counts: an undo comes right after the celebration.
+ */
+export async function lastFinishedAssignment(ownerId: string, standIn: Pick<Task, "id" | "stands_for">, withinMs = 30 * 60_000): Promise<string | null> {
+  if (!standIn.stands_for) return null;
+  const db = supabaseAdmin();
+  const { data: boards } = await db.from("boards").select("id, parent_board_id").eq("owner_id", ownerId);
+  const all = (boards ?? []) as { id: string; parent_board_id: string | null }[];
+  const scope = new Set([standIn.stands_for]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const b of all) if (b.parent_board_id && scope.has(b.parent_board_id) && !scope.has(b.id)) (scope.add(b.id), (grew = true));
+  }
+  const since = new Date(Date.now() - withinMs).toISOString();
+  const { data } = await db
+    .from("tasks")
+    .select("id, logged_at, stands_for, failed_at")
+    .eq("owner_id", ownerId)
+    .eq("status", "completed")
+    .is("failed_at", null)
+    .in("board_id", [...scope])
+    .gte("logged_at", since)
+    .order("logged_at", { ascending: false })
+    .limit(5);
+  const hit = ((data ?? []) as { id: string; stands_for: string | null }[]).find((r) => !r.stands_for && r.id !== standIn.id);
+  return hit?.id ?? null;
+}
