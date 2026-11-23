@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 45 (Opus, Nov 23 04:00 UTC, takes over run 43's claim, 2 hours old with nothing pushed):** UI check on `main` (a browser works in this container) for the flows Run C, D, E, G and H changed (the "Open for the next Dev loop 2 run" list), phone then tablet; fix regressions straight to `main`.
+
 - **Dev loop 2 run 44 note (Nov 23, 03:30 UTC):** Cal 4/5 compare (02:30) and run 43's UI check (01:58) are fresh claims; everything else in Run B/PRIORITIES is shipped, a design change already on a review branch (When 2/3 still need their UI check and review pages; not started here, a longer job for its own run) or parked. Nothing built.
 
 - **Run B thread, Cal 4/5 snapshot compare (Sonnet, Nov 23 02:30 UTC):** `wip/calendar-items` vs `main` with `--snapshot`/`--compare`; merge only on 0 differences.
