@@ -41,6 +41,7 @@ yarn-error.log*
 next-env.d.ts
 scripts/.xp-module.mjs
 scripts/.email-module.mjs
+scripts/.calendar-ops-module.mjs
 scripts/.test-session*.json
 dev.log
 

@@ -5,7 +5,7 @@ import { completeRiteForOwner, uncompleteRiteForOwner, createRiteForOwner, updat
 import * as ritesData from "@/lib/data/rites";
 import { revalidatePath } from "next/cache";
 import * as winsData from "@/lib/data/wins";
-import { listEvents, deleteCalendarEvent } from "@/lib/google-calendar";
+import { listEvents } from "@/lib/google-calendar";
 import * as tasksData from "@/lib/data/tasks";
 import { sessionRef, sessionIdOf } from "@/lib/calendar-task-window";
 import * as xp from "@/lib/data/xp";
@@ -21,7 +21,8 @@ import { byDuePriority } from "@/lib/due-soon";
 import { cleanRepeat, repeatIsUp } from "@/lib/habit-repeat";
 import { signIn, CALENDAR_AUTH_PARAMS } from "@/auth";
 import * as schedulingData from "@/lib/data/scheduling";
-import { requireProfileId, assertDay, requireSessionMaybeGoogle, moveSession, attachCalendarEvent, readExtras, guideTasks, cleanPriorities, type Priority } from "./_shared";
+import { requireProfileId, assertDay, requireSessionMaybeGoogle, moveSession, attachCalendarEvent, readExtras, guideTasks, cleanPriorities, googleSide, type Priority } from "./_shared";
+import { applyCalendarOps } from "@/lib/data/calendar-ops";
 import { deleteTaskAction } from "./quests";
 
 /** Complete a rite for your local `day` (YYYY-MM-DD); pays its XP once per day. */
@@ -176,28 +177,25 @@ export async function planQuickEventAction(input: { title: string; startISO: str
  */
 export async function unscheduleTaskAction(taskId: string) {
   const { profileId, accessToken } = await requireSessionMaybeGoogle();
-  // One of a quest's further sessions: only that session comes off.
-  const sid = sessionIdOf(taskId);
-  if (sid) {
-    const sess = await tasksData.getTaskSession(sid, profileId);
-    if (sess?.google_calendar_event_id && accessToken) await deleteCalendarEvent(accessToken, sess.google_calendar_event_id).catch(() => {});
-    await tasksData.deleteTaskSession(sid, profileId);
-    revalidatePath("/");
-    revalidatePath("/calendar");
-    return;
-  }
-  const { data: t } = await supabaseAdmin().from("tasks").select("plan_xp, status").eq("id", taskId).eq("owner_id", profileId).maybeSingle<{ plan_xp: number | null; status: string }>();
-  const eventId = await tasksData.unscheduleTask(taskId, profileId);
+  // One write path (planner step 5): the row first, Google after, and the opposite back for Undo.
   // A quest made from a calendar event leaves that event where it was (it may be a meeting someone else
   // set up); only quests the app put on Google take their event with them.
-  const fromEvent = eventId ? !!readEventQuestSettingsOf(await readExtras(profileId)).made?.[eventId] : false;
-  if (eventId && accessToken && !fromEvent) await deleteCalendarEvent(accessToken, eventId).catch(() => {});
+  const keepEvent = async (eventId: string) => !!readEventQuestSettingsOf(await readExtras(profileId)).made?.[eventId];
+  // One of a quest's further sessions: only that session comes off.
+  const sid = sessionIdOf(taskId);
+  const t = sid ? null : (await supabaseAdmin().from("tasks").select("plan_xp, status").eq("id", taskId).eq("owner_id", profileId).maybeSingle<{ plan_xp: number | null; status: string }>()).data;
+  const res = await applyCalendarOps(profileId, [{ op: "remove", ref: sid ? `s:${sid}` : `t:${taskId}` }], { google: googleSide(accessToken, profileId, { keepEvent }) });
+  for (const n of res.google) console.warn(n);
+  let undo = res.undo;
+  // A planning item made from the planner goes away entirely, and the XP its planning paid is taken back.
   if (t && t.plan_xp !== null && t.plan_xp !== undefined && t.status === "open") {
     await tasksData.deleteTask(taskId, profileId);
     if (t.plan_xp > 0) await xp.awardXp(profileId, -t.plan_xp, "task_completed");
+    undo = [];
   }
   revalidatePath("/");
   revalidatePath("/calendar");
+  return { undo };
 }
 
 /** A planning item: what it is, how long it takes, and the XP planning it earns. */
