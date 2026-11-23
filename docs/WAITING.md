@@ -4,7 +4,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Dev loop 2 run 56 note (Nov 23, after 12:00 UTC):** `main` unchanged since run 51; no new feedback notes since Nov 21 17:39. Nothing unclaimed that ships straight. Nothing built.
+- **Dev loop 2 runs 56–57 note (Nov 23, 12:00 and 12:57 UTC):** `main` unchanged since run 51; no new feedback notes since Nov 21 17:39. Nothing unclaimed that ships straight. Nothing built.
 
 - **Dev loop 2 runs 52–55 note (Nov 23, 09:30, 09:55, 10:56 and 11:56 UTC):** `main` unchanged since run 51 (docs only); no new feedback notes since Nov 21 17:39; no Postgres errors since 05:00; everything left is a design change on a review branch or parked. Nothing built.
 
