@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 50 (Opus, Nov 23 07:58 UTC):** open feedback bugs not yet looked at: 9151d379 (Today completion shows the board before the celebration), b285e3e2 (claiming a reward said 0 coins and kicked out). Not the quest editor (run 49).
+
 - **Dev loop 2 run 46 note (Nov 23, 06:00 to 08:10 UTC):** UI check on `main` @ b06f56e (after Run E, G, H and Cal 4/5) for `today, today2, calcomplete, calfail, offline, questextras, create, sequence, savekeys, tour, import, calendar, todaycal, welcome, welcomeoff, settings, toucanask, feedback`: phone morning and evening **0 errors**, tablet morning and evening **0 errors**, desktop `todaycal` **0 errors** (the React #185 bug the Run B thread found is gone: run 43's fix holds). Still open below: the by-hand checks (undo offline, the editor and welcome hand steps, T7 timed nudges) and the snapshot compare, which need a saved baseline. No new feedback notes since Nov 21 17:39 (b55781e2 "more celebration pls" is a design ask). Nothing built.
 
 - **Dev loop 2 run 49 (Sonnet, Nov 23 07:30 UTC):** runs 46 and 48 hold fresh claims, so this run takes E9 (editor lighter): perf scenario fix, `npm run perf -- --only editor` baseline, then memo on the editor parts (no screen change).
