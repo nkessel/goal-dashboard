@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 46 (Opus, Nov 23 06:00 UTC, takes over run 45's claim, 2 hours old with nothing pushed):** UI check on `main` @ b06f56e for the Run E/G/H and Cal 4/5 flows (the "Open for the next Dev loop 2 run" list) plus desktop `todaycal`, phone then tablet; fix regressions straight to `main`; then bug-fix feedback notes.
+
 - **Bug on `main` (found Nov 23, Run B thread):** UI check `todaycal` on desktop shows React error #185 (too many updates) morning and evening; phone and tablet clean. **Likely fixed by Dev loop 2 run 43** (same #185 seen on tablet inside long runs: drag over Today's calendar, see SHIPPED Nov 23); desktop re-check pending, below.
 
 - **Dev loop 2 run 45 (Opus, Nov 23 04:00 UTC, takes over run 43's claim, 2 hours old with nothing pushed):** UI check on `main` (a browser works in this container) for the flows Run C, D, E, G and H changed (the "Open for the next Dev loop 2 run" list), phone then tablet; fix regressions straight to `main`.
