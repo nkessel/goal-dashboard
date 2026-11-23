@@ -50,7 +50,7 @@ import { BoardPicker } from "./BoardPicker";
 import { useEscape } from "@/lib/use-escape";
 import { useEditorToolbar, useIsEmbedded, usePortalTarget } from "@/components/ui/EmbedHost";
 import { freshKey, loadDrafts, removeDraft, saveDraft, type QuestDraftSave } from "@/lib/quest-drafts";
-import { isNetworkError, isOffline, queueOffline, saveOrQueue } from "@/lib/offline";
+import { isNetworkError, isOffline, queueOffline, saveOrQueue, settleCompletion } from "@/lib/offline";
 import { addOptimisticQuest, markOptimisticQueued, resolveOptimisticQuest } from "@/lib/optimistic-quests";
 import { EditorScale } from "./editor/EditorScales";
 import { coinsForXp } from "@/lib/coins";
@@ -1619,7 +1619,8 @@ export function QuestEditorDialog({
                 onClick={() =>
                   startSaving(async () => {
                     await chain.current;
-                    await reopenTaskAction(task.id);
+                    // A completion still on its way (or waiting offline) is settled first, so it can't land after.
+                    if (!(await settleCompletion(task.id))) await reopenTaskAction(task.id);
                     close();
                   })
                 }

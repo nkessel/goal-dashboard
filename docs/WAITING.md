@@ -6,7 +6,11 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 - **Bug on `main` (found Nov 23, Run B thread):** UI check `todaycal` on desktop shows React error #185 (too many updates) morning and evening; phone and tablet clean. Unclaimed.
 
-- **Run B thread, Run G picks (Opus, Nov 23 02:14 UTC):** XP/coin math tests, undo-completion bugs.
+- **Dev loop 2 run 45 (Opus, Nov 23 04:00 UTC, takes over run 43's claim, 2 hours old with nothing pushed):** UI check on `main` (a browser works in this container) for the flows Run C, D, E, G and H changed (the "Open for the next Dev loop 2 run" list), phone then tablet; fix regressions straight to `main`.
+
+- **Dev loop 2 run 44 note (Nov 23, 03:30 UTC):** Cal 4/5 compare (02:30) and run 43's UI check (01:58) are fresh claims; everything else in Run B/PRIORITIES is shipped, a design change already on a review branch (When 2/3 still need their UI check and review pages; not started here, a longer job for its own run) or parked. Nothing built.
+
+- **Run B thread, Cal 4/5 snapshot compare (Sonnet, Nov 23 02:30 UTC):** `wip/calendar-items` vs `main` with `--snapshot`/`--compare`; merge only on 0 differences.
 
 - **Dev loop 2 run 43 (Opus, Nov 23 01:58 UTC, takes over run 42's claim, which left nothing):** UI check on `main` for the flows Run C, D and E moved code in (phone, then tablet), fix regressions; then open feedback notes that are bug fixes.
 
@@ -67,6 +71,8 @@ Started in the owner's Claude project threads; written here so another account c
 ---
 
 ## Open for the next Dev loop 2 run (not claimed)
+
+- **Undo quest completion (Run G picks, Opus, Nov 23, shipped to `main`, no browser here): UI check.** Server and offline-queue fixes, no new look (see SHIPPED Nov 23). A browser session: `npm run ui-check -- --only today,calcomplete,calfail,offline,questextras --devices phone,tablet`, then by hand on the fake database: complete a quest on Today, press "Undo quest completion" in the celebration (card open at once, XP and coins back); the same from Victories Today's Undo and the quest editor's Undo on a done quest; with the connection off, complete then undo (the card stays open, nothing is sent once back online), and undo a quest done before going offline (it is sent once back online).
 
 - **Auto-scheduler counts (Run H, Sonnet, Nov 23, shipped to `main`, no browser here): UI check.** Open the calendar's auto-scheduler (phone and tablet) with a habit already placed: the header number equals the sum of the section numbers; Habits shows only habits still waiting for a time and matches its ✨ All N; in Folders the first three numbered quests are the soonest-due.
 - **Run E code moves (Opus, Nov 23, no screen change, no browser here):** E4, E6, E7 (quest editor: `tasks/editor/EditorProgress.tsx`, `use-quest-steps.ts`, `EditorSteps.tsx`, `use-quest-scheduling.ts`, `EditorScheduling.tsx`), T7 (`toucan/nudges.ts`: the arriving, due-today and promise nudges as hooks), W4 (`xp/welcome/use-card.ts`, and `use-held-screen.ts`, the repeat-ask keyboard code moved whole and unchanged), W5 (`xp/welcome/GreetingLine.tsx`, `WiseLine.tsx`). Needs a browser session: `npm run ui-check -- --only create,today,today2,sequence,savekeys,tour,import,calendar,todaycal,questextras,welcome,welcomeoff,settings,toucanask,feedback --devices phone,tablet` with the snapshot compare against the last clean `main`, plus by hand: in the quest editor add, tick, rename and delete a sub-quest, change progress, set a due date and an early bonus, pick a time and take it off the calendar, then save and reopen. On the welcome screen: rewrite the greeting (keep it / retire it), thumbs on the greeting and the wise line, ‹ › through wise lines then open the gear and close it (the line you were on should stay), drag and resize the card, and a field low on the card with the phone-keyboard device (a real iPhone was not checked: W4's keyboard code is repeat-ask territory). T7's timed nudges (3 hours before something due, a promise's time) need a hand test with the clock moved.

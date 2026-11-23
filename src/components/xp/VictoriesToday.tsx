@@ -7,6 +7,13 @@ import { CoinIcon, DiamondIcon, CloseIcon } from "@/components/ui/Icons";
 import { coinsForXp } from "@/lib/coins";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { useLongPress } from "@/lib/use-long-press";
+import { settleCompletion } from "@/lib/offline";
+
+/** Undo a victory: a completion still on its way (or waiting offline) is settled first, so it can't land after. */
+async function undoCompletion(id: string) {
+  if (await settleCompletion(id).catch(() => false)) return;
+  await reopenTaskAction(id).catch(() => {});
+}
 import { SectionTitle } from "@/components/ui/Ornaments";
 import { SettingsGear } from "@/components/ui/SettingsGear";
 import { eveningDayKey } from "@/components/evening/evening-clock";
@@ -352,7 +359,7 @@ function VictoryPreview({ task, coins, note, onEdit, onClose }: { task: Task; co
                 </button>
                 <button type="button" disabled={pending} onClick={() => start(async () => {
                     // Take back what it paid out first, then delete it.
-                    await reopenTaskAction(task.id).catch(() => {});
+                    await undoCompletion(task.id);
                     await deleteTaskAction(task.id).catch(() => {});
                     onClose();
                   })} className="cursor-pointer font-semibold underline underline-offset-2 disabled:opacity-50" style={{ color: "var(--t-warn)" }}>
@@ -362,7 +369,7 @@ function VictoryPreview({ task, coins, note, onEdit, onClose }: { task: Task; co
             </>
           ) : (
             <>
-              <button type="button" disabled={pending} onClick={() => start(async () => (await reopenTaskAction(task.id).catch(() => {}), onClose()))} className="cursor-pointer font-semibold underline underline-offset-2 disabled:opacity-50" style={{ color: "var(--t-ink)" }}>
+              <button type="button" disabled={pending} onClick={() => start(async () => (await undoCompletion(task.id), onClose()))} className="cursor-pointer font-semibold underline underline-offset-2 disabled:opacity-50" style={{ color: "var(--t-ink)" }}>
                 {pending ? "Undoing…" : "Undo completion"}
               </button>
               <button type="button" onClick={() => setConfirmDelete(true)} className="cursor-pointer underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>

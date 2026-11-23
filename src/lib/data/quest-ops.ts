@@ -10,6 +10,7 @@ import * as profilesData from "@/lib/data/profiles";
 import * as rewardsData from "@/lib/data/rewards";
 import * as ritesData from "@/lib/data/rites";
 import * as bossesData from "@/lib/data/bosses";
+import * as stepsData from "@/lib/data/steps";
 import * as xp from "@/lib/data/xp";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { computeLevelForXp } from "@/lib/levels";
@@ -59,16 +60,20 @@ async function finishTaskItself(ownerId: string, taskId: string, completedAt?: s
     return { totalXp: (await profilesData.getProfileById(ownerId))?.total_xp ?? null, coinsEarned: 0, rewardCompleted: false, earlyBird: 0 };
   }
   const completed = await tasksData.completeTask(taskId, ownerId, completedAt);
+  // Another save finished it a moment ago (two taps, or a queued save and a fresh one at once): it pays once.
+  if (!completed) return { totalXp: (await profilesData.getProfileById(ownerId))?.total_xp ?? null, coinsEarned: 0, rewardCompleted: false, earlyBird: 0 };
   // The next quest in its sequence steps forward (taking its place on Today).
   if (was) await releaseNext(ownerId, was).catch(() => {});
   // Partial progress may already have paid some of this quest's XP; pay the rest.
   const tracked = typeof completed.xp_awarded === "number";
-  const payout = tracked ? completed.xp_value - (completed.xp_awarded ?? 0) : completed.xp_value;
+  const basis = tracked ? (completed.xp_awarded ?? 0) : 0;
+  const payout = completed.xp_value - basis;
   if (tracked) await tasksData.setTaskPayout(taskId, ownerId, { progress: 100, xpAwarded: completed.xp_value });
   let totalXp: number | null = null;
   let coinsEarned = 0;
   if (payout !== 0) {
-    const award = await xp.awardXp(ownerId, payout, "task_completed", taskId);
+    // On the running total: a quest paid in parts pays the same coins and stat XP as one paid at once.
+    const award = await xp.awardXp(ownerId, payout, "task_completed", taskId, null, { basis });
     totalXp = award.totalXp;
     coinsEarned = award.coins === null ? 0 : award.coinsEarned;
   } else {
@@ -147,11 +152,11 @@ export async function adjustXpForEditForOwner(ownerId: string, taskId: string, n
           : Math.round((Math.max(0, newXpValue) * (before.progress ?? 0)) / 100);
       const delta = target - before.xp_awarded;
       if (delta !== 0) {
-        await xp.awardXp(ownerId, delta, "task_completed", taskId);
+        await xp.awardXp(ownerId, delta, "task_completed", taskId, null, { basis: before.xp_awarded });
         await tasksData.setTaskPayout(taskId, ownerId, { xpAwarded: target });
       }
-    } else if (before.status === "completed") {
-      await xp.awardXp(ownerId, newXpValue - before.xp_value, "task_completed", taskId);
+    } else if (before.status === "completed" && !before.failed_at) {
+      await xp.awardXp(ownerId, newXpValue - before.xp_value, "task_completed", taskId, null, { basis: before.xp_value });
     }
   }
   return before;
@@ -159,36 +164,150 @@ export async function adjustXpForEditForOwner(ownerId: string, taskId: string, n
 
 export async function reopenTaskForOwner(ownerId: string, taskId: string) {
   const before = await tasksData.getTask(taskId, ownerId);
-  await tasksData.reopenTask(taskId, ownerId);
+  // A stand-in quest stays open: its check finished the assignment it spoke for, so undo reopens that one.
+  if (before?.stands_for && before.status !== "completed") {
+    const { lastFinishedAssignment } = await import("@/lib/data/standins");
+    const finished = await lastFinishedAssignment(ownerId, before);
+    if (finished) return reopenTaskForOwner(ownerId, finished);
+  }
+  // Only the undo that actually reopens it takes anything back (a second tap, or one racing it, changes nothing).
+  const reopened = await tasksData.reopenTask(taskId, ownerId);
+  if (!reopened || !before || before.status !== "completed") {
+    revalidatePath("/");
+    return;
+  }
   // Undo what the quest paid out so re-completing later doesn't farm points;
   // progress starts over.
   // A failed quest paid nothing and finished nothing: reopening it only reopens it.
-  const failed = !!before?.failed_at;
-  if (before?.status === "completed" && before.reward_id && !failed) {
+  const failed = !!before.failed_at;
+  if (before.reward_id && !failed) {
     // Reopening a reward's quest puts the reward back to accepted (bonus coins back out).
     const was = await rewardsData.uncompleteReward(before.reward_id, ownerId);
     if (was && (was.bonus_coins ?? 0) > 0) await rewardsData.addCoins(ownerId, -(was.bonus_coins ?? 0));
     revalidatePath("/rewards");
   }
-  if (before?.status === "completed" && before.boss_id && !failed) await bossStep(ownerId, before.boss_id, -1).catch(() => {});
-  if (before?.status === "completed" && !failed) {
+  if (before.boss_id && !failed) await bossStep(ownerId, before.boss_id, -1).catch(() => {});
+  if (!failed) {
     const paid = typeof before.xp_awarded === "number" ? before.xp_awarded : before.xp_value;
-    if (paid > 0) await xp.awardXp(ownerId, -paid, "task_completed", taskId);
+    // The whole running total back out: exactly the coins and stat XP it paid, in one go or in parts.
+    if (paid > 0) await xp.awardXp(ownerId, -paid, "task_completed", taskId, null, { basis: paid });
     const coinAdjust = customCoinAdjustment(before);
     if (coinAdjust !== 0) await rewardsData.addCoins(ownerId, -coinAdjust);
     if (typeof before.xp_awarded === "number") await tasksData.setTaskPayout(taskId, ownerId, { progress: 0, xpAwarded: 0 });
+    // The early-bird bonus it paid comes back out too (its XP from the ledger, so exactly what was paid).
+    const early = await earlyBirdPaid(ownerId, taskId);
+    if (early > 0) await xp.awardXp(ownerId, -early, "early_bird", taskId);
+    const earlyCoins = before.completed_at ? earlyBirdCoins(before, Date.parse(before.completed_at)) : 0;
+    if (earlyCoins > 0) await rewardsData.addCoins(ownerId, -earlyCoins).catch(() => {});
   }
   revalidatePath("/");
   revalidatePath("/matrix");
 }
 
-export async function deleteTaskForOwner(ownerId: string, taskId: string) {
+/** The early-bird XP a quest has paid and not taken back (its early_bird awards, net). */
+async function earlyBirdPaid(ownerId: string, taskId: string): Promise<number> {
+  const { data } = await supabaseAdmin().from("xp_events").select("amount").eq("owner_id", ownerId).eq("task_id", taskId).eq("kind", "early_bird");
+  return ((data ?? []) as { amount: number }[]).reduce((n, r) => n + (r.amount ?? 0), 0);
+}
+
+/**
+ * Mark partial progress on a quest (0–100%). Pays the matching share of its XP now (coins and stat XP on the
+ * running total, so the parts add up to the whole); completing it later pays the rest.
+ */
+export async function setTaskProgressForOwner(ownerId: string, taskId: string, progress: number) {
   const task = await tasksData.getTask(taskId, ownerId);
-  // Reverse any XP already paid for this quest (completion or partial
-  // progress) so deleting it can't be used to farm points.
-  const paid = task ? (typeof task.xp_awarded === "number" ? task.xp_awarded : task.status === "completed" ? task.xp_value : 0) : 0;
+  if (!task) throw new Error("That quest isn't here anymore.");
+  if (typeof task.xp_awarded !== "number") throw new Error("Quest progress needs a quick database update first.");
+  if (task.status === "completed") return { xpEarned: 0, coinsEarned: 0, totalXp: null };
+  const pct = Math.max(0, Math.min(100, Math.round(progress)));
+  const target = Math.round((task.xp_value * pct) / 100);
+  const delta = target - task.xp_awarded;
+  await tasksData.setTaskPayout(taskId, ownerId, { progress: pct, xpAwarded: target });
+  const award = delta !== 0 ? await xp.awardXp(ownerId, delta, "task_completed", taskId, null, { basis: task.xp_awarded }) : null;
+  revalidatePath("/");
+  revalidatePath("/matrix");
+  revalidatePath("/boards", "layout");
+  return { xpEarned: delta, coinsEarned: award?.coinsEarned ?? 0, totalXp: award?.totalXp ?? null };
+}
+
+/**
+ * Saves a quest's step list. A step with its own XP pays it when it's done (and takes it back if it's unticked);
+ * `xpEarned` is what this save paid. Coins for step XP go on the running total of the quest's step XP, so ticking
+ * steps one by one and unticking them together come out even.
+ */
+export async function saveQuestStepsForOwner(ownerId: string, taskId: string, steps: stepsData.StepInput[]) {
+  const task = await tasksData.getTask(taskId, ownerId);
+  if (!task) throw new Error("That quest isn't here anymore.");
+  const list = steps.slice(0, 50);
+  // A ticked sub-quest taken out of the list gives back what it paid, as unticking it would (so adding, ticking
+  // and removing one can't farm XP).
+  const keep = new Set(list.map((st) => st.id).filter(Boolean));
+  const gone = ((await stepsData.listStepsForTask(taskId, ownerId)) ?? []).filter((st) => !keep.has(st.id) && ((st.xp_paid ?? 0) !== 0 || (st.coins_paid ?? 0) !== 0));
+  const saved = await stepsData.replaceSteps(taskId, ownerId, list);
+  let delta = 0;
+  let coinDelta = 0;
+  let paidBefore = 0;
+  let paidAfter = 0;
+  // Steps paying through the quest's own split, as one running total.
+  let questTrackBefore = 0;
+  // A sub-quest with its own stat split pays its XP through that split, apart from the rest.
+  const ownSplit: { amount: number; basis: number; split: Record<string, number> }[] = [];
+  for (const st of gone) {
+    const paid = st.xp_paid ?? 0;
+    paidBefore += paid;
+    coinDelta -= st.coins_paid ?? 0;
+    if (st.stat_split && Object.keys(st.stat_split).length) ownSplit.push({ amount: -paid, basis: paid, split: st.stat_split });
+    else {
+      questTrackBefore += paid;
+      delta -= paid;
+    }
+  }
+  for (const st of saved) {
+    const owed = st.done ? (st.xp ?? 0) : 0;
+    const paid = st.xp_paid ?? 0;
+    paidBefore += paid;
+    paidAfter += owed;
+    const own = !!(st.stat_split && Object.keys(st.stat_split).length);
+    if (!own) questTrackBefore += paid;
+    // A sub-quest's own coins (owner, Nov 14), paid when ticked and taken back when unticked.
+    const owedC = st.done ? (st.coins ?? 0) : 0;
+    const paidC = st.coins_paid ?? 0;
+    if (owed !== paid || owedC !== paidC) {
+      if (own && owed !== paid) ownSplit.push({ amount: owed - paid, basis: paid, split: st.stat_split! });
+      else delta += owed - paid;
+      coinDelta += owedC - paidC;
+      await stepsData.setStepPaid(st.id, ownerId, owed, owedC !== paidC ? owedC : undefined);
+    }
+  }
+  if (delta !== 0) await xp.awardXp(ownerId, delta, "task_completed", taskId, null, { basis: questTrackBefore, coins: 0 });
+  for (const o of ownSplit) {
+    if (o.amount === 0) continue;
+    await xp.awardXp(ownerId, o.amount, "task_completed", taskId, o.split, { basis: o.basis, coins: 0 });
+    delta += o.amount;
+  }
+  const xpCoins = coinsForXp(paidAfter) - coinsForXp(paidBefore);
+  if (xpCoins + coinDelta !== 0) await rewardsData.addCoins(ownerId, xpCoins + coinDelta).catch(() => {});
+  revalidatePath("/");
+  revalidatePath("/boards", "layout");
+  return {
+    steps: saved.map((s) => ({ id: s.id, title: s.title, done: s.done, sort_order: s.sort_order, xp: s.xp ?? 0, coins: s.coins ?? 0, minutes: s.minutes ?? null, stat_split: s.stat_split ?? null, weight: s.weight ?? null, progress: s.progress ?? (s.done ? 100 : 0), state: s.state ?? null, parent_id: s.parent_id ?? null })),
+    xpEarned: delta,
+    coinsEarned: xpCoins + coinDelta,
+  };
+}
+
+export async function deleteTaskForOwner(ownerId: string, taskId: string) {
+  let task = await tasksData.getTask(taskId, ownerId);
+  // A finished quest is undone first, so everything it paid (early bonus, custom coins, a reward's bonus) comes back out.
+  if (task?.status === "completed" && !task.failed_at && !task.stands_for) {
+    await reopenTaskForOwner(ownerId, taskId);
+    task = await tasksData.getTask(taskId, ownerId);
+  }
+  // Reverse any XP already paid for this quest (partial progress)
+  // so deleting it can't be used to farm points.
+  const paid = task ? (typeof task.xp_awarded === "number" ? task.xp_awarded : task.status === "completed" && !task.failed_at ? task.xp_value : 0) : 0;
   if (paid > 0) {
-    await xp.awardXp(ownerId, -paid, "task_completed", taskId);
+    await xp.awardXp(ownerId, -paid, "task_completed", taskId, null, { basis: paid });
   }
   await tasksData.deleteTask(taskId, ownerId);
   revalidatePath("/");

@@ -75,14 +75,22 @@ export async function awardXp(
   kind: "task_completed" | "daily_check_in" | "streak_bonus" | "planning_ritual" | "early_bird" | "mess_battle",
   taskId?: string,
   /** A sub-quest's own stat split, used instead of its quest's. */
-  statSplit?: Record<string, number> | null
+  statSplit?: Record<string, number> | null,
+  /**
+   * `basis`: what this quest (or this track of it) had already paid before this award. With it, coins and stat
+   * shares are worked out on the running total (coins for the total after, less coins for the total before), so a
+   * quest paid in parts (progress, then the rest) pays exactly what it would in one go, and taking the whole
+   * total back takes back exactly what was paid. `coins`: the coin change to make instead of the automatic one.
+   */
+  opts?: { basis?: number; coins?: number }
 ): Promise<XpAwardResult> {
   const db = supabaseAdmin();
   // Coins follow the whole award; a quest may send part of its XP to
   // character stats instead of the main meter.
   const fullAmount = amount;
+  const basis = opts?.basis;
   if (taskId && kind === "task_completed" && amount !== 0) {
-    amount = await statsData.splitTaskXp(ownerId, taskId, amount, statSplit).catch(() => amount);
+    amount = await statsData.splitTaskXp(ownerId, taskId, amount, statSplit, basis).catch(() => amount);
   }
   // Quests restore a little HP.
   if (taskId && kind === "task_completed" && fullAmount > 0) await hpData.heal(ownerId).catch(() => {});
@@ -122,8 +130,13 @@ export async function awardXp(
   }
 
   // Coins follow XP at 1 per XP_PER_COIN, rounded down per award (and the
-  // same amount back out when an award is reversed).
-  const coinDelta = Math.sign(fullAmount) * coinsForXp(Math.abs(fullAmount));
+  // same amount back out when an award is reversed); on the running total when a basis is given.
+  const coinDelta =
+    opts?.coins !== undefined
+      ? Math.round(opts.coins)
+      : basis !== undefined
+        ? coinsForXp(basis + fullAmount) - coinsForXp(basis)
+        : Math.sign(fullAmount) * coinsForXp(Math.abs(fullAmount));
   const hasCoins = typeof profile.coins === "number";
   const { error: updateErr } = await db
     .from("profiles")

@@ -5,10 +5,10 @@ import { FeltAsk } from "@/components/ui/FeltAsk";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { settleCompletion } from "@/lib/offline";
+import { saveOrQueue, settleCompletion } from "@/lib/offline";
 import { createPortal } from "react-dom";
 import type { Reward } from "@/lib/data/types";
-import { claimRewardAction, getQuestForEditAction, listAvailableRewardsAction, reopenTaskAction } from "@/app/actions";
+import { claimRewardAction, getQuestForEditAction, listAvailableRewardsAction } from "@/app/actions";
 import { celebrateReward } from "./RewardCelebration";
 import type { Task } from "@/lib/data/types";
 import { QuestEditorDialog } from "@/components/tasks/LazyQuestEditorDialog";
@@ -504,8 +504,9 @@ export function QuestComplete(props: QuestCompleteProps) {
                   onClose();
                   try {
                     // Wait for the completion to land first (or cancel it if it was still waiting offline).
+                    // Offline, the undo waits in the queue and goes once back online (the card stays open meanwhile).
                     const onlyHere = await settleCompletion(taskId);
-                    if (!onlyHere) await reopenTaskAction(taskId);
+                    if (!onlyHere) await saveOrQueue("reopenQuest", { id: taskId });
                   } catch {
                     // The server said no (or we're offline): the card shows it done again.
                     clearQuestNow(taskId);
