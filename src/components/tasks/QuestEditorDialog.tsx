@@ -3,15 +3,13 @@
 import { PillTrays } from "@/components/ui/PillTrays";
 import { sessionRef } from "@/lib/calendar-task-window";
 import { CardLookPicker } from "@/components/calendar/CardLookPicker";
-import { saveQuestWindow, useQuestWindow } from "@/lib/use-quest-cal";
+import { useQuestWindow } from "@/lib/use-quest-cal";
 import { minutesOf, rangeWords } from "@/lib/auto-schedule";
-import { TimeRangePick } from "@/components/ui/TimeRangePick";
 import { useProgressUnit, saveProgressUnit } from "@/lib/use-progress-units";
 import { pctOf, type ProgressUnit } from "@/lib/progress-units";
 import { FileChips } from "@/components/ui/FileChips";
 import { AddFile } from "@/components/ui/AddFile";
 import type { FileRef } from "@/lib/file-refs";
-import { TimeToken } from "@/components/xp/NightFields";
 import { LinkOuts } from "@/components/ui/Linked";
 import { TimeWheels } from "@/components/ui/TimeWheels";
 import { CloseIcon } from "@/components/ui/Icons";
@@ -32,8 +30,6 @@ import {
   reopenTaskAction,
   saveQuestStepsAction,
   scheduleTaskAction,
-  addTaskSessionAction,
-  unscheduleTaskAction,
   setTaskPlanByAction,
   setTaskStatSplitAction,
   setTaskPrivateAction,
@@ -47,10 +43,9 @@ import {
 import { celebrateProgress, celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { IconPicker } from "./IconPicker";
 import { CheckMark } from "./TaskRow";
-import { WhenPicker } from "@/components/calendar/WhenPicker";
 import { Fold } from "@/components/ui/Fold";
 import { useCalCardLook } from "@/lib/use-quest-cal";
-import { ScheduleWithin, withinLabel } from "./ScheduleWithin";
+import { withinLabel } from "./ScheduleWithin";
 import { BoardPicker } from "./BoardPicker";
 import { useEscape } from "@/lib/use-escape";
 import { useEditorToolbar, useIsEmbedded, usePortalTarget } from "@/components/ui/EmbedHost";
@@ -62,11 +57,10 @@ import { coinsForXp } from "@/lib/coins";
 import type { QuestTemplate } from "@/lib/quest-templates";
 import { stepPayload, treeOrder } from "@/lib/quest-steps";
 import { EditorArrange } from "./EditorArrange";
-import { EarlyBonusFields } from "./EarlyBonusFields";
 import { readEditorLayout, serverEditorLayout, subscribeEditorLayout, type EditorPart } from "@/lib/quest-editor-layout";
 import { DateField } from "@/components/ui/DateField";
 import type { QuestDraft, QuestEditorMode } from "./editor/types";
-import { localDate, localTime, shortTime, slotWords, planByIn, dueIso, dueChipLabel, dueQuickPicks, ESTIMATE_PICKS } from "./editor/dates";
+import { localDate, localTime, shortTime, planByIn, dueIso, dueChipLabel, ESTIMATE_PICKS } from "./editor/dates";
 import { FactCaret } from "./editor/glyphs";
 import { PlacePanel, PlacePill } from "./editor/EditorPlaceLook";
 import { AutoGrowText } from "./editor/AutoGrowText";
@@ -80,6 +74,8 @@ import { EditorXp } from "./editor/EditorXp";
 import { EditorProgress } from "./editor/EditorProgress";
 import { useQuestSteps } from "./editor/use-quest-steps";
 import { EditorSteps } from "./editor/EditorSteps";
+import { useQuestScheduling } from "./editor/use-quest-scheduling";
+import { EditorScheduling } from "./editor/EditorScheduling";
 import { EditorAlsoOn, EditorStandsFor } from "./editor/EditorBoardTray";
 import { EditorTags } from "./editor/EditorTags";
 import { EditorSaveTemplate, TemplateList } from "./editor/EditorTemplates";
@@ -243,55 +239,13 @@ export function QuestEditorDialog({
     if (statTimer.current) clearTimeout(statTimer.current);
     statTimer.current = setTimeout(() => void setTaskStatSplitAction(task.id, next).catch(() => {}), 500);
   }
-  // The scheduling priority list beside the calendar.
-  const [toSchedule, setToSchedule] = useState(task?.schedule_rank != null);
+  // When to do it: the calendar and the list to schedule (editor/use-quest-scheduling.ts).
+  const sched = useQuestScheduling({ task, slot, setSlot, initialSlot, onUnscheduled: () => void (savedSlotStart.current = null) });
+  const { planDays } = sched;
   const [isPriv, setIsPriv] = useState(!!task?.is_private);
   function changePrivate(v: boolean) {
     setIsPriv(v);
     if (task) void setTaskPrivateAction(task.id, v).catch(() => setIsPriv(!v));
-  }
-  const [schedNote, setSchedNote] = useState<string | null>(null);
-  // The day drawn in place: to move its time, or to add another session.
-  const [whenOpen, setWhenOpen] = useState<"move" | "more" | null>(null);
-  const [addingSession, setAddingSession] = useState(false);
-  const [sessionNote, setSessionNote] = useState<string | null>(null);
-  function pickWhen(picked: { start: string; end: string }) {
-    if (whenOpen !== "more" || !task) {
-      setSlot(picked);
-      setWhenOpen(null);
-      return;
-    }
-    setAddingSession(true);
-    addTaskSessionAction(sessionRef(task), picked.start, picked.end)
-      .then(() => (setSessionNote(`Another session: ${slotWords(picked)}`), setWhenOpen(null)))
-      .catch((e) => setSessionNote(e instanceof Error ? e.message : "Couldn't add that session."))
-      .finally(() => setAddingSession(false));
-  }
-  function takeOffCalendar() {
-    setWhenOpen(null);
-    if (!task || slot !== initialSlot || !initialSlot) return setSlot(null);
-    setSlot(null);
-    unscheduleTaskAction(sessionRef(task))
-      .then(() => (savedSlotStart.current = null))
-      .catch((e) => (setSlot(initialSlot), setSessionNote(e instanceof Error ? e.message : "Couldn't take it off the calendar.")));
-  }
-  // "Schedule within": days from today to its plan-by, while it's on the list to schedule.
-  const [planDays, setPlanDays] = useState<number | null>(() => {
-    if (task?.schedule_rank == null || !task.plan_by) return null;
-    const d = new Date(task.plan_by);
-    d.setHours(12, 0, 0, 0);
-    const t = new Date();
-    t.setHours(12, 0, 0, 0);
-    return Math.max(0, Math.round((d.getTime() - t.getTime()) / 86_400_000));
-  });
-  function rateWithin(days: number | null) {
-    setPlanDays(days);
-    setToSchedule(days !== null);
-    if (!task) return;
-    setSchedNote(null);
-    setTaskPlanByAction(task.id, days === null ? null : planByIn(days))
-      .then(() => setSchedNote(days === null ? "Off the list to schedule" : "On the list to schedule"))
-      .catch((e) => setSchedNote(e instanceof Error ? e.message : "Couldn't update the list."));
   }
   const initialBoard = task ? (task.board_id ?? null) : (create?.boardId ?? null);
   const [boardId, setBoardId] = useState<string | null>(initialBoard);
@@ -1026,83 +980,6 @@ export function QuestEditorDialog({
     ]
       .filter(Boolean)
       .join(" · ") || "Due date";
-  const schedulingBlock = doingNow ? null : (
-    <div className="flex flex-col gap-2">
-      <div className="flex min-h-8 items-center gap-2">
-        {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
-        <img src="/design/ui-calendar.png" alt="" width={15} height={15} className="h-[15px] w-[15px] shrink-0" />
-        <span className={`${labelCls} shrink-0`}>Calendar</span>
-        <span className="min-w-0 flex-1 truncate text-[13px] tabular-nums" style={{ color: shownSlot ? "var(--t-ink)" : "var(--t-ink-soft)" }}>
-          {shownSlot ? slotWords(shownSlot) : "Not on it yet"}
-        </span>
-        {!fixedSchedule && (
-          <>
-            {slot && slot !== initialSlot && (
-              <button type="button" onClick={() => (setSlot(initialSlot), setWhenOpen(null))} className="text-xs underline" style={{ color: "var(--t-ink-soft)" }}>
-                Undo
-              </button>
-            )}
-            <button type="button" onClick={() => setWhenOpen((o) => (o === "move" ? null : "move"))} aria-expanded={whenOpen === "move"} className="qe-fact flex h-8 shrink-0 items-center rounded-full px-3 text-[12.5px] font-semibold" data-open={whenOpen === "move" ? "true" : undefined}>
-              {slot ? "Change" : "Find a time"}
-            </button>
-            {slot && (
-              <button type="button" onClick={takeOffCalendar} aria-label="Take it off the calendar" title="Take it off the calendar" className="h-8 w-6 shrink-0 text-[17px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
-                <CloseIcon size={10} />
-              </button>
-            )}
-          </>
-        )}
-      </div>
-      {/* A quest already on the calendar can get another session (it ran long; more of it tomorrow). */}
-      {task && initialSlot && slot === initialSlot && !fixedSchedule && (
-        <button type="button" onClick={() => setWhenOpen((o) => (o === "more" ? null : "more"))} aria-expanded={whenOpen === "more"} className="qe-fact flex h-8 items-center self-start rounded-full px-3 text-[12.5px] font-semibold" data-open={whenOpen === "more" ? "true" : undefined}>
-          ＋ Another session
-        </button>
-      )}
-      {sessionNote && (
-        <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }} role="status">
-          {sessionNote}
-        </span>
-      )}
-      <Fold open={whenOpen !== null}>
-        {whenOpen !== null && (
-          <div className="pt-1">
-            <WhenPicker
-              key={whenOpen}
-              minutes={Math.max(15, Number(estimate) || 30)}
-              title={title.trim() || "This quest"}
-              isAdventure={isAdventure}
-              initial={whenOpen === "move" ? (slot?.start ?? null) : null}
-              placing={addingSession}
-              onPick={pickWhen}
-            />
-          </div>
-        )}
-      </Fold>
-      {/* How soon it needs a time: puts it on the auto-scheduler's list in that group. */}
-      <ScheduleWithin days={planDays} onRate={rateWithin} />
-      {/* When in the day it may go: the auto-scheduler only looks inside this range. */}
-      {task && !fixedSchedule && (
-        <div data-quest-window className="flex flex-col gap-1.5">
-          <span className={labelCls}>Time of day</span>
-          <TimeRangePick small value={{ from: timeWindow?.from ?? "", to: timeWindow?.to ?? "" }} onChange={(v) => void saveQuestWindow(task.id, v.from || v.to ? { ...(v.from ? { from: v.from } : {}), ...(v.to ? { to: v.to } : {}) } : null)} startWord="After" />
-        </div>
-      )}
-      {toSchedule && planDays == null && (
-        <span className="flex items-center gap-2 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-          On the list to schedule
-          <button type="button" onClick={() => rateWithin(null)} className="underline underline-offset-2">
-            Take it off
-          </button>
-        </span>
-      )}
-      {schedNote && (
-        <span className="text-[12px]" style={{ color: "var(--t-ink-soft)" }} role="status">
-          {schedNote}
-        </span>
-      )}
-    </div>
-  );
   /** The sub-quests drawer: out of the "+ Sub-quests" pill, with a caret pointing up at it. */
   const subPillRef = useRef<HTMLButtonElement>(null);
   const cardLook = useCalCardLook(task?.id);
@@ -1688,43 +1565,7 @@ export function QuestEditorDialog({
                   {facts.includes("sequence") && partNodes.sequence}
                   {factOpen === "due" && (
                     <div key="due" data-pill-tray className="reveal qe-fact-panel pill-tray-box flex flex-col gap-2 rounded-xl p-3" data-tour="panel-due">
-                      <div className="flex flex-wrap items-center gap-1">
-                        {dueQuickPicks().map((q) => (
-                          <button key={q.label} type="button" aria-pressed={dueDate === q.day} onClick={() => setDueDate(q.day)} className="qe-fact h-8 rounded-full px-2.5 text-[13px] font-semibold" data-open={dueDate === q.day ? "true" : undefined}>
-                            {q.label}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`${labelCls} shrink-0`}>Pick a date</span>
-                        <DateField value={dueDate} onChange={setDueDate} ariaLabel="Due date" placeholder="No due date" className="h-9 min-w-0 flex-1 rounded-lg border px-2 text-[15px]" style={fieldStyle} />
-                        {dueDate && (
-                          <>
-                            <TimeToken value={dueTime} onChange={setDueTime} label="Due time (optional)" kind="any" compact />
-                            <button type="button" onClick={() => (setDueDate(""), setDueTime(""))} aria-label="Clear the due date" title="No due date" className="h-9 w-7 shrink-0 text-[18px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
-                              <CloseIcon size={11} />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                      {/* Finishing early: a reward, right with the date it's measured from. */}
-                      {dueDate && (
-                        <div className="flex flex-col gap-1.5 border-t pt-2" style={{ borderColor: "rgba(139,112,64,.22)" }}>
-                          <span className="flex items-center gap-1.5 text-[13.5px] font-semibold" style={{ color: "var(--t-ink)" }}>
-                            <span aria-hidden className="text-[12px]">⏱</span> Early bonus
-                            <span className="font-normal" style={{ color: "var(--t-ink-soft)" }}>
-                              for finishing before it&rsquo;s due
-                            </span>
-                          </span>
-                          <EarlyBonusFields value={{ xp: earlyBonus, coins: earlyCoins, perDay: earlyPerDay }} onChange={(v) => (setEarlyBonus(v.xp), setEarlyCoins(v.coins), setEarlyPerDay(v.perDay))} chipBorder={chipBorder} />
-                        </div>
-                      )}
-                      {/* When to do it: the calendar and the list to schedule. */}
-                      {schedulingBlock && (
-                        <div className="border-t pt-2" style={{ borderColor: "rgba(139,112,64,.22)" }}>
-                          {schedulingBlock}
-                        </div>
-                      )}
+                      <EditorScheduling task={task} doingNow={doingNow} isAdventure={isAdventure} labelCls={labelCls} fieldStyle={fieldStyle} chipBorder={chipBorder} dueDate={dueDate} setDueDate={setDueDate} dueTime={dueTime} setDueTime={setDueTime} early={{ xp: earlyBonus, coins: earlyCoins, perDay: earlyPerDay }} onEarlyChange={(v) => (setEarlyBonus(v.xp), setEarlyCoins(v.coins), setEarlyPerDay(v.perDay))} fixedSchedule={!!fixedSchedule} shownSlot={shownSlot} slot={slot} setSlot={setSlot} initialSlot={initialSlot} estimate={estimate} title={title} timeWindow={timeWindow} sched={sched} />
                     </div>
                   )}
 
