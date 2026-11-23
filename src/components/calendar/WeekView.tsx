@@ -49,6 +49,20 @@ function useHydrated() {
   return useSyncExternalStore(noSubscribe, () => true, () => false);
 }
 
+/**
+ * Pick mode (When 3, `MiniCalendar`): the calendar places one quest that isn't saved yet. A tap on an empty spot
+ * puts it there, it drags and its foot resizes; nothing else on the calendar moves, opens or navigates, and
+ * nothing is written: the new time goes to `onChange`, and the host saves it. Everything for it sits behind `pick`.
+ */
+export type CalPick = {
+  title: string;
+  minutes: number;
+  value: { start: string; end: string } | null;
+  onChange: (s: { start: string; end: string }) => void;
+  /** Move the days shown by n (a sideways swipe or trackpad swipe), instead of going to the calendar screen. */
+  onShiftDays?: (n: number) => void;
+};
+
 /** The fixed time column, while the days scroll under it: parchment, so the days slide behind it. */
 const TIME_BG = "linear-gradient(90deg, #f3e6c8 85%, #efe0bd)";
 
@@ -66,7 +80,10 @@ export function WeekView({
   habitLook = "quest",
   embedded = false,
   ui,
+  pick: pickMode,
 }: {
+  /** Pick mode: place this one quest (see `CalPick`). */
+  pick?: CalPick;
   /** What the server read from the `cal-ui` cookie: starting values, so the first picture is the final one. */
   ui?: CalUi;
   /** Inside a box of its own that scrolls (Today's day calendar): it scrolls that box, not the page, and stays on its day. */
@@ -96,7 +113,9 @@ export function WeekView({
   // null: the late hours follow the quests (a quest running past 10:30 PM opens them; owner, Nov 19: "Yes").
   const [lateChoice, setLate] = useState<boolean | null>(ui?.late ?? null);
   // Just placed at a time behind the early/late buttons (from a picker): open those hours so it's seen (planner step 2c).
+  const picking = !!pickMode;
   useEffect(() => {
+    if (picking) return;
     let at: string | null = null;
     try {
       at = window.sessionStorage.getItem("cal-reveal");
@@ -110,13 +129,13 @@ export function WeekView({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from storage after a placement
     if (hr < DAY_FROM) setEarly(true);
     else if (hr >= DAY_UNTIL) setLate(true);
-  }, [tasks]);
+  }, [tasks, picking]);
   const H0 = early ? HOUR_START : DAY_FROM;
   const [gripY, setGripY] = useState<number | null>(null);
   const [itemMenu, setItemMenu] = useState<{ x: number; y: number; target: MenuTarget } | null>(null);
   const HOUR_PX = hourPx;
   useEffect(() => {
-    if (ui?.zoom) return;
+    if (ui?.zoom || picking) return;
     try {
       const z = Number(window.localStorage.getItem(ZOOM_KEY));
       // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
@@ -129,6 +148,8 @@ export function WeekView({
   function zoomTo(px: number) {
     const v = Math.round(Math.max(MIN_HOUR_PX, Math.min(MAX_HOUR_PX, px)));
     setHourPx(v);
+    // Pick mode's small calendar keeps its own size: the calendar screen's zoom stays as it is.
+    if (picking) return;
     try {
       window.localStorage.setItem(ZOOM_KEY, String(v));
       writeCalUi({ zoom: v });
@@ -269,7 +290,7 @@ export function WeekView({
     // Only the main button picks a time (a right-click is for a hold's menu).
     if (e.pointerType === "mouse" && e.button !== 0) return;
     const m = minuteAt(e);
-    if (carried) {
+    if (carried && !pickMode) {
       e.preventDefault();
       void placeCarried(carried, dayIndex, m);
       return;
@@ -321,6 +342,14 @@ export function WeekView({
       setSel(null);
       return; // a scroll, not a tap
     }
+    // Pick mode: a tap puts the quest there at its length (a mouse drag, at the length dragged). Nothing opens.
+    if (pickMode) {
+      setSel(null);
+      const start = minuteDate(day, lo);
+      const end = p.mouse && p.moved ? minuteDate(day, hi) : new Date(start.getTime() + Math.max(15, pickMode.minutes) * 60_000);
+      pickMode.onChange({ start: start.toISOString(), end: end.toISOString() });
+      return;
+    }
     // A second tap on a meal or habit hold opens its menu instead (owner, Nov 4: "double-tap").
     if (!p.moved && holdMenuAt(day, e.clientX, e.clientY, "tap", e.timeStamp)) {
       setSel(null);
@@ -364,7 +393,8 @@ export function WeekView({
       // Its own box scrolls: an hour before now.
       const sc = h.closest<HTMLElement>("[data-cal-scroller]");
       if (!sc) return;
-      const d = new Date();
+      // Pick mode opens on the picked time when there is one.
+      const d = pickMode?.value ? new Date(pickMode.value.start) : new Date();
       const hr = Math.min(H1, Math.max(H0, d.getHours() + d.getMinutes() / 60 - 1));
       sc.scrollTop = Math.max(0, h.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop + (hr - H0) * HOUR_PX - 40);
       return;
@@ -575,6 +605,7 @@ export function WeekView({
       el.removeEventListener("touchend", onEnd);
       el.removeEventListener("wheel", onWheel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- zoomTo reads only setters and pick mode, which is fixed for a WeekView's life
   }, []);
 
   // Fluid days: drag the day headers sideways to move through days, or drag
@@ -583,6 +614,10 @@ export function WeekView({
   const [fluid, setFluid] = useState<{ dx: number; w: number | null; n?: number } | null>(null);
   const dragged = useRef(false);
   const goTo = (startOffset: number, n: number) => {
+    if (pickMode) {
+      if (startOffset) pickMode.onShiftDays?.(startOffset);
+      return;
+    }
     const first = new Date(days[seamless ? Math.max(0, Math.min(days.length - 1, firstIdx)) : 0]);
     first.setDate(first.getDate() + startOffset);
     const key = formatDateParam(first);
@@ -926,6 +961,7 @@ export function WeekView({
   // edge to change how long it runs — snapping to the quarter hour. A mouse
   // drags after a few pixels; a finger holds for a moment first.
   type Span = { dayIndex: number; top: number; bottom: number };
+  type DragItem = { kind: "task"; task: Task } | { kind: "event"; event: GoogleCalendarEvent } | { kind: "pick" };
   const [moving, setMoving] = useState<(Span & { key: string }) | null>(null);
   const [pending, setPending] = useState<Record<string, Span>>({});
   const [seenData, setSeenData] = useState({ tasks, events });
@@ -944,12 +980,14 @@ export function WeekView({
     to: Span;
     active: boolean;
     timer?: number;
-    item: { kind: "task"; task: Task } | { kind: "event"; event: GoogleCalendarEvent };
+    item: DragItem;
   } | null>(null);
   const justDragged = useRef(false);
 
-  function startItemDrag(e: React.PointerEvent, key: string, span: Span, item: { kind: "task"; task: Task } | { kind: "event"; event: GoogleCalendarEvent }) {
-    if (carried) return;
+  function startItemDrag(e: React.PointerEvent, key: string, span: Span, item: DragItem) {
+    if (carried && !pickMode) return;
+    // Pick mode: only the quest being placed moves.
+    if (pickMode && item.kind !== "pick") return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
     // A popup opened from this card (the quest editor, a menu) is portalled out of it but its
     // pointer events still bubble here through React: dragging inside it moved the quest (owner, Nov 5).
@@ -1010,7 +1048,7 @@ export function WeekView({
     if (dayIndex === d.from.dayIndex && top === d.from.top && bottom === d.from.bottom) {
       // A finger held still and let go: that's a long press, so open the card's menu (iPhone fires no contextmenu).
       const fromDay = days[d.from.dayIndex];
-      if (d.touch && fromDay) {
+      if (d.touch && fromDay && d.item.kind !== "pick") {
         const start = minuteDate(fromDay, d.from.top);
         const end = minuteDate(fromDay, d.from.bottom);
         setItemMenu({
@@ -1025,12 +1063,15 @@ export function WeekView({
     if (!day) return;
     const start = minuteDate(day, top).toISOString();
     const end = minuteDate(day, bottom).toISOString();
+    // Pick mode writes nothing: the host gets the new time.
+    if (d.item.kind === "pick") return pickMode?.onChange({ start, end });
+    const item = d.item;
     setPending((p) => ({ ...p, [d.key]: d.to }));
     setPlaceError(null);
     void (async () => {
       try {
-        if (d.item.kind === "task") await scheduleTaskAction(sessionRef(d.item.task), start, end);
-        else await updateGoogleEventAction(d.item.event.id, d.item.event.calendarId ?? "primary", { startISO: start, endISO: end });
+        if (item.kind === "task") await scheduleTaskAction(sessionRef(item.task), start, end);
+        else await updateGoogleEventAction(item.event.id, item.event.calendarId ?? "primary", { startISO: start, endISO: end });
         router.refresh();
       } catch (err) {
         setPending((p) => {
@@ -1072,7 +1113,8 @@ export function WeekView({
 
   type Item =
     | { kind: "task"; key: string; dayIndex: number; top: number; bottom: number; start: Date; end: Date; task: Task }
-    | { kind: "event"; key: string; dayIndex: number; top: number; bottom: number; start: Date; end: Date; event: GoogleCalendarEvent };
+    | { kind: "event"; key: string; dayIndex: number; top: number; bottom: number; start: Date; end: Date; event: GoogleCalendarEvent }
+    | { kind: "pick"; key: "pick"; dayIndex: number; top: number; bottom: number; start: Date; end: Date };
   const items: Item[] = [];
   for (const event of hydrated ? events : []) {
     if (event.isAllDay || hiddenEvents.has(event.id)) continue;
@@ -1095,6 +1137,17 @@ export function WeekView({
     const minMins = Math.max(20, (30 / HOUR_PX) * 60);
     const top = Math.max(0, Math.min(offset(start, days[dayIndex]), gridMinutes - minMins));
     items.push({ kind: "task", key: `t-${sessionRef(task)}`, dayIndex, top, bottom: Math.max(top + minMins, offset(end, days[dayIndex])), start, end, task });
+  }
+
+  // Pick mode: the quest being placed, as a card of its own (dashed, "tentative") at its picked time.
+  if (pickMode?.value && hydrated) {
+    const start = new Date(pickMode.value.start);
+    const end = new Date(pickMode.value.end);
+    const dayIndex = days.findIndex((d) => isSameDay(d, start));
+    if (dayIndex !== -1 && !outside(start, end, days[dayIndex])) {
+      const top = offset(start, days[dayIndex]);
+      items.push({ kind: "pick", key: "pick", dayIndex, top, bottom: Math.max(top + 20, offset(end, days[dayIndex])), start, end });
+    }
   }
 
   // An item being dragged (or just dropped, until fresh data arrives) shows at its new spot.
@@ -1172,14 +1225,17 @@ export function WeekView({
     }
     return true;
   });
+  // Pick mode takes no quests dragged in from elsewhere (Today's side calendar keeps them).
   useEffect(
     () =>
-      registerCalendarDrop({
-        hover: (x, y, q) => dropIn("hover", x, y, q),
-        drop: (x, y, q) => dropIn("drop", x, y, q),
-        leave: () => void dropIn("leave", 0, 0, null),
-      }),
-    []
+      picking
+        ? undefined
+        : registerCalendarDrop({
+            hover: (x, y, q) => dropIn("hover", x, y, q),
+            drop: (x, y, q) => dropIn("drop", x, y, q),
+            leave: () => void dropIn("leave", 0, 0, null),
+          }),
+    [picking]
   );
 
   const lineColor = isAdventure ? "rgba(122,82,51,.25)" : "var(--t-card-border)";
@@ -1264,11 +1320,11 @@ export function WeekView({
       <div className="relative" style={{ paddingBottom: 30 }}>
       {/* Earlier and later hours: on the time bar itself, just above and below its first and last marks (owner, Nov 12). */}
       <HoursButton side="early" open={early} hidden={hidden.early} isAdventure={isAdventure} top={Math.max(0, headTop - 26)} onToggle={() => {
-        writeCalUi({ early: !early });
+        if (!pickMode) writeCalUi({ early: !early });
         setEarly(!early);
       }} />
       <HoursButton side="late" open={late} hidden={hidden.late} isAdventure={isAdventure} top={headTop + (gridMinutes / 60) * HOUR_PX + 4} onToggle={() => {
-        writeCalUi({ late: !late });
+        if (!pickMode) writeCalUi({ late: !late });
         setLate(!late);
       }} />
       {seamless && (
@@ -1304,7 +1360,7 @@ export function WeekView({
         <div />
         {/* The grip on the last day's edge: pull it in for narrower days (more of them), out for wider ones. */}
         <div className="pointer-events-none relative z-[3]" style={{ gridColumn: (pre ? nCols : seamless ? Math.min(days.length, firstIdx + vis) : days.length) + 1, gridRow: 1 }}>
-          {!seamless && <button
+          {!seamless && !pickMode && <button
             type="button"
             onPointerDown={startDayResize}
             aria-label="Drag to show more or fewer days"
@@ -1334,7 +1390,8 @@ export function WeekView({
               draggable={false}
               onPointerDown={startDayScroll}
               onClickCapture={(e) => {
-                if (dragged.current) {
+                // Pick mode stays where it is (the editor is open).
+                if (dragged.current || pickMode) {
                   e.preventDefault();
                   dragged.current = false;
                 }
@@ -1547,6 +1604,37 @@ export function WeekView({
               {dayItems.map((it) => {
                 const l = lanes.get(it.key) ?? { lane: 0, count: 1 };
                 const height = ((it.bottom - it.top) / 60) * HOUR_PX - 2;
+                if (it.kind === "pick") {
+                  const isMovingPick = moving?.key === "pick";
+                  return (
+                    <div
+                      key="pick"
+                      data-cal-pick
+                      onPointerDownCapture={(e) => startItemDrag(e, "pick", { dayIndex: it.dayIndex, top: it.top, bottom: it.bottom }, { kind: "pick" })}
+                      className="cal-chip cal-tentative pointer-events-auto absolute flex flex-col overflow-hidden px-1.5 py-0.5 text-[11.5px] font-semibold leading-tight"
+                      style={{
+                        top: (it.top / 60) * HOUR_PX + 1,
+                        height,
+                        left: `${(100 / l.count) * l.lane}%`,
+                        width: `calc(${100 / l.count}% - 2px)`,
+                        zIndex: isMovingPick ? 40 : 20,
+                        color: "#2a1c10",
+                        cursor: isMovingPick ? 'url("/design/cursor-grabbing.svg") 13 12, grabbing' : 'url("/design/cursor-grab.svg") 13 12, grab',
+                        transition: isMovingPick ? undefined : "top 120ms ease-out, height 120ms ease-out",
+                        touchAction: "none",
+                        ["--tent-c" as string]: "#8a6116",
+                      }}
+                    >
+                      <span className="truncate font-display">{pickMode?.title}</span>
+                      {height >= 30 && (
+                        <span className="truncate text-[10.5px] font-normal tabular-nums" style={{ color: "#5b4520" }}>
+                          {formatShortTimeRange(it.start, it.end)}
+                        </span>
+                      )}
+                      {height >= 18 && <div data-resize aria-hidden title="Drag to change how long it runs" className="cal-resize absolute inset-x-1 bottom-0 h-[7px] cursor-ns-resize" />}
+                    </div>
+                  );
+                }
                 const past = now ? it.end.getTime() <= now.getTime() : false;
                 const label = formatShortTimeRange(it.start, it.end);
                 const oneLine = height < 34;
@@ -1571,14 +1659,17 @@ export function WeekView({
                     }}
                     onContextMenu={(e) => {
                       e.preventDefault();
+                      if (pickMode) return;
                       setItemMenu({
                         x: e.clientX,
                         y: e.clientY,
                         target: it.kind === "task" ? { kind: "task", task: it.task, start: it.start, end: it.end } : { kind: "event", id: it.event.id, title: it.event.title, start: it.start, end: it.end },
                       });
                     }}
-                    className="pointer-events-auto absolute"
+                    // Pick mode: the others are only there to see (85%, nothing opens), so the new card stands out.
+                    className={`${pickMode ? "pointer-events-none" : "pointer-events-auto"} absolute`}
                     style={{
+                      ...(pickMode ? { opacity: 0.85 } : {}),
                       top: (it.top / 60) * HOUR_PX + 1,
                       height,
                       left: fan ? l.lane * step : `${(100 / l.count) * l.lane}%`,

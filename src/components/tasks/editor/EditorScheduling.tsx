@@ -6,7 +6,7 @@ import { CloseIcon } from "@/components/ui/Icons";
 import { DateField } from "@/components/ui/DateField";
 import { TimeRangePick } from "@/components/ui/TimeRangePick";
 import { TimeToken } from "@/components/xp/NightFields";
-import { WhenPicker } from "@/components/calendar/WhenPicker";
+import { MiniCalendar } from "@/components/calendar/MiniCalendar";
 import { minutesOf, rangeWords } from "@/lib/auto-schedule";
 import { saveQuestWindow, useQuestWindow } from "@/lib/use-quest-cal";
 import { addDaysYmd, ymd } from "@/lib/when";
@@ -47,8 +47,8 @@ function Pencil({ open, onClick, label }: { open: boolean; onClick: () => void; 
  * Same picks and words as the import card's When panel (`imports/triage/AttrPills.tsx`).
  *
  * The values stay with the dialog, which saves and drafts them as before: a Fixed date is the due date,
- * a Flexible one is "plan within N days" (the list to schedule, `sched.rateWithin`). "Pick a time" still
- * opens `WhenPicker` here; When 3 swaps in the mini calendar. WH-n comments match the review codes.
+ * a Flexible one is "plan within N days" (the list to schedule, `sched.rateWithin`). "Pick a time" opens the
+ * mini calendar in place (When 3). WH-n and MC-n comments match the review codes.
  */
 export function EditorScheduling({ task, doingNow, isAdventure, labelCls, fieldStyle, chipBorder, dueDate, setDueDate, dueTime, setDueTime, early, onEarlyChange, fixedSchedule, shownSlot, slot, setSlot, initialSlot, estimate, title, timeWindow, sched }: {
   task: Task | null;
@@ -82,6 +82,8 @@ export function EditorScheduling({ task, doingNow, isAdventure, labelCls, fieldS
   const [other, setOther] = useState(false);
   const [earlyOpen, setEarlyOpen] = useState(false);
   const [rangeOpen, setRangeOpen] = useState(false);
+  // Another session, while it's being picked on the mini calendar (added only on its button).
+  const [extra, setExtra] = useState<Slot | null>(null);
   // The clock is read once, when the panel opens (and again on each tap), never on every draw.
   const [now] = useState(() => new Date());
   const today = ymd(now);
@@ -255,10 +257,33 @@ export function EditorScheduling({ task, doingNow, isAdventure, labelCls, fieldS
             {sessionNote}
           </span>
         )}
+        {/* When 3: the real calendar, small, in place (MC-n codes on the review page). It writes nothing: a
+            picked time is the quest's slot (saved with the quest, as before); another session is added on its button. */}
         <Fold open={whenOpen !== null}>
           {whenOpen !== null && (
-            <div className="pt-1">
-              <WhenPicker key={whenOpen} minutes={Math.max(15, Number(estimate) || 30)} title={title.trim() || "This quest"} isAdventure={isAdventure} initial={whenOpen === "move" ? (slot?.start ?? null) : null} placing={addingSession} onPick={pickWhen} />
+            <div className="flex flex-col gap-2 pt-1">
+              <MiniCalendar
+                key={whenOpen}
+                title={title.trim() || "This quest"}
+                minutes={Math.max(15, Number(estimate) || 30)}
+                value={whenOpen === "move" ? slot : extra}
+                onChange={(s) => (whenOpen === "move" ? setSlot(s) : setExtra(s))}
+                taskId={task?.id ?? null}
+                hideStart={whenOpen === "move" ? (initialSlot?.start ?? null) : null}
+                dueAt={dueDate ? new Date(`${dueDate}T${dueTime || "23:59"}`).toISOString() : null}
+                theme={isAdventure ? "adventure" : "calm"}
+              />
+              <div className="flex justify-end gap-2">
+                {whenOpen === "more" ? (
+                  <button type="button" disabled={!extra || addingSession} onClick={() => extra && pickWhen(extra)} className="qe-fact h-8 rounded-full px-3 text-[12.5px] font-semibold disabled:opacity-50" data-open="true">
+                    {addingSession ? "Adding…" : "Add this session"}
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => setWhenOpen(null)} className="qe-fact h-8 rounded-full px-3 text-[12.5px] font-semibold" data-open={slot ? "true" : undefined}>
+                    Done
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </Fold>

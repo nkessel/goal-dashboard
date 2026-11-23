@@ -363,7 +363,15 @@ export const FLOWS = [
             await h.tap((p) => p.locator("[data-quest-window] button", { hasText: /^Any time$/ }).first(), "editor: time of day, any", { optional: true, expectMove: true });
           }
           // The day drawn in place to pick a time (no popup).
-          if (await h.tap((p) => p.locator("[data-when-slot] button", { hasText: /^(Pick a time|Change)$/ }).first(), "editor: pick a time", { optional: true, expectMove: true })) await h.check("quest editor: pick a time");
+          // When 3: the real calendar, small, in place. Tap a spot, Auto-schedule, the next day, Done.
+          if (await h.tap((p) => p.locator("[data-when-slot] button", { hasText: /^(Pick a time|Change)$/ }).first(), "editor: pick a time", { optional: true, expectMove: true })) {
+            await h.find((p) => p.locator("[data-mini-calendar] [data-cal-hit]").first()).waitFor({ timeout: 8000 }).catch(() => h.note?.("mini calendar: no grid"));
+            await h.check("quest editor: mini calendar");
+            if (await h.tap((p) => p.locator("[data-mini-calendar] [data-cal-hit]").first(), "mini calendar: tap a spot", { optional: true, expectMove: true })) await h.check("mini calendar: placed");
+            if (await h.tap((p) => p.locator("[data-mini-calendar]").getByRole("button", { name: /^auto-schedule$/i }).first(), "mini calendar: auto-schedule", { optional: true, expectMove: true })) await h.check("mini calendar: auto-scheduled");
+            if (await h.tap((p) => p.locator("[data-mini-calendar]").getByRole("button", { name: /^later days$/i }).first(), "mini calendar: next day", { optional: true, expectMove: true })) await h.check("mini calendar: next day");
+            await h.tap((p) => p.getByRole("button", { name: /^done$/i }).last(), "mini calendar: done", { optional: true, expectMove: true });
+          }
         }
         await h.typeIn((p) => p.locator("[role=dialog] input, [role=dialog] textarea").first(), "quest editor title");
         // The portrait picker with the keyboard up: it sits above the keyboard (owner's recording, Nov 3).

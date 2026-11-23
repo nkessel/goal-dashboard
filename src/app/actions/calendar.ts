@@ -566,3 +566,24 @@ export async function findFeedAction(url: string) {
   const { findFeed } = await import("@/lib/data/ics");
   return findFeed(u);
 }
+
+/**
+ * The mini calendar's days (When 3, `calendar/MiniCalendar.tsx`): the quests on the calendar, your Google events
+ * and the daily layer (essentials, habits with a time), as the calendar screen draws them. Reads only: unlike
+ * Today's side calendar it doesn't turn upcoming events into quests.
+ */
+export async function calendarWindowAction(fromISO: string, toISO: string) {
+  const { profileId, accessToken } = await requireSessionMaybeGoogle();
+  const from = new Date(fromISO);
+  const to = new Date(toISO);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to <= from) throw new Error("That isn't a range of days.");
+  const [tasks, google, profileRes, rites] = await Promise.all([
+    tasksData.listCalendarTasksForOwner(profileId, from, to).catch(() => []),
+    accessToken ? import("@/lib/google-calendar").then(({ listEventsAllCalendars }) => listEventsAllCalendars(accessToken, from, to)).catch(() => null) : Promise.resolve(null),
+    supabaseAdmin().from("profiles").select("scheduler").eq("id", profileId).maybeSingle<{ scheduler: Record<string, unknown> | null }>(),
+    ritesData.listRites(profileId).catch(() => null),
+  ]);
+  const linked = new Set(tasks.map((t) => t.google_calendar_event_id).filter((id): id is string => Boolean(id)));
+  const events = (google?.events ?? []).filter((e) => !linked.has(e.id));
+  return { tasks, events, daily: { settings: profileRes.data?.scheduler ?? null, habits: timedHabitsFrom(rites ?? [], cleanRepeat) } };
+}
