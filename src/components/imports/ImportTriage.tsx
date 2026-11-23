@@ -3,10 +3,8 @@
 import { PillTrays } from "@/components/ui/PillTrays";
 import { Fold, useLingerValue } from "@/components/ui/Fold";
 import { GearIcon, CloseIcon, SnoozeIcon } from "@/components/ui/Icons";
-
 import { FileChips } from "@/components/ui/FileChips";
-
-import { createContext, useContext, useEffect, useRef, useState, useTransition } from "react";
+import { useContext, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBoardQuickAction, decideImportCardAction, editImportCardAction, importCardAction, markImportCardImportedAction, scheduleTaskAction, applyAutoScheduleAction, unscheduleTaskAction } from "@/app/actions";
@@ -30,8 +28,8 @@ import { LevelScales } from "@/components/ui/LevelScales";
 import { CoinIcon } from "@/components/ui/Icons";
 import { NumberInput } from "@/components/ui/NumberInput";
 import type { Task } from "@/lib/data/types";
-import { quickPlanDays } from "@/lib/schedule-horizon";
 import { ScheduleWithin as SchedRate, withinLabel } from "@/components/tasks/ScheduleWithin";
+import { ATTRS, ATTRS_KEY, ATTR_LAYOUT_KEY, ATTR_SHOWN_DEFAULT, AttrKey, Attrs, BoardOpt, BoardsCtx, COIN_DEFAULT, DAY_NAMES, Draft, GOLD, INK, KINDS, KIND_ONE, Kind, OFTEN, SERVER_KIND, SOFT, Step, XP_DEFAULT, addLabel, chip, dayLabel, draftFor, fieldStyle, findBoard, importLabel, importWhere, inDays, keyOf, minutesLabel, nextDow, now, oftenLabel, pickOff, pickOn, planLabel, planOptions, questExtras, rateable, readJSON, tinyAttrs, withAttrs, writeJSON } from "./triage/types";
 
 /*
  * Sorting imports, one card at a time: Import, Snooze or Skip. Import walks
@@ -42,108 +40,6 @@ import { ScheduleWithin as SchedRate, withinLabel } from "@/components/tasks/Sch
  */
 
 const asQuest = (c: ImportCard): ImportCard => (c.kind === "schedule" ? { ...c, kind: "quest" } : c);
-type BoardOpt = { id: string; title: string; color: string | null; /** The board it sits inside, if any. */ parent?: string | null };
-type Step = "board" | "plan" | "matters" | "often" | "time" | "review";
-type Kind = ImportCard["kind"];
-const KINDS: { key: Kind; label: string; icon: string }[] = [
-  { key: "quest", label: "Quests", icon: "⚔" },
-  { key: "habit", label: "Habits", icon: "🌱" },
-  { key: "project", label: "Projects", icon: "🗺" },
-  { key: "shopping", label: "To buy", icon: "🛒" },
-  { key: "ritual", label: "Ritual of connection", icon: "💞" },
-  { key: "reward", label: "Rewards", icon: "🎁" },
-  { key: "done", label: "Already done", icon: "✓" },
-];
-const KIND_ONE: Record<Kind, string> = { quest: "⚔ Quest", schedule: "📅 To schedule", habit: "🌱 Habit", project: "🗺 Project", shopping: "🛒 To buy", ritual: "💞 Ritual of connection", reward: "🎁 Reward", done: "✓ Already done" };
-/** What Import makes of each kind. */
-const SERVER_KIND = (k: Kind): "quest" | "habit" | "done" | "project" | "reward" | "ritual" => (k === "habit" || k === "done" || k === "project" || k === "reward" || k === "ritual" ? k : "quest");
-type Draft = {
-  kind: Kind;
-  title: string;
-  description: string;
-  steps: string[];
-  /** To buy: items to put in the Treasure Chest as rewards instead (taken out of the buy list). */
-  rewards?: string[];
-  boardId: string | null | undefined;
-  due: string | null | undefined;
-  /** "Plan it within" this many days (0 = today); null = no need to schedule. */
-  planDays: number | null | undefined;
-  /** Rated on the card already ("Schedule within…"), so the steps don't ask again. */
-  rated?: boolean;
-  urgency: number | null | undefined;
-  importance: number | null | undefined;
-  minutes: number | null | undefined;
-  /** Habits: "daily", "weekdays", "days" (pick weekdays) or an interval. */
-  often: "daily" | "weekdays" | "days" | "week" | "2week" | "month" | undefined;
-  days: number[];
-};
-
-const INK = "var(--t-ink)";
-const SOFT = "var(--t-ink-soft)";
-const GOLD = "#8a6116";
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const pad = (n: number) => String(n).padStart(2, "0");
-const keyOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-// The clock, read when a choice is drawn or made.
-const now = () => new Date();
-const inDays = (n: number) => {
-  const d = now();
-  d.setDate(d.getDate() + n);
-  return keyOf(d);
-};
-const nextDow = (dow: number) => {
-  const d = now();
-  d.setDate(d.getDate() + (((dow - d.getDay() + 7) % 7) || 7));
-  return keyOf(d);
-};
-const dayLabel = (k: string) => {
-  if (k === inDays(0)) return "Today";
-  if (k === inDays(1)) return "Tomorrow";
-  const [y, m, d] = k.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-};
-const minutesLabel = (m: number) => (m >= 60 ? `${Math.round((m / 60) * 10) / 10} hr` : `${m} min`);
-const findBoard = (boards: BoardOpt[], hint: string | null) => {
-  if (!hint) return undefined;
-  const h = hint.trim().toLowerCase();
-  return boards.find((b) => b.title.trim().toLowerCase() === h) ?? boards.find((b) => b.title.toLowerCase().includes(h) || h.includes(b.title.toLowerCase()));
-};
-
-function draftFor(card: ImportCard): Draft {
-  const r = card.repeat;
-  let often: Draft["often"];
-  let days: number[] = [];
-  if (r?.weekdays?.length) {
-    often = "days";
-    days = r.weekdays.filter((d) => d >= 0 && d <= 6);
-  } else if (r?.times && r.times > 1 && (r.unit ?? "week") === "week") often = "days";
-  else if (r?.unit === "day") often = "daily";
-  else if (r?.unit === "week") often = (r.every ?? 1) >= 2 ? "2week" : "week";
-  else if (r?.unit === "month") often = "month";
-  return {
-    kind: card.kind,
-    title: card.title,
-    description: card.description ?? "",
-    steps: card.steps,
-    boardId: undefined,
-    due: card.due_on ?? undefined,
-    planDays: card.kind === "habit" || card.kind === "reward" || card.kind === "done" ? undefined : (card.plan_within_days ?? undefined),
-    rated: card.plan_within_days != null && card.kind !== "habit",
-    urgency: undefined,
-    importance: undefined,
-    minutes: card.minutes ?? undefined,
-    often,
-    days,
-  };
-}
-
-const chip = (on: boolean, big = false): React.CSSProperties => ({
-  border: `1.5px solid ${on ? "#8a6116" : "#b39a6a"}`,
-  color: "#2a1c10",
-  background: on ? "radial-gradient(circle at 35% 25%, #fff0bd, #e2bb5c 70%, #c9a04a)" : "rgba(255,250,238,.7)",
-  boxShadow: on ? "0 0 10px rgba(242,210,126,.5)" : undefined,
-  minHeight: big ? 44 : 36,
-});
 
 export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSchedule, focus = null, query: initialQuery = "" }: { waiting: ImportCard[]; setAside: ImportCard[]; boards: BoardOpt[]; theme: "calm" | "adventure"; toSchedule: Task[]; /** /import?card=<id>: open on that card. */ focus?: string | null; /** /import?q=…: start with a search. */ query?: string }) {
   const router = useRouter();
@@ -765,30 +661,6 @@ function CardView({ card, frame, onEdit, onRetag, onRate, attrs, shownAttrs, onA
 }
 
 /**
- * Where an import lands, in plain words beside its button (owner, Nov 10: "what does import as a quest
- * mean? does it go on the scheduling calendar? somewhere else?").
- */
-const importWhere = (k: Kind, planDays: number | null | undefined) => {
-  const sched = planDays != null && k !== "habit" && k !== "reward" && k !== "done";
-  switch (k) {
-    case "habit":
-      return "Joins your Daily Habits on Today.";
-    case "reward":
-      return "Goes in your Treasure Chest.";
-    case "done":
-      return "Counted as done: its XP now, nothing left open.";
-    case "project":
-      return "Becomes a quest board, a quest for each step.";
-    case "ritual":
-      return sched ? "Joins your rituals in Insights, and a quest goes on the auto-scheduler's list." : "Joins your rituals of connection in Insights.";
-    default:
-      return sched
-        ? "A quest on its board and in Additional Quests, and on the auto-scheduler's list to get a time on your calendar."
-        : "A quest on its board and in Additional Quests. Pick “Schedule within” to also give it a time on your calendar.";
-  }
-};
-
-/**
  * One line, just above Import, naming where this card lands (owner, Nov 15): the board, the due day,
  * the calendar time or the auto-scheduler's list. Other kinds keep their plain line.
  */
@@ -1264,10 +1136,6 @@ function StepRow({ id, title, small, editable, xp, onXp, coins, onCoins, onRenam
   );
 }
 
-// What the button does, in its own words (it used to say just "Import").
-const importLabel = (k: Kind) =>
-  k === "done" ? "Log as done ✓" : k === "habit" ? "Import as habit ✦" : k === "reward" ? "Import as reward ✦" : k === "project" ? "Import as board ✦" : k === "shopping" ? "Import as buy list ✦" : k === "schedule" ? "Import to schedule ✦" : k === "ritual" ? "Import as ritual ✦" : "Import as quest ✦";
-
 /** "Snooze…": snooze it (quick picks here, Other… for the full picker), archive it, or delete it. */
 function LaterRow({ open, small = false, done, onSnooze, onSkip, onDelete, onQuick }: { open: boolean; small?: boolean; done: boolean; onSnooze: () => void; onSkip: () => void; onDelete: () => void; onQuick: (until: Date, label: string) => void }) {
   const [sure, setSure] = useState(false);
@@ -1627,14 +1495,6 @@ function MattersStep({ value, onPick }: { value: number | null | undefined; onPi
   );
 }
 
-const OFTEN: { key: Draft["often"]; label: string }[] = [
-  { key: "daily", label: "Every day" },
-  { key: "weekdays", label: "Weekdays" },
-  { key: "days", label: "Certain days…" },
-  { key: "week", label: "Once a week" },
-  { key: "2week", label: "Every 2 weeks" },
-  { key: "month", label: "Once a month" },
-];
 function OftenStep({ draft, hint, onChange, onDone }: { draft: Draft; hint: string | null; onChange: (p: Partial<Draft>) => void; onDone: () => void }) {
   return (
     <>
@@ -1696,11 +1556,6 @@ function TimeStep({ value, hint, onPick }: { value: number | null | undefined; h
       </label>
     </>
   );
-}
-
-function oftenLabel(d: Draft) {
-  if (d.often === "days") return d.days.length ? [1, 2, 3, 4, 5, 6, 0].filter((x) => d.days.includes(x)).map((x) => DAY_NAMES[x]).join(", ") : "Certain days";
-  return OFTEN.find((o) => o.key === d.often)?.label ?? "Every day";
 }
 
 function Review({ draft, boards, onChange, onJump }: { draft: Draft; boards: BoardOpt[]; onChange: (p: Partial<Draft>) => void; onJump: (s: Step) => void }) {
@@ -1928,21 +1783,6 @@ function SetAside({ cards, onBack, isAdventure }: { cards: ImportCard[]; onBack:
   );
 }
 
-// The same picks as on the card (owner, Nov 6: "this week, within 2 weeks, 1 month, or other").
-const planOptions = (): { label: string; days: number }[] => quickPlanDays(now());
-// Short words for a list row, so the picks fit on one line.
-const rateable = (k: Kind) => k !== "habit" && k !== "reward" && k !== "done";
-
-function planLabel(d: Draft) {
-  const parts: string[] = [];
-  if (typeof d.planDays === "number") {
-    const o = planOptions().find((x) => x.days === d.planDays);
-    parts.push(d.planDays === 0 ? "Plan it today" : o ? `Plan within ${o.label.toLowerCase()}` : `Plan within ${d.planDays} days`);
-  } else parts.push("Not on the schedule list");
-  if (d.due) parts.push(`due ${dayLabel(d.due)}`);
-  return parts.join(", ");
-}
-
 const URGENCY: { label: string; value: number }[] = [
   { label: "Can wait", value: 2 },
   { label: "Soonish", value: 3 },
@@ -2005,64 +1845,8 @@ function PlanStep({ draft, noted, onChange, onDone }: { draft: Draft; noted: str
   );
 }
 
-const addLabel = (d: Draft) => (d.kind === "habit" ? "Add the habit" : d.kind === "reward" ? "Add to the Treasure Chest" : d.kind === "project" ? "Make it a board" : d.kind === "done" ? "Log as done ✓" : d.kind === "shopping" ? "Add the buy list" : d.kind === "ritual" ? "Add the ritual" : d.kind === "schedule" || typeof d.planDays === "number" ? "Add to my list to schedule" : "Add the quest");
-
-// ---- Quest details on a card (owner, Nov 6: "easy pills for XP, due date, and other quest attributes … the rest under a button") ----
-// Built from the quest editor's own parts (owner, Nov 6: "make sure that any designs … fit the current design language"):
-// `.qe-fact` pills, `.qe-fact-panel` panels, the editor's XP bar and coin stepper, Due picks, Time picks and IconScale.
-
-/** A quest's details picked on the card, before importing. Kept on this device by card id. */
-type Attrs = { /** XP a sub-quest pays when done, by its name. */ stepXp?: Record<string, number>; /** Coins a sub-quest pays when done, by its name. */ stepCoins?: Record<string, number>; xp?: number; coins?: number; due?: string | null; tiny?: boolean; minutes?: number | null; importance?: number; urgency?: number; energy?: number; effort?: number; /** A board id; null: no board; unset: the note's suggestion. */ board?: string | null; /** A time on the calendar, picked on the card (owner, Nov 15); placed right after import. */ slot?: { start: string; end: string } | null; /** The date is Fixed (has to be done by then) or Flexible (a goal); owner, Nov 18. Unset: a date from the notes reads as Fixed. */ firm?: boolean };
-type AttrKey = "reward" | "time" | "due" | "tiny" | "importance" | "board";
-const ATTRS: { key: AttrKey; label: string }[] = [
-  { key: "reward", label: "XP & coins" },
-  { key: "time", label: "Time" },
-  { key: "due", label: "When" },
-  { key: "importance", label: "Urgency & importance" },
-  { key: "board", label: "Board" },
-];
-const ATTR_SHOWN_DEFAULT: AttrKey[] = ["reward", "time", "due", "importance", "board"];
-const ATTRS_KEY = "import-attrs";
-// v2: the pills were regrouped on Nov 6 (XP & coins one pill; importance, difficulty and energy one pill).
-const ATTR_LAYOUT_KEY = "import-attr-shown-v2";
-/** Every import starts at 15 XP and a coin (owner, Nov 6). */
-const XP_DEFAULT = 15;
-const COIN_DEFAULT = 1;
-/**
- * Tiny on or off, as the quest editor does it: on fills 5 minutes and two energy boosts only where nothing
- * was set; off takes back exactly what it filled (it used to leave its 5 minutes and energy behind).
- */
-function tinyAttrs(a: Attrs, on: boolean): Attrs {
-  if (on) return { ...a, tiny: true, minutes: a.minutes ?? TINY.minutes, energy: a.energy || TINY.energy };
-  return { ...a, tiny: false, minutes: a.minutes === TINY.minutes ? undefined : a.minutes, energy: a.energy === TINY.energy ? undefined : a.energy };
-}
-/** A tiny task: two energy boosts, 15 XP, 5 minutes, a coin (owner, Nov 6). */
-const TINY: Attrs = { tiny: true, energy: 2, xp: 15, minutes: 5, coins: 1 };
-const withAttrs = (k: Kind) => k === "quest" || k === "schedule" || k === "shopping" || k === "done";
 const XP_MAX = 350;
 
-/** The boards, for the Board pill (and a new board made from it). */
-const BoardsCtx = createContext<{ boards: BoardOpt[]; add: (b: BoardOpt) => void; /** Save a card's edited sub-quests. */ resteps: (id: string, steps: string[]) => void; adventure?: boolean }>({ boards: [], add: () => {}, resteps: () => {} });
-
-function readJSON<T>(key: string, fallback: T): T {
-  try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-function writeJSON(key: string, v: unknown) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(v));
-  } catch {
-    /* storage unavailable */
-  }
-}
-
-const pickOn: React.CSSProperties = { background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" };
-const pickOff: React.CSSProperties = { border: "1px solid rgba(139,112,64,.45)", color: "var(--t-ink)", background: "rgba(255,250,235,.35)" };
-const fieldStyle: React.CSSProperties = { borderColor: "rgba(139,112,64,.45)", background: "rgba(255,250,238,.6)" };
 function Glyph({ src, size = 14 }: { src: string; size?: number }) {
   // eslint-disable-next-line @next/next/no-img-element -- the quest card's own glyphs
   return <img src={src} alt="" width={size} height={size} className="shrink-0" style={{ width: size, height: size }} />;
@@ -2443,7 +2227,3 @@ function AttrLayout({ open, shown, onChange }: { open: boolean; shown: AttrKey[]
   );
 }
 
-/** What the picked details mean for the new quest (defaults: 15 XP, a coin). */
-function questExtras(a: Attrs): { xp: number; coins: number; isTiny?: boolean; energyGain?: number; effort?: number } {
-  return { xp: a.xp ?? XP_DEFAULT, coins: a.coins ?? COIN_DEFAULT, isTiny: a.tiny || undefined, energyGain: a.energy || undefined, effort: a.effort || undefined };
-}
