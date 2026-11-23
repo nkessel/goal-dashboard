@@ -78,6 +78,7 @@ import { PlacePanel, PlacePill } from "./editor/EditorPlaceLook";
 import { AutoGrowText } from "./editor/AutoGrowText";
 import { EditorTime } from "./editor/EditorTime";
 import { EditorShowsIn } from "./editor/EditorShowsIn";
+import { EditorMatrix } from "./editor/EditorMatrix";
 import { EditorXp } from "./editor/EditorXp";
 import { EditorAlsoOn, EditorStandsFor } from "./editor/EditorBoardTray";
 import { EditorTags } from "./editor/EditorTags";
@@ -1711,30 +1712,7 @@ export function QuestEditorDialog({
     // Shown right under the "Scheduled" button (in Time to complete), not as a part of its own.
     scheduling: null,
     matrix: (
-      <>
-              {/* Plot on the matrix, with "not actionable yet" beside it */}
-              {task && !isCompleted && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (onPlot) onPlot();
-                      else window.location.assign(`/matrix?plot=${task.id}`);
-                    }}
-                    className="hover-glow flex min-h-9 items-center justify-center gap-2 rounded-full border px-3 text-[13px] font-semibold"
-                    style={{ borderColor: chipBorder, color: "var(--t-ink)" }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- matrix glyph */}
-                    <img src="/design/ui-target.png" alt="" width={18} height={18} />
-                    Plot on the Priority Matrix
-                  </button>
-                  <label className="flex min-h-9 cursor-pointer items-center gap-2 text-[13px]" title="Keep it as an aspiration on its board, off Today and the map">
-                    <input type="checkbox" checked={aspiration} onChange={(e) => setAspiration(e.target.checked)} className="h-4 w-4 shrink-0" style={{ accentColor: isAdventure ? "#8a6c2c" : "var(--t-accent)" }} />
-                    <span className="font-semibold">Not actionable yet</span>
-                  </label>
-                </div>
-              )}
-      </>
+      <EditorMatrix task={task} isCompleted={isCompleted} onPlot={onPlot} chipBorder={chipBorder} isAdventure={isAdventure} aspiration={aspiration} setAspiration={setAspiration} />
     ),
     steps: (
       <>
