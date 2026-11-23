@@ -4,15 +4,11 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 46 note (Nov 23, 06:00 to 08:10 UTC):** UI check on `main` @ b06f56e (after Run E, G, H and Cal 4/5) for `today, today2, calcomplete, calfail, offline, questextras, create, sequence, savekeys, tour, import, calendar, todaycal, welcome, welcomeoff, settings, toucanask, feedback`: phone morning and evening **0 errors**, tablet morning and evening **0 errors**, desktop `todaycal` **0 errors** (the React #185 bug the Run B thread found is gone: run 43's fix holds). Still open below: the by-hand checks (undo offline, the editor and welcome hand steps, T7 timed nudges) and the snapshot compare, which need a saved baseline. No new feedback notes since Nov 21 17:39 (b55781e2 "more celebration pls" is a design ask). Nothing built.
+
 - **Dev loop 2 run 49 (Sonnet, Nov 23 07:30 UTC):** runs 46 and 48 hold fresh claims, so this run takes E9 (editor lighter): perf scenario fix, `npm run perf -- --only editor` baseline, then memo on the editor parts (no screen change).
 
 - **Dev loop 2 run 48 (Opus, Nov 23 07:05 UTC):** run 46 (06:00) holds the UI check and bug-fix notes, so this run takes note 61806de0 (a "see all" link to the journal after a check-in journal is saved), a small wording change, on `review/journal-see-all` with a review page.
-
-- **Dev loop 2 run 46 (Opus, Nov 23 06:00 UTC, takes over run 45's claim, 2 hours old with nothing pushed):** UI check on `main` @ b06f56e for the Run E/G/H and Cal 4/5 flows (the "Open for the next Dev loop 2 run" list) plus desktop `todaycal`, phone then tablet; fix regressions straight to `main`; then bug-fix feedback notes.
-
-- **Bug on `main` (found Nov 23, Run B thread):** UI check `todaycal` on desktop shows React error #185 (too many updates) morning and evening; phone and tablet clean. **Likely fixed by Dev loop 2 run 43** (same #185 seen on tablet inside long runs: drag over Today's calendar, see SHIPPED Nov 23); desktop re-check pending, below.
-
-- **Dev loop 2 run 45 (Opus, Nov 23 04:00 UTC, takes over run 43's claim, 2 hours old with nothing pushed):** UI check on `main` (a browser works in this container) for the flows Run C, D, E, G and H changed (the "Open for the next Dev loop 2 run" list), phone then tablet; fix regressions straight to `main`.
 
 - **Dev loop 2 run 43 note (Nov 23, 02:00 to 04:15 UTC; its claim was taken over by run 45 while the check ran):** UI check on `main` @ 7ef4f98 for the flows Run C, D and E moved code in (`today, today2, welcome, welcomeoff, calendar, todaycal, create, sequence, savekeys, import, tour, questextras, settings, feedback, language, toucanask, pages, insights`): phone morning and evening (579 shots) **0 errors**; tablet morning 0 errors apart from React #185 on `todaycal` (only inside the long run; clean alone). Fix shipped (SHIPPED, Nov 23 run 43). Not done: snapshot compare, tablet evening, Run G/H and Cal 4/5's flows (run 45 has those), and the by-hand checks listed below.
 
@@ -39,9 +35,6 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 - **Session claude-2d (Opus, owner's account):** Nov 20, merged the four review branches above to `main`; `review/boards-nov18` merged Nov 21 on the owner's OK. Nothing in progress.
 
-
-
-
 - **Waiting on the owner's design review**: `review/tabs-instant` (tabs that feel instant, step 1: a quiet stand-in per bottom-bar tab so the slide plays the moment you tap; codes TI-1 stand-in look, TI-2 slide timing, TI-3 nav highlight, TI-4 avatar) · review page: pending UI check (not published yet) · Nov 22. On his OK: merge.
 - **Waiting on the owner's design review**: `review/language-window` (BUILD-PLAN task 9, notes c084cb95, d6ad55e1, 34a34b07: the learning sheet with words one by one, Learn / New phrase in the bottom-right corner, My phrases by day, ideas edited by hold or right-click, translating keeps going when minimized) · https://claude.ai/artifact/2RJaybfEsaYxSEWrfjeYkg#l1 (sheet), #l2 (My phrases, with his question: this device only, or every device?), #l3, #l4 · Nov 22. On his OK: merge, mark the three notes.
 - **Waiting on the owner's design review**: `review/insights-nov21` (notes 6ea34408 unset check-in meters greyed, 5cf0051d the insights chart its own part beneath the check-in, full width, c63a6861 Wheel of Time Done at the end of its lists) · https://claude.ai/artifact/7Sch9V9M66dRvFXRsFDmqD#i1 (meters), #i2 (chart, phone), #i3 (tablet), #i4 (Done) · Nov 22 (Dev loop 2 run 17). On his OK: merge, mark the three notes.
@@ -54,7 +47,6 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 - **Dev loop 2 run 27 note (Nov 22):** RUN-B 0(b) is finished: tablet **evening** UI check of the last 15 flows (welcomeoff, navorder, todaycal, savekeys, cleaning, import, settings, questdrop, calfail, calendar, feedback, language, offline, inventory, questextras): 0 errors. Every flow is now clean on phone and tablet, morning and evening.
 
 **Shipped Nov 20 (merged to `main` from `merge-nov20`, owner: "do what you think is best"):** `review/faces-feel`, `review/insights-nov19`, `review/insights-timeline`, `review/subquests-sequence`. See `docs/SHIPPED.md`. Review pages: https://claude.ai/artifact/DgobEgqytFM6qsSuC2bZeJ and https://claude.ai/artifact/69UKiWJeE7BgPnJLRU8q6E
-
 
 ## 0a. Work in progress and waiting on the owner (Nov 12)
 
