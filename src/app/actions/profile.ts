@@ -12,8 +12,9 @@ import * as feedbackData from "@/lib/data/feedback";
 import * as rewardsData from "@/lib/data/rewards";
 import { finishTaskForOwner as finishTask } from "@/lib/data/quest-ops";
 import { requireProfileId, readExtras } from "./_shared";
-import { getOwnWordsAction, getWelcomeLayoutAction, toucanPrefsAction } from "./rest";
+import { getOwnWordsAction, getWelcomeLayoutAction } from "./rest";
 import { questCalExtrasAction, questPlacesAction } from "./quest-extras";
+import { toucanPrefsAction } from "./coursework";
 
 // XP / leveling (Priority #8)
 export async function dailyCheckInAction(tzOffsetMinutes?: number): Promise<xp.CheckInResult> {
