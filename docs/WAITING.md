@@ -4,7 +4,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Dev loop 2 run 107 note (Nov 24, 23:25 UTC):** `main` unchanged since run 97 (docs only); no new feedback notes since d8f914be (16:43 UTC). Nothing unclaimed that ships straight. Nothing built.
+- **Dev loop 2 runs 107–108 note (Nov 24, 23:25 and 23:56 UTC):** `main` unchanged since run 97 (docs only); no new feedback notes since d8f914be (16:43 UTC). Nothing unclaimed that ships straight. Nothing built.
 
 - **Dev loop 2 run 104 note (Nov 24, 21:30 to 23:10 UTC):** UI check of `review/leaf-why` done (flows leaflog, insights, today, phone and tablet, morning and evening): 0 errors, 20 warnings; review page published (link in its entry below). One warning to look at before merging: Streaks on Insights shifts 70-85px once at load in `leaflog` (not compared with main).
 
