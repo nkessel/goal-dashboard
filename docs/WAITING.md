@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 92 note (Nov 24, 15:30 UTC):** run 91 holds a fresh claim on three Insights bug notes and run 90 on the TI review page. Left unclaimed and not built: 23fec0e0 (sleep check-in day picker: any day; same Insights files as run 91, take it after run 91 ships), 7582dd84 (past feedback option), 0540ea84 (metric line dotted/dashed/solid), fe0a2175 (sleep smiley question) are design changes (need a review branch); 39d49c51 (a schedule list: Date night, AR collab lab w/Tiffany, Circle singing) has no dates or lengths, so it needs the owner's word before anything goes on his calendar. Nothing built.
+
 - **Dev loop 2 run 91 (Opus, Nov 24 14:57 UTC):** new Insights bug notes from today: c675eb5e (sleep check-in didn't save bedtime/wake), df878ace (toucan still drags where its closed bubble was), a82f71a1 second half (XP totals and per-month averages hidden by default).
 
 - **Dev loop 2 run 90 (Opus, Nov 24 13:58 UTC):** takes the TI item below: UI check of `review/tabs-instant` and its review page.
