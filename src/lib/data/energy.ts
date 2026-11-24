@@ -125,7 +125,7 @@ export async function listCheckInsSince(ownerId: string, sinceISO: string): Prom
 // Write-in events and #tags beside a check-in
 // ---------------------------------------------------------------------------
 
-export type CheckNote = { id: string; body: string; tags: string[]; created_at: string; details?: string | null; tone?: number | null };
+export type CheckNote = { id: string; body: string; tags: string[]; created_at: string; details?: string | null; tone?: number | null; reason?: string | null; before_tone?: number | null; before_feelings?: string[] | null; after_feelings?: string[] | null; outcome?: string | null; after_note?: string | null; reflected_at?: string | null };
 
 /** "Slept badly #sleep #travel" → tags ["sleep", "travel"]; the text is kept whole. */
 export function tagsIn(text: string): string[] {
@@ -142,7 +142,7 @@ function tidyNote(text: string): string {
     .slice(0, 400);
 }
 
-export async function addCheckNote(ownerId: string, text: string, atISO?: string | null, allDay = false, extra: { details?: string | null; tone?: number | null } = {}): Promise<CheckNote> {
+export async function addCheckNote(ownerId: string, text: string, atISO?: string | null, allDay = false, extra: { details?: string | null; tone?: number | null; leaf?: { reason: string | null; beforeTone: number | null; beforeFeelings: string[] } } = {}): Promise<CheckNote> {
   const body = tidyNote(text);
   if (!body) throw new Error("Write something first.");
   // Logged for another moment (earlier today, yesterday…): up to 90 days back, never in the future.
@@ -155,7 +155,7 @@ export async function addCheckNote(ownerId: string, text: string, atISO?: string
     if (t < Date.now() - 90 * 86_400_000) throw new Error("That's more than 90 days ago.");
     at = new Date(t).toISOString();
   }
-  const { data, error } = await supabaseAdmin().from("check_in_notes").insert({ owner_id: ownerId, body, tags: tagsIn(body), ...(at ? { created_at: at } : {}), ...(allDay ? { all_day: true } : {}), ...(extra.details?.trim() ? { details: extra.details.trim().slice(0, 1000) } : {}), ...(typeof extra.tone === "number" && Number.isInteger(extra.tone) && extra.tone >= -2 && extra.tone <= 2 ? { tone: extra.tone } : {}) }).select("id, body, tags, created_at, details, tone").single();
+  const { data, error } = await supabaseAdmin().from("check_in_notes").insert({ owner_id: ownerId, body, tags: tagsIn(body), ...(at ? { created_at: at } : {}), ...(allDay ? { all_day: true } : {}), ...(extra.details?.trim() ? { details: extra.details.trim().slice(0, 1000) } : {}), ...(typeof extra.tone === "number" && Number.isInteger(extra.tone) && extra.tone >= -2 && extra.tone <= 2 ? { tone: extra.tone } : {}), ...(extra.leaf?.reason ? { reason: extra.leaf.reason } : {}), ...(extra.leaf?.beforeTone != null ? { before_tone: extra.leaf.beforeTone } : {}), ...(extra.leaf?.beforeFeelings.length ? { before_feelings: extra.leaf.beforeFeelings } : {}) }).select("id, body, tags, created_at, details, tone").single();
   if (error) throw new Error(`Couldn't save that: ${error.message}`);
   return data as CheckNote;
 }
@@ -165,7 +165,7 @@ export async function deleteCheckNote(ownerId: string, id: string): Promise<void
 }
 
 export async function listCheckNotesSince(ownerId: string, sinceISO: string): Promise<CheckNote[]> {
-  const { data, error } = await supabaseAdmin().from("check_in_notes").select("id, body, tags, created_at, details, tone").eq("owner_id", ownerId).gte("created_at", sinceISO).order("created_at", { ascending: true }).limit(1000);
+  const { data, error } = await supabaseAdmin().from("check_in_notes").select("id, body, tags, created_at, details, tone, reason, before_tone, before_feelings, after_feelings, outcome, after_note, reflected_at").eq("owner_id", ownerId).gte("created_at", sinceISO).order("created_at", { ascending: true }).limit(1000);
   if (error) return [];
   return (data ?? []) as CheckNote[];
 }

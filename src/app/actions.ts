@@ -10,6 +10,7 @@ export * from "./actions/art";
 export * from "./actions/rewards";
 export * from "./actions/evening";
 export * from "./actions/journal";
+export * from "./actions/leaf";
 export * from "./actions/extras";
 export * from "./actions/quest-extras";
 export * from "./actions/toucan";

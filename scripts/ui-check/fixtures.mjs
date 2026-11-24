@@ -144,6 +144,17 @@ export function makeFixtures() {
     { owner_id: OWNER_ID, kind: "check_in", amount: 5, created_at: inHours(-27) },
   ].map((r) => ({ id: randomUUID(), ...r }));
 
+  // Leaf (cannabis) logs (Nov 24): one ~3 hours old with no follow-up, and older ones that were followed up, so the reason
+  // "to sleep" has been typed three times and shows as a chip. Generic words only.
+  const leaf = (hoursAgo, extra = {}) => ({ id: randomUUID(), owner_id: OWNER_ID, body: "🍃 Cannabis", tags: [], created_at: inHours(-hoursAgo), ...extra });
+  const check_in_notes = [
+    leaf(3, { reason: "to sleep", before_tone: -1, before_feelings: ["exhausted", "restless"] }),
+    leaf(75, { reason: "to sleep", before_tone: -1, before_feelings: ["restless"], tone: 1, after_feelings: ["calm"], outcome: "yes", after_note: "Slept well.", reflected_at: inHours(-72) }),
+    leaf(120, { reason: "To sleep", before_tone: 0, tone: 0, outcome: "partly", reflected_at: inHours(-117) }),
+    leaf(200, { reason: "to unwind", tone: 1, reflected_at: inHours(-197) }),
+    leaf(260, { reason: "to unwind", tone: 1, reflected_at: inHours(-257) }),
+  ];
+
   return {
     profiles: [
       {
@@ -188,6 +199,7 @@ export function makeFixtures() {
     import_cards,
     check_ins,
     xp_events,
+    check_in_notes,
     app_defaults: [],
   };
 }

@@ -13,6 +13,7 @@ import { writeExtra } from "@/lib/data/extras";
 import * as ritesData from "@/lib/data/rites";
 import { cleanRepeat, repeatIsUp } from "@/lib/habit-repeat";
 import * as energyData from "@/lib/data/energy";
+import { LEAF_EVENT, cleanFace, cleanFeelings, cleanReason } from "@/lib/leaf";
 import { requireProfileId, requireIdentity, readExtras } from "./_shared";
 
 // "Doing now" and the journal (both from the + sheet)
@@ -305,10 +306,12 @@ export async function addCheckNoteAction(text: string, atISO?: string | null, al
  * throwing, so the page can say what went wrong (a thrown error shows only as
  * a "server error" on the live site).
  */
-export async function logEventAction(input: { title: string; details?: string | null; tone?: number | null; at?: string | null; allDay?: boolean }) {
+export async function logEventAction(input: { title: string; details?: string | null; tone?: number | null; at?: string | null; allDay?: boolean; /** The leaf log only (owner, Nov 24): why, the face before, the feeling words before. */ reason?: string | null; beforeTone?: number | null; beforeFeelings?: string[] }) {
   try {
     const ownerId = await requireProfileId();
-    const note = await energyData.addCheckNote(ownerId, String(input.title ?? ""), input.at ?? null, !!input.allDay, { details: input.details ?? null, tone: input.tone ?? null });
+    const isLeaf = String(input.title ?? "") === LEAF_EVENT;
+    const leaf = isLeaf ? { reason: cleanReason(input.reason), beforeTone: cleanFace(input.beforeTone), beforeFeelings: cleanFeelings(input.beforeFeelings) } : undefined;
+    const note = await energyData.addCheckNote(ownerId, String(input.title ?? ""), input.at ?? null, !!input.allDay, { details: input.details ?? null, tone: input.tone ?? null, leaf });
     revalidatePath("/insights");
     return { ok: true as const, note };
   } catch (e) {

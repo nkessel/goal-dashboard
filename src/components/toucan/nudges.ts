@@ -6,7 +6,8 @@
 import { useEffect, type RefObject } from "react";
 import type { useRouter } from "next/navigation";
 import { openPlanMyDay } from "@/components/calendar/PlanMyDay";
-import { coachPromiseAction, answerDeadlineGuessAction } from "@/app/actions";
+import { coachPromiseAction, answerDeadlineGuessAction, leafPendingAction } from "@/app/actions";
+import { clock, toucanAsks } from "@/lib/leaf";
 import { afternoonCheckAt, dueSoonList, dueWhen, neglected, type DeadlineGuess, type GuideTask } from "@/lib/toucan-guide";
 import type { CoachPromise } from "@/lib/coach";
 import { dailyBudget, polish, voice, windowOf, type ToucanStyle } from "@/lib/toucan-style";
@@ -93,6 +94,30 @@ export function useArrivalNudges({ pathname, mode, router, raiseRef, actionsRef,
       const spend = (slot: string) => writeCheckins(day, { count: used.count + 1, slots: [...used.slots, slot] });
       const planDay = { label: "Plan my day", run: openPlanMyDay };
       const invite = (text: string, n: Omit<SnoozeNote, "text" | "until">) => say(text, actionsRef.current({ ...n, text: polish(st, text), until: 0 }));
+
+      // A leaf log with no follow-up yet, once its time has come (owner, Nov 24: WR-1 A, WR-2 B): once per log.
+      try {
+        const asked = (id: string) => {
+          try {
+            return window.localStorage.getItem(`toucan-leaf-asked:${id}`) === "1";
+          } catch {
+            return true;
+          }
+        };
+        const nowAt = new Date();
+        const ripe = (await leafPendingAction()).find((l) => !asked(l.id) && toucanAsks(new Date(l.at), nowAt));
+        if (ripe) {
+          try {
+            window.localStorage.setItem(`toucan-leaf-asked:${ripe.id}`, "1");
+          } catch {}
+          spend(`leaf:${ripe.id}`);
+          say(`Earlier, at ${clock(new Date(ripe.at))}, you smoked.${ripe.reason ? ` Why: “${ripe.reason}”.` : ""} How did it actually go?`, [
+            { label: "How was it?", run: () => router.push("/insights?leaf=follow") },
+            { label: "Later", run: () => {} },
+          ]);
+          return;
+        }
+      } catch {}
 
       // A quest with no due date whose name matches something coming up on the calendar.
       const guess = (watch.guesses as DeadlineGuess[]).find((g) => !shown(`due:${g.taskId}`));

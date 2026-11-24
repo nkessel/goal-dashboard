@@ -37,6 +37,7 @@ Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Rea
 - Insights: the XP totals line hidden by default, a checkbox to show it (`review/insights-xp-totals`, Nov 24).
 - Tabs that feel instant: a stand-in per tab while it loads, TI-1..4 (`review/tabs-instant`, Nov 24; fix the Insights reload shift before merging).
 - A See all link to past journal entries after saving (`review/journal-see-all`, Nov 23).
+- The leaf (cannabis) log asking why and how you feel, with a follow-up: the tap panel, hold or right-click, a toucan ask (`review/leaf-why`, Nov 24; migration 0100 on merge).
 - Streaks and tracked events: keep-away cards like habits, Edit habit, log a tracked event earlier (`review/anti-habits`, Nov 22).
 - The walkthrough's first words (`review/walkthrough-intro`, Nov 22).
 - Renaming a board where its title sits (`review/board-title`, Nov 22).

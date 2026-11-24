@@ -164,7 +164,7 @@ export default async function InsightsPage() {
                 <h2 className={`m-0 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "#3b2a14" }}>
                   Events &amp; #tags <span className="text-[13px] font-normal" style={{ color: "#6b5631" }}>— log anything, any time</span>
                 </h2>
-                <EventLog zone={appTimeZone()} notes={notes.map((n) => ({ id: n.id, body: n.body, created_at: n.created_at, details: n.details ?? null, tone: n.tone ?? null }))} />
+                <EventLog zone={appTimeZone()} notes={notes.map((n) => ({ id: n.id, body: n.body, created_at: n.created_at, details: n.details ?? null, tone: n.tone ?? null, reason: n.reason ?? null, before_tone: n.before_tone ?? null, before_feelings: n.before_feelings ?? null, after_feelings: n.after_feelings ?? null, outcome: n.outcome ?? null, after_note: n.after_note ?? null, reflected_at: n.reflected_at ?? null }))} />
               </section>
               ),
             },

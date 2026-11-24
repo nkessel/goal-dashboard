@@ -12,8 +12,10 @@ import { setSplitOn, splitEvents, splitOn } from "@/lib/event-split";
 import { DateField } from "@/components/ui/DateField";
 import { CloseIcon } from "@/components/ui/Icons";
 import { TrackedEvents } from "./TrackedEvents";
+import { LeafFollowUp } from "./LeafFollowUp";
+import { OUTCOMES, isLeafBody, leafWaits, type LeafInfo } from "@/lib/leaf";
 
-type Note = { id: string; body: string; created_at: string; details?: string | null; tone?: number | null };
+type Note = { id: string; body: string; created_at: string; details?: string | null; tone?: number | null; reason?: string | null; before_tone?: number | null; before_feelings?: string[] | null; after_feelings?: string[] | null; outcome?: string | null; after_note?: string | null; reflected_at?: string | null };
 
 /** How it felt: five faces (owner, Nov 13), shared with the Insights chart. */
 export const toneOf = (t: number | null | undefined) => faceOf(t);
@@ -65,6 +67,8 @@ export function EventLog({ notes, zone }: { notes: Note[]; zone?: string }) {
   }, []);
   const [error, setError] = useState<string | null>(null);
   const [gone, setGone] = useState<Set<string>>(new Set());
+  // Leaf logs whose follow-up was just saved (the page refreshes after).
+  const [done, setDone] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
 
   function type(v: string) {
@@ -148,6 +152,8 @@ export function EventLog({ notes, zone }: { notes: Note[]; zone?: string }) {
   const [showEarlier, setShowEarlier] = useState(false);
   const [openNote, setOpenNote] = useState<string | null>(null);
   const [editingNote, setEditingNote] = useState<string | null>(null);
+  // A leaf log's follow-up open in place (owner, Nov 24: the "How was it?" tag).
+  const [followNote, setFollowNote] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const all = notes.filter((n) => !gone.has(n.id)).slice(-30).reverse();
   // Today in the app's time zone, the same on the server (UTC on Vercel) and in the browser: in the device's
@@ -305,11 +311,14 @@ export function EventLog({ notes, zone }: { notes: Note[]; zone?: string }) {
             if (detailsOf[n.id] !== undefined) n = { ...n, details: detailsOf[n.id] };
             if (tones[n.id] !== undefined) n = { ...n, tone: tones[n.id] };
             if (times[n.id]) n = { ...n, created_at: times[n.id] };
+            const leaf = isLeafBody(body);
+            const waits = leaf && leafWaits({ ...n, body, reflected_at: n.reflected_at ?? (done.has(n.id) ? "now" : null) }, now);
+            const info: LeafInfo = { id: n.id, at: n.created_at, reason: n.reason ?? n.details ?? null, beforeTone: n.before_tone ?? null, beforeFeelings: n.before_feelings ?? [] };
             return (
-              <li key={n.id} className="relative max-w-full">
+              <li key={n.id} className={`relative max-w-full ${waits ? "flex items-center gap-1" : ""}`}>
                 <button
                   type="button"
-                  onClick={() => setOpenNote(openNote === n.id ? null : n.id)}
+                  onClick={() => (setFollowNote(null), setOpenNote(openNote === n.id ? null : n.id))}
                   aria-expanded={openNote === n.id}
                   className="flex h-7 max-w-[min(100%,240px)] items-center gap-1 rounded-full pl-2 pr-2.5 text-[13px]"
                   style={tag ? { background: "#e9d49a", border: "1px solid #8a6116", color: "#2a1c10", fontWeight: 600 } : { background: "rgba(255,250,235,.7)", border: "1px solid rgba(139,112,64,.4)", color: INK }}
@@ -323,9 +332,24 @@ export function EventLog({ notes, zone }: { notes: Note[]; zone?: string }) {
                   )}
                   <span className="min-w-0 truncate" title={n.details ?? undefined}>{body.split("\n")[0]}</span>
                 </button>
+                {waits && (
+                  <button type="button" onClick={() => (setEditingNote(null), setFollowNote(n.id), setOpenNote(n.id))} className="h-6 shrink-0 rounded-full px-2 text-[12px] font-semibold" style={{ border: "1px dashed #7a9a5a", color: "#2c6a2a" }}>
+                    How was it?
+                  </button>
+                )}
                 {openNote === n.id && (
                   <div role="dialog" aria-label="Event" className="card-pop-in absolute left-0 top-8 z-20 flex w-[min(300px,80vw)] flex-col gap-2 rounded-xl p-3" style={{ background: "#fbf3df", border: "1.5px solid #b39a6a", boxShadow: "0 10px 24px rgba(0,0,0,.25)" }}>
-                    {editingNote === n.id ? (
+                    {followNote === n.id ? (
+                      <LeafFollowUp
+                        item={info}
+                        onClose={() => setFollowNote(null)}
+                        onSaved={() => {
+                          setFollowNote(null);
+                          setDone((d) => new Set(d).add(n.id));
+                          router.refresh();
+                        }}
+                      />
+                    ) : editingNote === n.id ? (
                       <EventEdit
                         note={{ ...n, body, details: n.details, tone: n.tone, created_at: n.created_at }}
                         onCancel={() => setEditingNote(null)}
@@ -335,10 +359,14 @@ export function EventLog({ notes, zone }: { notes: Note[]; zone?: string }) {
                       <div className="flex items-start gap-2">
                         <p className="m-0 min-w-0 flex-1 whitespace-pre-line text-[15px] leading-snug [overflow-wrap:anywhere]" style={{ color: INK }}>
                           {body}
-                          {n.details && (
-                            <span className="mt-1 block text-[13.5px]" style={{ color: INK_SOFT }}>
-                              {n.details}
-                            </span>
+                          {leaf ? (
+                            <LeafDetails n={n} reason={info.reason} />
+                          ) : (
+                            n.details && (
+                              <span className="mt-1 block text-[13.5px]" style={{ color: INK_SOFT }}>
+                                {n.details}
+                              </span>
+                            )
                           )}
                         </p>
                         <button type="button" onClick={() => setEditingNote(n.id)} aria-label="Edit" title="Edit" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-black/[.06]" style={{ color: INK_SOFT }}>
@@ -376,6 +404,30 @@ export function EventLog({ notes, zone }: { notes: Note[]; zone?: string }) {
         </button>
       )}
     </div>
+  );
+}
+
+const wordsOf = (face: number | null | undefined, words: string[] | null | undefined) => [toneOf(face)?.label, ...(words ?? [])].filter(Boolean).join(" · ");
+
+/** An opened leaf row: why, how you felt before and after, whether it gave what you wanted, the line (owner, Nov 24). */
+function LeafDetails({ n, reason }: { n: Note; reason: string | null }) {
+  const rows: [string, string][] = [
+    ["Why", reason ?? ""],
+    ["Before", wordsOf(n.before_tone, n.before_feelings)],
+    ["After", wordsOf(n.reflected_at ? n.tone : null, n.after_feelings)],
+    ["What you wanted", OUTCOMES.find((o) => o.v === n.outcome)?.label ?? ""],
+    ["Your line", n.after_note ?? ""],
+  ];
+  const shown = rows.filter(([, v]) => v);
+  if (!shown.length) return null;
+  return (
+    <span className="mt-1 flex flex-col gap-0.5 text-[13.5px]" style={{ color: INK_SOFT }}>
+      {shown.map(([k, v]) => (
+        <span key={k}>
+          <span className="font-semibold">{k}:</span> {v}
+        </span>
+      ))}
+    </span>
   );
 }
 

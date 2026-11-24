@@ -6,33 +6,10 @@ import { deleteCheckNoteAction, saveTrackedEventsAction, trackedEventsAction } f
 import { saveOrQueue } from "@/lib/offline";
 import { Fold } from "@/components/ui/Fold";
 import { CloseIcon } from "@/components/ui/Icons";
-import { TimeWheels } from "@/components/ui/TimeWheels";
+import { useLeafLog, type LeafSaid } from "./LeafLog";
 
 const INK = "#3b2a14";
 const pill = { background: "rgba(233,212,154,.55)", border: "1px solid #a88a3f", color: "#2a1c10" } as const;
-
-const LEAF_EVENT = "🍃 Cannabis";
-
-/** A seven-fingered leaf, green on parchment (owner, Nov 13: "better drawn, have the leaf be green"). */
-function LeafIcon() {
-  const blades: [number, number][] = [
-    [0, 1],
-    [-38, 0.86],
-    [38, 0.86],
-    [-74, 0.66],
-    [74, 0.66],
-    [-108, 0.4],
-    [108, 0.4],
-  ];
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden>
-      <path d="M12 15.500V22" stroke="#2c6a2a" strokeWidth="1.400" strokeLinecap="round" />
-      {blades.map(([deg, k]) => (
-        <path key={deg} d="M0 0C-2.300-3.800-1.700-9 0-13.500 1.700-9 2.300-3.800 0 0Z" transform={`translate(12 15.800) rotate(${deg}) scale(${k})`} fill="#3f9a3a" stroke="#1f5a1e" strokeWidth={0.7 / k} strokeLinejoin="round" />
-      ))}
-    </svg>
-  );
-}
 
 /**
  * Tracked events (owner, Nov 4: anti-habits as "events, but ones that I want to track, with timing recorded"):
@@ -43,7 +20,7 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
   const [names, setNames] = useState<string[] | null>(null);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
-  const [said, setSaid] = useState<{ text: string; undo?: () => void } | null>(null);
+  const [said, setSaid] = useState<LeafSaid | null>(null);
   // "How do you feel?" under the event just logged (owner, Nov 19).
   const [feltNote, setFeltNote] = useState<string | null>(null);
   const closeFeltNote = useCallback(() => setFeltNote(null), []);
@@ -56,8 +33,8 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
     setNames(next);
     saveTrackedEventsAction(next).catch(() => setSaid({ text: "That didn't save. Try again?" }));
   };
-  // The leaf button (owner, Nov 12): logs it at a time picked on wheels, now by default.
-  const [leaf, setLeaf] = useState<number | null>(null);
+  // The leaf button and its panels live in LeafLog.tsx (owner, Nov 24: why, how you feel, a follow-up).
+  const leaf = useLeafLog({ report: setSaid, onLogged });
   const log = async (name: string, when?: Date) => {
     // Stamped now, so it keeps its real time when it waits for a connection.
     const out = await saveOrQueue("logEvent", { title: name, at: (when ?? new Date()).toISOString() }).catch((e) => ({ queued: false as const, result: { ok: false as const, error: e instanceof Error ? e.message : "Couldn't log that." } }));
@@ -129,49 +106,9 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
             style={{ color: INK, borderBottom: "1px solid #a88a3f" }}
           />
         )}
-        <button
-          type="button"
-          aria-expanded={leaf !== null}
-          aria-label="Log cannabis"
-          title="Log cannabis: pick the time, now by default"
-          onClick={() => {
-            const d = new Date();
-            setLeaf((v) => (v === null ? d.getHours() * 60 + d.getMinutes() : null));
-          }}
-          data-leaf-log
-          className="hover-glow ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-          style={{ background: "radial-gradient(circle at 35% 30%, #fffaf0, #f0e4c4 75%)", border: "1px solid #7a9a5a", boxShadow: leaf !== null ? "0 0 0 2px rgba(63,138,58,.4)" : undefined }}
-        >
-          <LeafIcon />
-        </button>
+        {leaf.button}
       </div>
-      <Fold open={leaf !== null}>
-        <div className="flex flex-wrap items-center gap-2.5 pt-0.5">
-          <TimeWheels value={leaf ?? 0} onChange={setLeaf} />
-          <div className="flex flex-col gap-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                const at = new Date();
-                const now = at.getHours() * 60 + at.getMinutes();
-                const m = leaf ?? now;
-                at.setHours(Math.floor(m / 60), m % 60, 0, 0);
-                // A time later than now means that time yesterday (nothing is logged in the future).
-                if (m > now + 1) at.setDate(at.getDate() - 1);
-                setLeaf(null);
-                void log(LEAF_EVENT, m === now ? undefined : at);
-              }}
-              // The app's forest-green primary, like the quest editor's Save (owner, Nov 19: the bright green was off).
-              className="qe-save h-9 rounded-full px-4 text-[14px] font-semibold"
-            >
-              Log it
-            </button>
-            <button type="button" onClick={() => setLeaf(null)} className="h-7 text-[13px] underline underline-offset-2" style={{ color: "#6b5631" }}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      </Fold>
+      {leaf.panels}
       <Fold open={!!removing}>
         <div className="flex items-center gap-2 text-[13px]" style={{ color: "inherit" }}>
           <span>Stop tracking “{removing}”? (what&apos;s logged stays)</span>
@@ -184,7 +121,7 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
         </div>
       </Fold>
       {said && (
-        <p role="status" className="confirm-pop m-0 flex items-center gap-2 text-[13px]" style={{ color: "inherit" }}>
+        <p role="status" className="confirm-pop m-0 flex flex-wrap items-center gap-x-2 text-[13px]" style={{ color: "inherit" }}>
           {said.text}
           {said.undo && (
             <button type="button" onClick={() => (said.undo?.(), setSaid(null))} className="font-semibold underline underline-offset-2">
@@ -194,6 +131,7 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
           <button type="button" onClick={() => setSaid(null)} aria-label="Close" className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-black/5">
             <CloseIcon size={9} />
           </button>
+          {said.note && <span className="order-last basis-full text-[12.5px] opacity-70">{said.note}</span>}
         </p>
       )}
       {feltNote && <FeltInline key={feltNote} target={{ kind: "note", id: feltNote }} onClose={closeFeltNote} />}

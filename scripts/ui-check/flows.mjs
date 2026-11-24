@@ -1277,6 +1277,78 @@ export const FLOWS = [
     },
   },
   {
+    // The leaf log asks why and how you feel, then follows up (owner, Nov 24; mockup codes WI-1 C, WB-1 B, WB-2 A, WR-1..5).
+    // Tap the leaf: faces, feeling words, your usual reasons, a reason, Log it. Right-click or hold it: the follow-up.
+    // Then Today, where the toucan may ask how the earlier one went.
+    name: "leaflog",
+    timeoutMs: 300_000,
+    async run(h) {
+      await h.goto("/insights", { name: "leaflog" });
+      const panel = (p) => p.locator("[data-leaf-panel]");
+      if (!(await h.tap((p) => p.locator("[data-leaf-log]").first(), "leaf button", { optional: true, expectMove: true }))) return h.record({ kind: "step-skipped", severity: "info", target: "leaflog", detail: "no leaf button on Insights" });
+      await h.settle(600);
+      await h.check("leaf: the tap panel");
+      await h.tap((p) => panel(p).getByRole("radio", { name: "Poor" }).first(), "face before", { optional: true });
+      await h.tap((p) => panel(p).getByRole("button", { name: /^exhausted$/ }).first(), "feeling word before", { optional: true });
+      if (!(await h.page.locator("[data-leaf-panel] [aria-label='Your usual reasons'] button", { hasText: /to sleep/i }).count())) h.record({ kind: "leaf-chip", severity: "error", target: "leaf reasons", detail: "a reason typed three times didn't show as a chip" });
+      await h.tap((p) => panel(p).getByRole("button", { name: /^to sleep$/i }).first(), "reason chip", { optional: true });
+      await h.typeIn((p) => panel(p).getByLabel("Why are you smoking?").first(), "leaf reason", " with tea");
+      await h.tap((p) => panel(p).locator("button[aria-label=When]").first(), "leaf: Now chip", { optional: true, expectMove: true });
+      await h.check("leaf: filled in, time wheels open");
+      await h.tap((p) => panel(p).getByRole("button", { name: /^log it$/i }).first(), "log it", { optional: true, expectMove: true });
+      await h.settle(900);
+      if (await h.page.locator("[data-felt-inline]").count()) h.record({ kind: "leaf-felt", severity: "error", target: "leaf log", detail: "the faces row showed after a leaf log (the before face was just given)" });
+      if (!(await h.page.getByText(/I'll ask how it went/).count())) h.record({ kind: "leaf-ask", severity: "error", target: "leaf log", detail: "no \"I'll ask how it went\" line after logging" });
+      await h.check("leaf: logged, the status line says when I'll ask");
+      // Right-click (touch: hold) the leaf: the latest waiting log, straight away.
+      const leafBtn = h.page.locator("[data-leaf-log]").first();
+      await leafBtn.evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+      await leafBtn.click({ button: "right" }).catch(() => {});
+      await h.page.locator("[data-leaf-followup]").first().waitFor({ timeout: 4000 }).catch(() => {});
+      await h.settle(600);
+      if (!(await h.page.locator("[data-leaf-followup]").count())) h.record({ kind: "leaf-follow", severity: "error", target: "leaf right-click", detail: "right-clicking the leaf didn't open the follow-up" });
+      await h.check("leaf: follow-up form");
+      // "Earlier one?" steps to the 3-hour-old log from the fixtures; fill that one in and save it.
+      await h.tap((p) => p.locator("[data-leaf-follow-panel]").getByRole("button", { name: /^earlier one\?$/i }).first(), "Earlier one?", { optional: true, expectMove: true });
+      await h.tap((p) => p.locator("[data-leaf-followup]").getByRole("radio", { name: "Partly" }).first(), "did it give what I wanted: Partly", { optional: true });
+      await h.tap((p) => p.locator("[data-leaf-followup]").getByRole("radio", { name: "Good" }).first(), "face after", { optional: true });
+      await h.tap((p) => p.locator("[data-leaf-followup]").getByRole("button", { name: /^calm$/ }).first(), "feeling word after", { optional: true });
+      await h.check("leaf: follow-up filled in");
+      await h.tap((p) => p.locator("[data-leaf-followup]").getByRole("button", { name: /^save$/i }).first(), "save follow-up", { optional: true, expectMove: true });
+      await h.settle(900);
+      await h.check("leaf: follow-up saved");
+      // A hold on touch does the same as a right-click. The log just made is still waiting: skip its follow-up too.
+      const hold = () =>
+        leafBtn.evaluate(async (el) => {
+          el.dispatchEvent(new PointerEvent("pointerdown", { pointerType: "touch", bubbles: true }));
+          await new Promise((r) => setTimeout(r, 700));
+          el.dispatchEvent(new PointerEvent("pointerup", { pointerType: "touch", bubbles: true }));
+          el.click();
+        });
+      await hold();
+      await h.settle(800);
+      await h.tap((p) => p.locator("[data-leaf-followup]").getByRole("button", { name: /^save$/i }).first(), "save the other follow-up", { optional: true, expectMove: true });
+      await h.settle(900);
+      await hold();
+      await h.settle(800);
+      if (!(await h.page.getByText(/nothing waiting for a follow-up/i).count())) h.record({ kind: "leaf-hold", severity: "warn", target: "leaf hold", detail: "after a hold, \"Nothing waiting for a follow-up.\" didn't show (or the hold also fired the tap)" });
+      await h.check("leaf: nothing waiting");
+      // The backup tag in the event log, and an opened leaf row.
+      await h.goto("/insights", { name: "leaflog-log" });
+      const row = h.page.locator("ul[aria-label='Events and tags'] li", { hasText: "Cannabis" }).first();
+      if (await row.count()) {
+        await row.evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+        await h.tap((p) => p.locator("ul[aria-label='Events and tags'] li", { hasText: "Cannabis" }).first().locator("button").first(), "open a leaf row", { optional: true, expectMove: true });
+        await h.check("leaf: an opened row");
+      }
+      // Today: the toucan asks about an earlier one (once, if it is time and the check-in budget allows).
+      await h.page.evaluate(() => { try { for (const k of Object.keys(localStorage)) if (k.startsWith("toucan-leaf-asked:")) localStorage.removeItem(k); } catch {} });
+      await h.goto("/", { name: "leaflog-today" });
+      await h.settle(5000);
+      await h.check("leaf: Today, the toucan may ask how it went");
+    },
+  },
+  {
     name: "insights",
     async run(h) {
       await h.goto("/insights", { name: "insights" });
@@ -1411,6 +1483,9 @@ export const FLOWS = [
       await h.check("after ritual");
       // The leaf button by the tracked events (owner, Nov 12): time wheels, now by default, then Log it.
       if (await h.tap((p) => p.locator("[data-leaf-log]").first(), "leaf button", { optional: true, expectMove: true })) {
+        await h.settle(500);
+        // The wheels sit behind the "Now ▾" chip (owner, Nov 24).
+        await h.tap((p) => p.locator("[data-leaf-panel] button[aria-label=When]").first(), "leaf: Now chip", { optional: true, expectMove: true });
         await h.settle(500);
         await h.check("leaf: time wheels");
         // Tap the chosen hour to type the time (owner, Nov 17).
