@@ -6,7 +6,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 - **Dev loop 2 run 104 note (Nov 24, 21:30 to 23:10 UTC):** UI check of `review/leaf-why` done (flows leaflog, insights, today, phone and tablet, morning and evening): 0 errors, 20 warnings; review page published (link in its entry below). One warning to look at before merging: Streaks on Insights shifts 70-85px once at load in `leaflog` (not compared with main).
 
-- **Dev loop 2 runs 100–105 note (Nov 24, ~19:00 to 21:56 UTC):** `main` unchanged since run 97; no new feedback notes after d8f914be (16:43 UTC). Run 105: run 104 holds the only open work (leaf-why UI check). Nothing unclaimed that ships straight. Nothing built.
+- **Dev loop 2 runs 100–106 note (Nov 24, ~19:00 to 22:56 UTC):** `main` code unchanged since run 97 (docs only); no new feedback notes after d8f914be (16:43 UTC). Run 105: run 104 held the only open work (leaf-why UI check, now done). Run 106: nothing unclaimed that ships straight. Nothing built.
 
 - **Dev loop 2 runs 98–99 note (Nov 24, evening UTC, last 18:56):** `main` unchanged since run 97; no new feedback notes since d8f914be (16:43 UTC). Nothing unclaimed that ships straight. Nothing built.
 
