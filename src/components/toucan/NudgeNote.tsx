@@ -115,13 +115,15 @@ export function NudgeNote({ text, actions, onClose, instant = false }: { text: s
       role="status"
       // The toucan himself flies in and says it: the bird on the left, his words in a bubble beside him.
       // Centred with margins, not a half-width translate: a half-pixel offset made the words shimmer while the bird moved.
-      className={`fixed z-[58] flex w-[min(380px,calc(100vw-24px))] cursor-grab touch-none items-end gap-1 ${place ? "" : "inset-x-0 bottom-24 mx-auto"}`}
+      // Once his words are closed only the bird catches touches: the empty space where the bubble was lets drags and taps through to the page (note df878ace).
+      className={`fixed z-[58] flex w-[min(380px,calc(100vw-24px))] items-end gap-1 ${quiet ? "pointer-events-none [&_[data-bird]]:pointer-events-auto [&_[data-bird]]:cursor-grab [&_[data-bird]]:touch-none" : "cursor-grab touch-none"} ${place ? "" : "inset-x-0 bottom-24 mx-auto"}`}
       style={place ?? undefined}
       onPointerDown={(e) => {
         if ((e.target as HTMLElement).closest("button:not([data-bird])")) return;
         const r = e.currentTarget.getBoundingClientRect();
         drag.current = { dx: e.clientX - r.left, dy: e.clientY - r.top, moved: false };
-        e.currentTarget.setPointerCapture(e.pointerId);
+        // Capture on the bird while his words are closed: the box itself takes no touches then.
+        ((quiet && (e.target as HTMLElement).closest<HTMLElement>("[data-bird]")) || e.currentTarget).setPointerCapture(e.pointerId);
       }}
       onPointerMove={(e) => {
         const d = drag.current;

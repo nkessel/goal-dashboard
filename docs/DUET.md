@@ -65,6 +65,8 @@ Result: `{ok, change_id?, summary, data?, notes?}` or `{ok:false, error, candida
 
 ## Not done from here
 
+Sleep is not in this door either: the sleep and wake log is `profiles.life_wheel->'wheelOfTime'->'log'->'YYYY-MM-DD'` (`{bed, wake, effort, hindrances, at}`, the day is the morning after the night), not `check_ins`, `calendar_blocks`, `energy_log` or `check_in_notes`. Read it there before reporting a sleep log as missing (Nov 24, note c675eb5e).
+
 Anything needing his Google token: placing or moving a quest on his calendar. If an edit would normally also lengthen a calendar block, the database part is done and a note says the block wasn't changed (it follows the next time he opens the quest in the app). Steps, sub-quests, scheduling, rewards, goals and failing a quest are not in this door yet.
 
 ## Switching it on (needs the owner's yes)
