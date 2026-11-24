@@ -55,6 +55,8 @@ type View = {
   grid?: "few" | "some" | "many";
   /** XP drawn as stacked coins instead of bars, where "+n XP" won't fit under the days (owner, Nov 19: off by default). */
   xpCoins?: boolean;
+  /** The "n XP over the week · n a day on average" line under the chart; hidden unless chosen (owner, Nov 24, note a82f71a1). */
+  xpTotals?: boolean;
   /** The lines between days (owner, Nov 19): dotted with solid weeks, all dotted, all solid, weeks only, or none. */
   dayLines?: "dotWeek" | "dotted" | "solid" | "weeks" | "off";
 };
@@ -670,6 +672,10 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
                 <input type="checkbox" checked={!!view.xpCoins} onChange={() => setV({ xpCoins: !view.xpCoins })} />
                 XP as coins (when zoomed out)
               </label>
+              <label className="relative z-[1] flex min-h-8 items-center gap-2 text-[14px]" style={{ color: INK }}>
+                <input type="checkbox" checked={!!view.xpTotals} onChange={() => setV({ xpTotals: !view.xpTotals })} />
+                XP totals and daily average
+              </label>
             </div>
           )}
         </div>
@@ -1141,9 +1147,9 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
           </div>
         )}
 
-      {(zoom || showXp) && (
+      {(zoom || (showXp && view.xpTotals)) && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]" style={{ color: INK_SOFT }}>
-          {showXp && (
+          {showXp && view.xpTotals && (
             <span className="tabular-nums">
               {xpTotal} XP over {n === 7 ? "the week" : `${n} days`} · {Math.round(xpTotal / n)} a day on average
             </span>
