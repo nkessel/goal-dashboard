@@ -268,18 +268,22 @@ export async function setRiteStepsAction(riteId: string, steps: { id: string; ti
 export async function tickRiteStepAction(riteId: string, stepId: string, day: string, on: boolean) {
   const ownerId = await requireProfileId();
   assertDay(day);
-  const rite = await ritesData.getRite(riteId, ownerId);
+  // Fewer round trips one after another, so a tick's XP shows sooner (owner's note 2983ab5d: "quite laggy").
+  const db = supabaseAdmin();
+  const [rite, { data: doneRow }] = await Promise.all([
+    ritesData.getRite(riteId, ownerId),
+    db.from("rite_completions").select("id").eq("owner_id", ownerId).eq("rite_id", riteId).eq("day", day).maybeSingle(),
+  ]);
   if (!rite) throw new Error("That habit isn't here anymore.");
   const changed = await ritesData.setRiteStepCheck(ownerId, riteId, stepId, day, on);
   const steps = ritesData.cleanRiteSteps(rite.steps);
   // A sub-habit with its own XP or coins pays them when ticked (and takes them back when unticked).
   const step = steps.find((st) => st.id === stepId);
-  if (changed && step) await payStep(ownerId, step, on ? 1 : -1);
-  const checks = ((await ritesData.listRiteStepChecks(ownerId, day)) ?? []).filter((c) => c.rite_id === riteId && c.day === day);
+  const [, checksAll] = await Promise.all([changed && step ? payStep(ownerId, step, on ? 1 : -1) : null, ritesData.listRiteStepChecks(ownerId, day)]);
+  const checks = (checksAll ?? []).filter((c) => c.rite_id === riteId && c.day === day);
   const ticked = new Set(checks.map((c) => c.step_id));
   // Only the required sub-habits finish it; with none required, ticks never complete or undo it.
   const all = stepsComplete(steps, (id) => ticked.has(id));
-  const { data: doneRow } = await supabaseAdmin().from("rite_completions").select("id").eq("owner_id", ownerId).eq("rite_id", riteId).eq("day", day).maybeSingle();
   let completed: { xp: number; coinsEarned: number } | null = null;
   if (all === true && !doneRow) completed = await completeRiteAction(riteId, day);
   else if (all === false && doneRow) await uncompleteRiteAction(riteId, day);
@@ -288,6 +292,7 @@ export async function tickRiteStepAction(riteId: string, stepId: string, day: st
 }
 
 async function payStep(ownerId: string, step: ritesData.RiteStep, sign: 1 | -1) {
+  // One after the other: both read and write the profile's coins.
   if (step.xp) await xp.awardXp(ownerId, sign * step.xp, "task_completed").catch(() => {});
   if (step.coins) await rewardsData.addCoins(ownerId, sign * step.coins).catch(() => {});
 }

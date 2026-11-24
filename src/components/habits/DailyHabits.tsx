@@ -1070,6 +1070,8 @@ export function DailyHabits({
           rite={editing === "new" ? undefined : editing}
           slot="day"
           startWithSub={editSub}
+          stepDone={editing !== "new" ? (id) => ticked(editing, id) : undefined}
+          onTickStep={editing !== "new" ? (id) => tickStep(editing, id) : undefined}
           extraSubs={
             editing !== "new" && editing.id === cleanId && cleaning ? (
               <CleaningParts

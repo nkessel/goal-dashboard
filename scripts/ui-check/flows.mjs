@@ -377,7 +377,19 @@ export const FLOWS = [
         await h.page.locator(".habit-row", { hasText: "Vitamins before 12pm" }).first().getByRole("checkbox", { name: /^B12/ }).first().evaluate((el) => el.click()).catch(() => {});
         await h.settle(600);
         await h.check("habit sub-habit ticked");
-        await vit.evaluate((el) => el.click()).catch(() => {});
+        // Its editor shows today's ticks on the sub-habit rows too (owner's note 7ba2172e).
+        await h.page.locator(".habit-row", { hasText: "Vitamins before 12pm" }).first().getByRole("checkbox", { name: /^B12/ }).first().dispatchEvent("contextmenu").catch(() => {});
+        await h.settle(300);
+        if (await h.tap((p) => p.getByRole("menuitem", { name: /edit sub-habits/i }).first(), "edit sub-habits from a sub-habit", { optional: true, expectMove: true })) {
+          await h.check("habit editor: ticked sub-habit shown");
+          const ok = await h.page.getByRole("dialog").getByRole("checkbox", { name: /^untick b12/i }).count().catch(() => 0);
+          if (!ok) h.record({ kind: "sub-habit-tick", severity: "error", target: "habit editor", detail: "B12 ticked on its card but not in the habit editor" });
+          await h.tap((p) => p.getByRole("dialog").getByRole("button", { name: /^close$/i }).last(), "close habit editor", { optional: true, expectMove: true });
+          await h.settle(400);
+          // A real click to fold the card again, so its shrinking counts as an answer to input.
+          await vit.evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+          await vit.click({ timeout: 3000 }).catch(() => vit.evaluate((el) => el.click()).catch(() => {}));
+        } else await vit.evaluate((el) => el.click()).catch(() => {});
         await h.settle(300);
       }
       // Schedule a quest from its ⋯ menu: the day drawn, tap a time (repeat ask 10).
