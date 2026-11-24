@@ -12,8 +12,10 @@ import {
   restoreArchivedQuestForOwner,
   setCoreHabitForOwner,
   uncompleteRiteForOwner,
+  tickRiteStepForOwner,
   updateRiteForOwner,
 } from "@/lib/data/quest-ops";
+import { undoCheckIn } from "./checkins";
 import { DuetError, isUuid } from "./pure";
 import { getChange, latestChange, markUndone, type LoggedChange } from "./log";
 import { questById } from "./load";
@@ -108,6 +110,15 @@ async function undoIt(ownerId: string, c: LoggedChange): Promise<{ summary: stri
     case "uncomplete_habit":
       await completeRiteForOwner(ownerId, need(), String(before.day), Number(before.pct) || 100);
       return { summary: `Marked the habit done again for ${before.day}.`, notes };
+    case "tick_subhabit": {
+      const r = await tickRiteStepForOwner(ownerId, need(), String(before.step_id), String(before.day), before.on === true);
+      if (r.completed) notes.push("That finished the habit again, XP and coins paid.");
+      if (r.uncompleted) notes.push("The habit is no longer done; its XP and coins were taken back.");
+      return { summary: `${before.on === true ? "Ticked" : "Unticked"} the sub-habit again for ${before.day}.`, notes };
+    }
+    case "check_in":
+    case "remove_check_in":
+      return { summary: await undoCheckIn(ownerId, c.action, c.before, c.after), notes };
     case "add_board": {
       const why = await removeEmptyBoard(ownerId, need());
       if (why) throw new DuetError(why);

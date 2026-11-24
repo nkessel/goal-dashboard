@@ -47,6 +47,12 @@ Result: `{ok, change_id?, summary, data?, notes?}` or `{ok:false, error, candida
 - `add_habit` `{title, slot?, days?, time?, xp?, coins?, minutes?, core?, repeat?}`. `days`: names ("Mon", "thursdays", "weekdays", "weekends") or numbers **0 (Sunday) to 6 (Saturday)**, as the app stores them; all seven or none = every day. `time`: "07:30", "7am". `repeat`: `{every, unit: day|week|month|year, from?}` instead of days. `core`: for a daily habit, "always in Today's Quests" (the habit plan); for an evening rite, rite vs mini-quest. Default XP 5.
 - `edit_habit` `{habit, title?, slot?, days?, time?, xp?, coins?, minutes?, core?, repeat?}` (`null` clears time, coins, minutes, repeat, days). The app has no way to move a habit between day and evening after creating it; `slot` here sets the column directly.
 - `move_habit` `{habit, above?|below?}` within its slot, `complete_habit` `{habit, day?, pct?}`, `uncomplete_habit` `{habit, day?}`, `remove_habit` `{habit}` (archives), `restore_habit` `{habit}`.
+- `tick_subhabit` `{habit, step, day?, on?}`: tick one sub-habit (`on: false` unticks), as the habit's checklist does in the app: a sub-habit's own XP and coins are paid, ticking the last required one completes the habit, unticking a required one of a done habit undoes it. `today` lists each habit's `sub_habits` with `done`. Code: `tickRiteStepForOwner` in `quest-ops.ts` (the app's `tickRiteStepAction` calls the same).
+
+### Check-ins
+- `check_in` `{energy?, metrics?, notes?, at?}`: `metrics` is `{"Mood": 7, "Focus": 6}` (or `[{metric, level}]`), 1 to 10 in tenths, names among the metrics he tracks (an unknown name is refused; adding a metric is done in the app); `Energy` may be given there too. `notes`: a line or a list of lines (with #tags), or `{text, details?, tone?: -2..2}`. `at`: a past moment (up to three months back); default now. The result's `data.ids` are the entries' keys.
+- `check_ins` `{day?}`: that New York day's readings and notes, oldest first, each with its `key` (`e:` energy, `c:` other metric, `n:` note) and `archived` if hidden in the app.
+- `remove_check_in` `{ids}`: deletes those entries for good (up to 12; keys from `check_ins`). `undo` puts them back as they were.
 
 ### Boards
 - `add_board` `{title, parent?}`, `edit_board` `{board, title?, parent?}` (`parent: null` = top level), `move_board` `{board, above?|below?}` among its siblings.
@@ -67,7 +73,7 @@ Result: `{ok, change_id?, summary, data?, notes?}` or `{ok:false, error, candida
 
 Sleep is not in this door either: the sleep and wake log is `profiles.life_wheel->'wheelOfTime'->'log'->'YYYY-MM-DD'` (`{bed, wake, effort, hindrances, at}`, the day is the morning after the night), not `check_ins`, `calendar_blocks`, `energy_log` or `check_in_notes`. Read it there before reporting a sleep log as missing (Nov 24, note c675eb5e).
 
-Anything needing his Google token: placing or moving a quest on his calendar. If an edit would normally also lengthen a calendar block, the database part is done and a note says the block wasn't changed (it follows the next time he opens the quest in the app). Steps, sub-quests, scheduling, rewards, goals and failing a quest are not in this door yet.
+Anything needing his Google token: placing or moving a quest on his calendar. If an edit would normally also lengthen a calendar block, the database part is done and a note says the block wasn't changed (it follows the next time he opens the quest in the app). Quest steps, sub-quests, scheduling, rewards, goals, failing a quest, the journal, tracked events (streaks) and adding a check-in metric are not in this door yet (owner's note d8f914be asks for every interaction in the app; the three gaps it named, sub-habit ticks, check-in metrics and notes, removing a check-in entry, were added Nov 24).
 
 ## Switching it on (needs the owner's yes)
 
@@ -89,4 +95,5 @@ Anything needing his Google token: placing or moving a quest on his calendar. If
 ## Testing
 
 - `node --experimental-strip-types scripts/test-duet.mjs` (name resolution, weekdays, clamping, dates, ordering).
+- `node scripts/ui-check/duet-route-try.mjs` after a `npm run ui-check` build: starts the fake database (with the Duet keys seeded) and `next start`, then calls `today`, `tick_subhabit`, `check_in`, `check_ins`, `remove_check_in` and `undo` and prints each result.
 - Route test without the real database: run `scripts/ui-check/fake-db.mjs` with `secret.duet_key` and `secret.duet_owner` seeded in `app_defaults`, start `next dev` against it (HANDOFF section 3), then POST to `/api/duet`.

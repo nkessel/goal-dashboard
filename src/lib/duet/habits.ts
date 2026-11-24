@@ -9,6 +9,7 @@ import {
   createRiteForOwner,
   readExtrasOf,
   setCoreHabitForOwner,
+  tickRiteStepForOwner,
   uncompleteRiteForOwner,
   updateRiteForOwner,
 } from "@/lib/data/quest-ops";
@@ -159,4 +160,28 @@ export async function restoreHabit(ownerId: string, a: Args): Promise<Out> {
   await ritesData.restoreRite(h.id, ownerId);
   revalidatePath("/");
   return { summary: `Restored habit "${h.title}".`, change: { kind: "habit", id: h.id, before: { archived: true }, after: { archived: false } } };
+}
+
+/** Tick (or, with `on: false`, untick) one sub-habit, as the habit's checklist does in the app. */
+export async function tickSubhabit(ownerId: string, a: Args): Promise<Out> {
+  const h = pick(await loadHabits(ownerId), a.habit, "habit");
+  const steps = ritesData.cleanRiteSteps(h.steps);
+  if (!steps.length) throw new DuetError(`"${h.title}" has no sub-habits. complete_habit checks off the whole habit.`);
+  const step = pick(steps, a.step, `sub-habit of "${h.title}"`);
+  if (has(a, "on") && typeof a.on !== "boolean") throw new DuetError("on must be true (tick) or false (untick).");
+  const on = a.on !== false;
+  const today = appDayKey();
+  if (has(a, "day") && !isDay(a.day)) throw new DuetError("day must look like 2026-11-27.");
+  const day = isDay(a.day) ? a.day : today;
+  if (day > today) throw new DuetError("A sub-habit can't be ticked for a day that hasn't come yet.");
+  const was = ((await ritesData.listRiteStepChecks(ownerId, day)) ?? []).some((c) => c.rite_id === h.id && c.step_id === step.id && c.day === day);
+  const r = was === on ? null : await tickRiteStepForOwner(ownerId, h.id, step.id, day, on);
+  if (!r || !r.changed) return { summary: `"${step.title}" on "${h.title}" was already ${on ? "ticked" : "unticked"} for ${day}.`, notes: ["No change made."] };
+  const paid = r.stepXp || r.stepCoins ? ` (${on ? "+" : "-"}${r.stepXp} XP${r.stepCoins ? `, ${r.stepCoins} coin${r.stepCoins === 1 ? "" : "s"}` : ""})` : "";
+  const tail = r.completed ? ` That finished "${h.title}": +${r.xp} XP, ${r.coinsEarned} coin${r.coinsEarned === 1 ? "" : "s"}.` : r.uncompleted ? ` "${h.title}" is no longer done; its XP and coins were taken back.` : "";
+  return {
+    summary: `${on ? "Ticked" : "Unticked"} "${step.title}" on "${h.title}" for ${day}${paid}.${tail}`,
+    data: { habit_done: r.done, xp: r.xp, coins_earned: r.coinsEarned },
+    change: { kind: "habit", id: h.id, before: { day, step_id: step.id, on: !on }, after: { day, step_id: step.id, on, completed: r.completed, uncompleted: r.uncompleted } },
+  };
 }

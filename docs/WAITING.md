@@ -4,7 +4,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Dev loop 2 run 97 (Opus, Nov 24 17:58 UTC):** note d8f914be, the three Duet gaps it names (sub-habit ticks, check-in metrics and notes, removing a quick-log entry): new `public.duet` actions in `src/lib/duet/`, no screen change.
+- **Dev loop 2 run 97 note (Nov 24, 17:58 to 18:40 UTC):** shipped the three Duet gaps from d8f914be (see SHIPPED). d8f914be left open: its wider ask (every app interaction through Duet) is a bigger, ongoing piece; what is still missing is listed in `docs/DUET.md` › Not done from here.
 
 - **Dev loop 2 run 96 note (Nov 24, 17:26 UTC):** `main` unchanged since run 95; no new feedback notes after d8f914be (16:43). Nothing unclaimed that ships straight. Nothing built.
 
