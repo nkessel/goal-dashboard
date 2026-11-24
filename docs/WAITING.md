@@ -4,7 +4,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Dev loop 2 runs 58–84 note (Nov 23, 13:30 UTC to Nov 24, 10:00 UTC):** `main` unchanged since run 57 (docs only; import swipe mockups wait on the owner); no new feedback notes since Nov 21 17:39. Nothing unclaimed that ships straight. Nothing built.
+- **Dev loop 2 runs 58–85 note (Nov 23, 13:30 UTC to Nov 24, 10:30 UTC):** `main` unchanged since run 57 (docs only; import swipe mockups wait on the owner); no new feedback notes since Nov 21 17:39. Nothing unclaimed that ships straight. Nothing built.
 
 - **Dev loop 2 runs 56–57 note (Nov 23, 12:00 and 12:57 UTC):** `main` unchanged since run 51; no new feedback notes since Nov 21 17:39. Nothing unclaimed that ships straight. Nothing built.
 
