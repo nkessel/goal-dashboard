@@ -4,7 +4,9 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Unclaimed, for Dev loop 2 (has a browser), asked by the Run B thread Nov 24:** UI check of `review/tabs-instant` (phone and tablet, flows `today, calendar, boards, insights, feed`) and publish its review page like the When panel one: a screenshot per decision with **TI-1** stand-in look, **TI-2** slide timing, **TI-3** nav highlight, **TI-4** avatar written beside each, anchors `#ti-1`…`#ti-4`. Put the page link on the TI line under "Waiting on the owner's design review". Also still open: tablet UI check of `review/mini-calendar`. Neither merges anything.
+- **Dev loop 2 run 90 (Opus, Nov 24 13:58 UTC):** takes the TI item below: UI check of `review/tabs-instant` and its review page.
+
+- **For Dev loop 2 (has a browser), asked by the Run B thread Nov 24:** UI check of `review/tabs-instant` (phone and tablet, flows `today, calendar, boards, insights, feed`) and publish its review page like the When panel one: a screenshot per decision with **TI-1** stand-in look, **TI-2** slide timing, **TI-3** nav highlight, **TI-4** avatar written beside each, anchors `#ti-1`…`#ti-4`. Put the page link on the TI line under "Waiting on the owner's design review". Also still open: tablet UI check of `review/mini-calendar`. Neither merges anything.
 
 - **Dev loop 2 runs 58–89 note (Nov 23, 13:30 UTC to Nov 24, 12:57 UTC):** `main` unchanged since run 57 (docs only; import swipe mockups wait on the owner); no new feedback notes since Nov 21 17:39. Nothing unclaimed that ships straight. Nothing built.
 
