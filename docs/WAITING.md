@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 95 (Opus, Nov 24 17:00 UTC):** tablet UI check of `review/mini-calendar` (flows `create`, `calendar`; checks only, no merge), then any bug it finds on that branch. New notes since run 94 (d49a6a72 Focus metric, 93ee7129 Insights cleanup, d8f914be Duet covers everything) are features or design: not taken.
+
 - **Dev loop 2 run 93 note (Nov 24, 15:58 to 17:00 UTC):** shipped 7ba2172e and a speed-up for 2983ab5d (see SHIPPED; 2983ab5d left open until he says the lag is gone). Not built: e8f873d6 (sub-habits get a share of importance like sub-quests, the habit's bar fills by those shares): a design change for a review branch (the sub-habit ⋯ menu or row would take a % like the quest editor's sub-quests).
 
 - **Dev loop 2 run 94 note (Nov 24, 16:30 UTC):** run 93's habit claim is 30 min old; every other open note is a design change, parked, or his own list. New today and left unbuilt: e8f873d6 (habit progress bar proportional to sub-habit weights, sub-habits with % importance: design, habit area, run 93's files) and d1ec226a (a missed-day penalty on habits, starting with Call Dad: a new feature, needs his decision on the penalty). Nothing built.
