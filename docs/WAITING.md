@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 91 (Opus, Nov 24 14:57 UTC):** new Insights bug notes from today: c675eb5e (sleep check-in didn't save bedtime/wake), df878ace (toucan still drags where its closed bubble was), a82f71a1 second half (XP totals and per-month averages hidden by default).
+
 - **Dev loop 2 run 90 (Opus, Nov 24 13:58 UTC):** takes the TI item below: UI check of `review/tabs-instant` and its review page.
 
 - **For Dev loop 2 (has a browser), asked by the Run B thread Nov 24:** UI check of `review/tabs-instant` (phone and tablet, flows `today, calendar, boards, insights, feed`) and publish its review page like the When panel one: a screenshot per decision with **TI-1** stand-in look, **TI-2** slide timing, **TI-3** nav highlight, **TI-4** avatar written beside each, anchors `#ti-1`…`#ti-4`. Put the page link on the TI line under "Waiting on the owner's design review". Also still open: tablet UI check of `review/mini-calendar`. Neither merges anything.
