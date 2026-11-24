@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Unclaimed, for Dev loop 2 (has a browser), asked by the Run B thread Nov 24:** UI check of `review/tabs-instant` (phone and tablet, flows `today, calendar, boards, insights, feed`) and publish its review page like the When panel one: a screenshot per decision with **TI-1** stand-in look, **TI-2** slide timing, **TI-3** nav highlight, **TI-4** avatar written beside each, anchors `#ti-1`…`#ti-4`. Put the page link on the TI line under "Waiting on the owner's design review". Also still open: tablet UI check of `review/mini-calendar`. Neither merges anything.
+
 - **Dev loop 2 runs 58–89 note (Nov 23, 13:30 UTC to Nov 24, 12:57 UTC):** `main` unchanged since run 57 (docs only; import swipe mockups wait on the owner); no new feedback notes since Nov 21 17:39. Nothing unclaimed that ships straight. Nothing built.
 
 - **Dev loop 2 runs 56–57 note (Nov 23, 12:00 and 12:57 UTC):** `main` unchanged since run 51; no new feedback notes since Nov 21 17:39. Nothing unclaimed that ships straight. Nothing built.
@@ -22,7 +24,6 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 - **Dev loop 2 run 44 note (Nov 23, 03:30 UTC):** Cal 4/5 compare (02:30) and run 43's UI check (01:58) are fresh claims; everything else in Run B/PRIORITIES is shipped, a design change already on a review branch (When 2/3 still need their UI check and review pages; not started here, a longer job for its own run) or parked. Nothing built.
 
-- **Run B thread, Cal 4/5 snapshot compare (Sonnet, Nov 23 02:30 UTC):** `wip/calendar-items` vs `main` with `--snapshot`/`--compare`; merge only on 0 differences.
 
 - **Dev loop 2 run 43 (Opus, Nov 23 01:58 UTC, takes over run 42's claim, which left nothing):** UI check on `main` for the flows Run C, D and E moved code in (phone, then tablet), fix regressions; then open feedback notes that are bug fixes.
 
