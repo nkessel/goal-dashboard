@@ -2,11 +2,11 @@
 
 import { useHiddenEvents } from "@/lib/hidden-events";
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useNowMinute } from "@/lib/use-now-minute";
 import { daySummary, useWeatherRange } from "@/lib/use-weather";
 import { useRouter } from "next/navigation";
 import { scheduleTaskAction, updateGoogleEventAction } from "@/app/actions";
 import { saveDayHold } from "@/lib/day-holds";
-import { DailyEventEditor, useDailySettings } from "./DailyEvents";
 import { carryQuest, useCarried, QUEST_DRAG_TYPE, registerCalendarDrop, type Carried } from "@/lib/schedule-carry";
 import { WeatherLocation, useWeatherPlaceName } from "@/components/ui/WeatherLocation";
 import Link from "next/link";
@@ -31,48 +31,15 @@ import { sessionRef, showsOnCalendar } from "@/lib/calendar-task-window";
 import type { CardShow } from "./CalendarLayers";
 import { GoogleEventChip } from "./GoogleEventChip";
 import type { DailyLayer, EssentialsLook, HabitLook } from "./CalendarLayers";
-import { SCHEDULER_DEFAULTS, dailyEvents, holdAt, localDayKey, mealsOn, type DayHold, type SchedulerSettings } from "@/lib/auto-schedule";
-import { habitBlocksOn } from "@/lib/timed-habits";
+import { localDayKey } from "@/lib/auto-schedule";
 import { driveWords, useAllQuestDrives } from "@/lib/use-quest-cal";
-import { fromFeedback } from "@/lib/from-feedback";
 import { writeCalUi, type CalUi } from "@/lib/cal-ui";
-
-/** Hour height: condensed by default; drag the times on the left to zoom. */
-const DEFAULT_HOUR_PX = 36;
-/** The hour last looked at on the calendar, if it was within the last few minutes (moving between days). */
-function savedCalHour(): number | null {
-  try {
-    const saved = JSON.parse(window.sessionStorage.getItem("cal-hour") ?? "null") as { hour: number; at: number } | null;
-    return saved && Date.now() - saved.at < 5 * 60_000 ? saved.hour : null;
-  } catch {
-    return null;
-  }
-}
-/** Adventure quests are picture cards, so its hours start roomier. */
-const ADVENTURE_HOUR_PX = 56;
-const MIN_HOUR_PX = 18;
-const MAX_HOUR_PX = 96;
-const ZOOM_KEY = "calendar-hour-px";
-/** How many days the zoom slider shows (partway too), remembered on this device. */
-const SPAN_KEY = "calendar-day-span";
-const MAX_SPAN = 14;
-/** "3 days", "2½ days". */
-function spanWords(s: number): string {
-  const r = Math.round(s * 2) / 2;
-  return `${Math.floor(r)}${r % 1 ? "½" : ""} day${r === 1 ? "" : "s"}`;
-}
-
-/** The current minute, ticking once a minute (0 on the server, so nothing time-dependent renders there). */
-export function useNowMinute() {
-  return useSyncExternalStore(
-    (cb) => {
-      const id = setInterval(cb, 30_000);
-      return () => clearInterval(id);
-    },
-    () => Math.floor(Date.now() / 60_000),
-    () => 0
-  );
-}
+import { DEFAULT_HOUR_PX, savedCalHour, ADVENTURE_HOUR_PX, MIN_HOUR_PX, MAX_HOUR_PX, ZOOM_KEY, SPAN_KEY, MAX_SPAN } from "./week/zoom-store";
+import { DaysZoom, HoursButton, GoToday, TodayCrest } from "./week/controls";
+import { RainPct, RainCloud } from "./week/weather";
+import { holdMenuAt, DailyBlocks } from "./week/DailyBlocks";
+import { laneLayout, placeOnGrid, type GridItem } from "./week/lanes";
+import { calendarItems } from "@/lib/calendar-items";
 
 /**
  * Whether this is the browser, after hydration. The server's clock is in another time zone than the person's,
@@ -771,8 +738,6 @@ export function WeekView({
     x.setHours(H0, 0, 0, 0);
     return x.getTime();
   };
-  /** Whether something lies wholly before or after the hours shown (those wait behind the Earlier/Later buttons). */
-  const hidden = { early: 0, late: 0 };
   // The hour's label, with its temperature beneath it when one day is on screen (owner, Nov 12: "put the temperature beneath/next to the times").
   const hourLabel = (row: number) => {
     const w = single ? weather?.[dayKeys[seamless ? Math.max(0, Math.min(days.length - 1, firstIdx)) : 0]]?.[H0 + row] : undefined;
@@ -947,13 +912,6 @@ export function WeekView({
     ro.observe(box);
     return () => ro.disconnect();
   }, [seamless, early, late]);
-  const outside = (start: Date, end: Date, day: Date) => {
-    const a = (start.getTime() - gridStart(day)) / 60_000;
-    const b = (end.getTime() - gridStart(day)) / 60_000;
-    if (b <= 0) hidden.early++;
-    else if (a >= gridMinutes) hidden.late++;
-    return b <= 0 || a >= gridMinutes;
-  };
   /** Minutes from the top of the grid, clamped to it. */
   const offset = (d: Date, day: Date) => Math.min(gridMinutes, Math.max(0, (d.getTime() - gridStart(day)) / 60_000));
 
@@ -1105,32 +1063,12 @@ export function WeekView({
     };
   }, []);
 
-  type Item =
-    | { kind: "task"; key: string; dayIndex: number; top: number; bottom: number; start: Date; end: Date; task: Task }
-    | { kind: "event"; key: string; dayIndex: number; top: number; bottom: number; start: Date; end: Date; event: GoogleCalendarEvent };
-  const items: Item[] = [];
-  for (const event of hydrated ? events : []) {
-    if (event.isAllDay || hiddenEvents.has(event.id)) continue;
-    const start = new Date(event.start);
-    const end = new Date(event.end);
-    const dayIndex = days.findIndex((d) => isSameDay(d, start));
-    if (dayIndex === -1) continue;
-    if (outside(start, end, days[dayIndex])) continue;
-    const top = offset(start, days[dayIndex]);
-    items.push({ kind: "event", key: `e-${event.id}`, dayIndex, top, bottom: Math.max(top + 20, offset(end, days[dayIndex])), start, end, event });
-  }
-  for (const task of hydrated ? tasks : []) {
-    if (!showsOnCalendar(task)) continue;
-    const { start, end } = getTaskDisplayWindow(task);
-    const dayIndex = days.findIndex((d) => isSameDay(d, start));
-    if (dayIndex === -1) continue;
-    if (outside(start, end, days[dayIndex])) continue;
-    // A short quest (a 15-minute mini-quest) still gets room for its card: at least ~30px tall. One that starts
-    // late at night moves up just enough that its card stays inside the grid, not cut at the bottom.
-    const minMins = Math.max(20, (30 / HOUR_PX) * 60);
-    const top = Math.max(0, Math.min(offset(start, days[dayIndex]), gridMinutes - minMins));
-    items.push({ kind: "task", key: `t-${sessionRef(task)}`, dayIndex, top, bottom: Math.max(top + minMins, offset(end, days[dayIndex])), start, end, task });
-  }
+  // One list of what's on the calendar (planner step 4, `lib/calendar-items.ts`), laid out on the grid
+  // (`week/lanes.ts`, split plan C2). Cards are drawn only in the browser (see `useHydrated`).
+  const placed = placeOnGrid(calendarItems(hydrated ? tasks : [], hydrated ? events : [], { hiddenEvents }), { days, h0: H0, gridMinutes, hourPx: HOUR_PX });
+  const hidden = placed.hidden;
+  type Item = GridItem;
+  const items: Item[] = placed.items;
 
   // An item being dragged (or just dropped, until fresh data arrives) shows at its new spot.
   for (let i = 0; i < items.length; i++) {
@@ -1141,27 +1079,7 @@ export function WeekView({
   }
 
   // Side-by-side lanes for overlapping items on the same day.
-  const lanes = new Map<string, { lane: number; count: number }>();
-  for (let d = 0; d < days.length; d++) {
-    const dayItems = items.filter((x) => x.dayIndex === d).sort((a, b) => a.top - b.top || b.bottom - a.bottom);
-    let cluster: { it: Item; lane: number }[] = [];
-    let clusterEnd = -1;
-    const flush = () => {
-      const count = Math.max(1, ...cluster.map((c) => c.lane + 1));
-      cluster.forEach((c) => lanes.set(c.it.key, { lane: c.lane, count }));
-      cluster = [];
-    };
-    for (const it of dayItems) {
-      if (it.top >= clusterEnd && cluster.length) flush();
-      const laneEnds: number[] = [];
-      cluster.forEach((c) => (laneEnds[c.lane] = Math.max(laneEnds[c.lane] ?? -1, c.it.bottom)));
-      let lane = laneEnds.findIndex((end) => end <= it.top);
-      if (lane === -1) lane = laneEnds.length;
-      cluster.push({ it, lane });
-      clusterEnd = Math.max(clusterEnd, it.bottom);
-    }
-    if (cluster.length) flush();
-  }
+  const lanes = laneLayout(items, days.length);
 
   // Quest cards dragged in from Today's lists (dnd-kit, finger or mouse) ask here where they'd land.
   function hitAt(x: number, y: number): { dayIndex: number; min: number } | null {
@@ -1666,504 +1584,3 @@ export function WeekView({
   );
 }
 
-/**
- * The days' zoom: a gilded slider from 1 day to 14 (log scale, so the close-ups get the room), partway too,
- * with a magnifier at each end that glides a day in or out.
- */
-function DaysZoom({ span, isAdventure, onChange, onStep }: { span: number; isAdventure: boolean; onChange: (s: number) => void; onStep: (s: number) => void }) {
-  const LOG = Math.log(MAX_SPAN);
-  const v = Math.round((Math.log(span) / LOG) * 1000);
-  const btn = "flex h-7 w-7 shrink-0 items-center justify-center rounded-full";
-  const ink = isAdventure ? "#6b5531" : "var(--t-ink-soft)";
-  const glass = (plus: boolean) => (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="2.2" />
-      <path d="M15.5 15.5L20 20M7.5 10.5h6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-      {plus && <path d="M10.5 7.5v6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />}
-    </svg>
-  );
-  return (
-    <span data-days-zoom className="ml-auto flex shrink-0 items-center gap-1" style={{ color: ink }}>
-      {/* Farther on the left, closer on the right (owner, Nov 17: "reverse the directionality"). */}
-      <button type="button" className={btn} aria-label="More days (farther)" title="More days (farther)" onClick={() => onStep(Math.min(MAX_SPAN, Math.floor(span + 0.01) + 1))}>
-        {glass(false)}
-      </button>
-      <input
-        type="range"
-        min={0}
-        max={1000}
-        step={1}
-        value={1000 - v}
-        aria-label="Days shown"
-        aria-valuetext={spanWords(span)}
-        title="Slide right to come closer, left for more days"
-        onChange={(e) => onChange(Math.exp(((1000 - Number(e.target.value)) / 1000) * LOG))}
-        className="gilded-range w-24 sm:w-36 lg:w-48"
-        style={{ "--p": `${(1000 - v) / 10}%` } as React.CSSProperties}
-      />
-      <button type="button" className={btn} aria-label="Fewer days (closer)" title="Fewer days (closer)" onClick={() => onStep(Math.max(1, Math.ceil(span - 0.01) - 1))}>
-        {glass(true)}
-      </button>
-      <span className="w-[58px] text-right text-[12.5px] font-semibold tabular-nums">{spanWords(span)}</span>
-    </span>
-  );
-}
-
-/** On the time bar, just above its first mark or below its last: shows the early-morning or late-night hours, or folds them away. */
-function HoursButton({ side, open, hidden, isAdventure, top, onToggle }: { side: "early" | "late"; open: boolean; hidden: number; isAdventure: boolean; top: number; onToggle: () => void }) {
-  const words = side === "early" ? (open ? "Hide before 7 AM" : "Show before 7 AM") : open ? "Hide after 10:30 PM" : "Show after 10:30 PM";
-  const up = side === "early" ? !open : open;
-  return (
-    <button
-      type="button"
-      aria-expanded={open}
-      aria-label={words}
-      title={words}
-      onClick={onToggle}
-      data-hours={side}
-      className="absolute left-[3px] z-[31] flex h-[22px] w-[34px] items-center justify-center gap-0.5 rounded-full"
-      style={{ top, color: "var(--t-ink-soft)", border: `1px solid ${isAdventure ? "rgba(168,138,63,.6)" : "var(--t-card-border)"}`, background: isAdventure ? "rgba(251,240,212,.85)" : "var(--t-card)" }}
-    >
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden style={{ transform: up ? undefined : "rotate(180deg)" }}>
-        <path d="M5 15l7-7 7 7" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      {!open && hidden > 0 && (
-        <span className="rounded-full px-1 text-[10px] font-bold leading-[14px]" style={{ background: "#d9b45f", color: "#2a1c10" }}>
-          {hidden}
-        </span>
-      )}
-    </button>
-  );
-}
-
-/** "Today" beside the + button: brings today and now's hour back to the middle of the screen. */
-function GoToday({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      data-go-today
-      data-hide-when-typing
-      aria-label="Go to today"
-      title="Go to today"
-      className="card-pop-in fixed bottom-[92px] z-[46] flex h-9 items-center gap-1 rounded-full px-3 text-[13px] font-semibold"
-      style={{ left: "calc(var(--fab-x, 50%) + 36px)", background: "radial-gradient(circle at 35% 25%, #fbefcb, #ead49a 70%)", border: "1px solid #a88a3f", color: "#2a1c10", boxShadow: "0 3px 10px rgba(0,0,0,.25)" }}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <rect x="4" y="5" width="16" height="15" rx="2.5" stroke="currentColor" strokeWidth="2" />
-        <path d="M4 10h16M9 3v4M15 3v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        <circle cx="12" cy="15" r="1.8" fill="currentColor" />
-      </svg>
-      Today
-    </button>
-  );
-}
-
-/** The little gilded shield over today's column. */
-function TodayCrest() {
-  return (
-    <svg aria-hidden width="18" height="21" viewBox="0 0 18 21" className="absolute left-1/2 top-0 -translate-x-1/2">
-      <path d="M9 1l7 2.6v6.1c0 4.6-3 8-7 9.8-4-1.8-7-5.2-7-9.8V3.6z" fill="url(#crest-g)" stroke="#5a4214" strokeWidth="1.1" />
-      <path d="M9 5.2c1.6 1.5 2.4 3 2.4 4.6 0 1.6-1 2.9-2.4 3.6-1.4-.7-2.4-2-2.4-3.6 0-1.6.8-3.1 2.4-4.6z" fill="#fbecc0" opacity=".9" />
-      <defs>
-        <linearGradient id="crest-g" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#f6dc8e" />
-          <stop offset=".55" stopColor="#d9b45f" />
-          <stop offset="1" stopColor="#a88a3f" />
-        </linearGradient>
-      </defs>
-    </svg>
-  );
-}
-
-/**
- * A day's essentials (meal time, wind-down, the after-dinner tidy) where there's
- * room for them, quieter than quests; and habits with a set time (Gym at 7),
- * which look like quests unless you choose otherwise.
- */
-/** Asks the day's holds whether one sits at this point and opens its menu (a tap needs a second one soon after). */
-function holdMenuAt(day: Date, x: number, y: number, kind: "tap" | "menu", t: number): boolean {
-  const ev = new CustomEvent("hold-menu", { cancelable: true, detail: { dayKey: localDayKey(day), x, y, kind, t } });
-  window.dispatchEvent(ev);
-  return ev.defaultPrevented;
-}
-
-
-// Each non-negotiable's own look, when it differs from the calendar's setting ("quest" card or dashed "hold").
-const LOOKS_KEY = "hold-looks";
-let looksCache: { raw: string | null; val: Record<string, "quest" | "hold"> } = { raw: null, val: {} };
-function readLooks(): Record<string, "quest" | "hold"> {
-  try {
-    const raw = window.localStorage.getItem(LOOKS_KEY);
-    if (raw !== looksCache.raw) looksCache = { raw, val: raw ? JSON.parse(raw) : {} };
-    return looksCache.val;
-  } catch {
-    return {};
-  }
-}
-const noLooks: Record<string, "quest" | "hold"> = {};
-function subscribeLooks(cb: () => void) {
-  window.addEventListener("hold-looks", cb);
-  window.addEventListener("storage", cb);
-  return () => {
-    window.removeEventListener("hold-looks", cb);
-    window.removeEventListener("storage", cb);
-  };
-}
-function setLook(key: string, look: "quest" | "hold" | null) {
-  const next = { ...readLooks() };
-  if (look) next[key] = look;
-  else delete next[key];
-  try {
-    window.localStorage.setItem(LOOKS_KEY, JSON.stringify(next));
-  } catch {
-    /* storage unavailable */
-  }
-  window.dispatchEvent(new Event("hold-looks"));
-}
-type HoldTarget = { key: string; label: string; at: number; minutes: number; kept: boolean; crowded: boolean; meal: boolean };
-
-/**
- * The day's non-negotiables: meals and the like float inside their ranges around everything else, and a
- * timed habit (Gym 7–10) takes the first free stretch of its window. When there's no room left in the range,
- * it shows in a muted red (owner, Nov 4). Right-click or double-tap one for its menu: keep it where it is
- * (the red goes), move it or change its length, or leave it out today.
- */
-function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventure }: { day: Date; daily: DailyLayer; essentials: EssentialsLook; habitLook: HabitLook; busy: { start: number; end: number }[]; topOf: (d: Date) => number; isAdventure: boolean }) {
-  const router = useRouter();
-  const dayKey = localDayKey(day);
-  const looks = useSyncExternalStore(subscribeLooks, readLooks, () => noLooks);
-  // Changes made here show at once, before the page catches up.
-  const [mine, setMine] = useState<Record<string, DayHold | null>>({});
-  const [menu, setMenu] = useState<HoldTarget | null>(null);
-  const [edit, setEdit] = useState(false);
-  const [every, setEvery] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  // The every-day editor is tall: bring the whole menu into view when it opens.
-  useEffect(() => {
-    if (every) menuRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [every]);
-  const lastTap = useRef<{ key: string; at: number } | null>(null);
-  useEffect(() => {
-    if (!menu) return;
-    const away = (e: PointerEvent) => {
-      if (fromFeedback(e) || (menuRef.current && menuRef.current.contains(e.target as Node))) return;
-      setMenu(null);
-    };
-    const key = (e: KeyboardEvent) => e.key === "Escape" && setMenu(null);
-    document.addEventListener("pointerdown", away);
-    document.addEventListener("keydown", key);
-    return () => {
-      document.removeEventListener("pointerdown", away);
-      document.removeEventListener("keydown", key);
-    };
-  }, [menu]);
-  const current = useDailySettings(daily.settings);
-  const base = { ...SCHEDULER_DEFAULTS, ...(current ?? {}) } as SchedulerSettings;
-  const dayHolds: Record<string, DayHold> = { ...(base.essentialDays?.[dayKey] ?? {}) };
-  for (const [k, v] of Object.entries(mine)) {
-    if (v) dayHolds[k] = v;
-    else delete dayHolds[k];
-  }
-  const settings = { ...base, essentialDays: { ...(base.essentialDays ?? {}), [dayKey]: dayHolds } };
-  const placed = habitBlocksOn(daily.habits, day, busy, dayHolds);
-  const habits = habitLook === "hidden" ? [] : placed;
-  const taken = [...busy, ...placed];
-  const holds =
-    essentials === "hidden"
-      ? []
-      : mealsOn(day, settings).map((m) => {
-          const at = m.kept ? m.from : holdAt(m.from, m.to, m.minutes, taken, m.ideal);
-          // Crowded out: it shows where it would best go, in red, until it's kept, moved or left out.
-          const shown = at ?? m.ideal ?? m.from;
-          taken.push({ start: shown, end: shown + m.minutes * 60_000 });
-          return { ...m, at: shown, crowded: at === null };
-        });
-
-  const pick = (t: HoldTarget) => {
-    setEdit(false);
-    setEvery(false);
-    setMenu(t);
-  };
-  // The holds let clicks through (a quest can be dragged or added over them); the grid asks them instead.
-  const targets: Record<string, HoldTarget> = {};
-  const handlers = (t: HoldTarget) => {
-    targets[t.key] = t;
-    return { "data-hold-day": dayKey, "data-hold-key": t.key };
-  };
-  const onHoldMenu = useEffectEvent((e: Event) => {
-    const d = (e as CustomEvent<{ dayKey: string; x: number; y: number; kind: "tap" | "menu"; t: number }>).detail;
-    if (d.dayKey !== dayKey) return;
-    const el = [...document.querySelectorAll<HTMLElement>(`[data-hold-day="${dayKey}"]`)].find((n) => {
-      const r = n.getBoundingClientRect();
-      return d.x >= r.left && d.x <= r.right && d.y >= r.top && d.y <= r.bottom;
-    });
-    const t = el ? targets[el.dataset.holdKey ?? ""] : undefined;
-    if (!t) return;
-    // A crowded (muted red) one opens at a single tap or click (owner, Nov 4).
-    if (d.kind === "tap" && !t.crowded) {
-      const last = lastTap.current;
-      if (!(last && last.key === t.key && d.t - last.at < 360)) {
-        lastTap.current = { key: t.key, at: d.t };
-        return;
-      }
-      lastTap.current = null;
-    }
-    e.preventDefault();
-    pick(t);
-  });
-  useEffect(() => {
-    const on = (e: Event) => onHoldMenu(e);
-    window.addEventListener("hold-menu", on);
-    return () => window.removeEventListener("hold-menu", on);
-  }, []);
-  const save = (key: string, hold: DayHold | null) => {
-    setMine((m) => ({ ...m, [key]: hold }));
-    saveDayHold(daily.settings, dayKey, key, hold)
-      .then(() => router.refresh())
-      .catch(() => setMine((m) => {
-        const n = { ...m };
-        delete n[key];
-        return n;
-      }));
-  };
-  const minsOf = (ms: number) => {
-    const d = new Date(ms);
-    return d.getHours() * 60 + d.getMinutes();
-  };
-  const keepAt = (t: HoldTarget, at: number, minutes = t.minutes) => {
-    save(t.key, { at: minsOf(at), minutes });
-    setMenu({ ...t, at, minutes, kept: true, crowded: false });
-  };
-  const red: React.CSSProperties = { background: "rgba(178,84,66,.13)", border: "1.5px dashed rgba(160,70,52,.6)", borderRadius: 6, color: "#8a3f2c" };
-
-  // The grid is parchment in every theme: a soft brown ink reads on it.
-  const ink = isAdventure ? "#6b5631" : "var(--t-ink-soft)";
-  const clock = (ms: number) => new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  const chip = "h-8 rounded-full px-2.5 text-[12.5px] font-semibold";
-  return (
-    <>
-      {holds.map((h) => {
-        const top = topOf(new Date(h.at));
-        const height = Math.max(16, topOf(new Date(h.at + h.minutes * 60_000)) - top - 2);
-        const look: React.CSSProperties = h.crowded
-          ? red
-          : essentials === "soft"
-            ? { background: "rgba(168,138,63,.16)", borderRadius: 6 }
-            : essentials === "line"
-              ? { borderLeft: "3px solid rgba(139,112,64,.55)" }
-              : { border: `1.5px ${h.kept ? "solid" : "dashed"} rgba(139,112,64,.6)`, borderRadius: 6 };
-        const t: HoldTarget = { key: h.key, label: h.name, at: h.at, minutes: h.minutes, kept: !!h.kept, crowded: h.crowded, meal: true };
-        const asQuest = (looks[h.key] ?? (essentials === "quest" ? "quest" : "hold")) === "quest";
-        if (asQuest) {
-          // Like a quest: a storybook card with its emoji.
-          return (
-            <div
-              key={h.key}
-              {...handlers(t)}
-              title={`${h.name}${h.crowded ? ": no free time left for it here" : ""} · right-click or double-tap`}
-              className="quest-card absolute inset-x-0.5 flex items-center gap-1.5 overflow-hidden"
-              style={{ top: top + 1, height, zIndex: menu?.key === h.key ? 3 : 0, padding: height >= 26 ? "3px 6px 3px 4px" : "1px 6px", borderRadius: 14, ...(h.crowded ? { background: "linear-gradient(rgba(178,84,66,.2), rgba(178,84,66,.2)), linear-gradient(180deg,#f6e8c4,#e8d29c)", border: "1.5px dashed rgba(160,70,52,.7)" } : {}) }}
-            >
-              <span aria-hidden className="shrink-0" style={{ fontSize: Math.min(20, Math.max(12, height - 10)), lineHeight: 1 }}>
-                {h.icon}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="font-display block truncate" style={{ color: h.crowded ? "#8a3f2c" : "#3a2a14", fontSize: 12.5, lineHeight: 1.15 }}>
-                  {h.name}
-                </span>
-                {height >= 34 && (
-                  <span className="block truncate" style={{ color: h.crowded ? "#8a3f2c" : "var(--t-ink-soft)", fontSize: 10.5, lineHeight: 1.2 }}>
-                    {clock(h.at)}
-                  </span>
-                )}
-              </span>
-            </div>
-          );
-        }
-        return (
-          <div
-            key={h.key}
-            {...handlers(t)}
-            title={h.crowded ? `${h.name}: no free time left for it here (right-click or double-tap)` : `${h.name}: ${h.kept ? "kept here" : "kept free (floats as things are planned)"} · right-click or double-tap`}
-            className="absolute inset-x-0.5 overflow-hidden px-1.5 py-0.5 text-[11px] italic leading-tight"
-            style={{ top: top + 1, height, color: ink, opacity: 0.9, zIndex: menu?.key === h.key ? 3 : 0, ...look }}
-          >
-            {/* As many lines as the block holds, the last ending in "…", so no word is cut by its edge (owner, Nov 14). */}
-            <span className="block" style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: Math.max(1, Math.floor((height - 4) / 13.75)), overflow: "hidden", overflowWrap: "anywhere" }}>
-              <span aria-hidden>{h.icon}</span> {h.name}
-            </span>
-          </div>
-        );
-      })}
-      {habits.map((b) => {
-        const top = topOf(new Date(b.start));
-        const height = Math.max(18, topOf(new Date(b.end)) - top - 2);
-        const time = new Date(b.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-        const quest = (looks[`h:${b.habit.id}`] ?? (habitLook === "quest" ? "quest" : "hold")) === "quest";
-        const t: HoldTarget = { key: `h:${b.habit.id}`, label: b.habit.title, at: b.start, minutes: Math.round((b.end - b.start) / 60_000), kept: !!b.kept, crowded: !!b.crowded, meal: false };
-        const crowdedLook: React.CSSProperties = b.crowded ? { background: "linear-gradient(rgba(178,84,66,.2), rgba(178,84,66,.2)), linear-gradient(180deg,#f6e8c4,#e8d29c)", border: "1.5px dashed rgba(160,70,52,.7)" } : {};
-        if (quest && isAdventure) {
-          // Like a quest: a storybook card with the habit's portrait beside its name (owner's mockup, Nov 3).
-          // Tall enough: the portrait stands above the name (so a narrow week column still shows both); else beside it.
-          const tall = height >= 50;
-          const art = tall ? Math.min(height - 24, 34) : height >= 26 ? Math.min(height - 8, 30) : 0;
-          return (
-            <div key={b.habit.id} {...handlers(t)} className={`quest-card absolute inset-x-0.5 flex overflow-hidden ${tall ? "flex-col items-center justify-center gap-0.5 text-center" : "items-center gap-1.5"}`} title={`${b.habit.title}: a daily habit, ${time}${b.crowded ? " (no free time left in its window)" : ""} · right-click or double-tap`} style={{ top: top + 1, height, zIndex: menu?.key === t.key ? 3 : 1, padding: tall ? "3px 3px" : height >= 26 ? "3px 6px 3px 4px" : "1px 6px", borderRadius: 14, ...crowdedLook }}>
-              {art >= 16 ? (
-                <span className="quest-art flex shrink-0 items-center justify-center overflow-hidden" style={{ width: art, height: art, borderRadius: art > 30 ? 8 : 5 }}>
-                  {b.habit.icon_key ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- habit portrait
-                    <img src={b.habit.icon_key} alt="" className="h-full w-full object-cover" draggable={false} />
-                  ) : (
-                    <span style={{ fontSize: art * 0.62, lineHeight: 1 }}>🌱</span>
-                  )}
-                </span>
-              ) : null}
-              <span className={tall ? "w-full min-w-0" : "min-w-0 flex-1"}>
-                <span className="font-display block truncate" style={{ color: b.crowded ? "#8a3f2c" : "#3a2a14", fontSize: 12.5, lineHeight: 1.15 }}>
-                  {b.habit.title}
-                </span>
-                {height >= (tall ? 76 : 34) && (
-                  <span className="block truncate" style={{ color: b.crowded ? "#8a3f2c" : "var(--t-ink-soft)", fontSize: 10.5, lineHeight: 1.2 }}>
-                    {time}
-                  </span>
-                )}
-              </span>
-            </div>
-          );
-        }
-        return (
-          <div
-            key={b.habit.id}
-            {...handlers(t)}
-            className="absolute inset-x-0.5 flex items-start gap-1 overflow-hidden px-1.5 py-0.5 text-[11.5px] leading-tight"
-            style={{
-              top: top + 1,
-              height,
-              zIndex: menu?.key === t.key ? 3 : 1,
-              borderRadius: 6,
-              color: quest ? "#2a1c10" : ink,
-              ...(quest
-                ? { background: "linear-gradient(180deg,#f6e8c4,#e8d29c)", border: "1px solid #a88a3f", boxShadow: "0 1px 3px rgba(0,0,0,.25)" }
-                : { border: `1.5px ${b.kept ? "solid" : "dashed"} rgba(139,112,64,.6)`, fontStyle: "italic" }),
-              ...(b.crowded ? red : {}),
-            }}
-          >
-            <span aria-hidden>🌱</span>
-            <span className="min-w-0">
-              <b className="block truncate">{b.habit.title}</b>
-              {height >= 30 && <span className="opacity-70">{time}</span>}
-            </span>
-          </div>
-        );
-      })}
-      {menu && (
-        <div
-          ref={menuRef}
-          role="menu"
-          aria-label={menu.label}
-          className="card-pop-in parchment pointer-events-auto absolute left-0.5 z-[30] flex w-[min(230px,calc(100vw-24px))] flex-col gap-1 p-2 text-[13px]"
-          style={{ top: topOf(new Date(menu.at + menu.minutes * 60_000)) + 2, borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 10px 24px rgba(0,0,0,.3)", color: "#2a1c10" }}
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <span className="relative z-[1] px-1 font-display text-[14.5px] leading-snug">
-            {menu.label}
-            <span className="block font-sans text-[12px] tabular-nums" style={{ color: menu.crowded ? "#8a3f2c" : "#6b5631" }}>
-              {clock(menu.at)} · {menu.minutes}m{menu.kept ? " · kept here" : ""}
-            </span>
-          </span>
-          {!every && (
-            <>
-          {!menu.kept && (
-            <button type="button" role="menuitem" onClick={() => (keepAt(menu, menu.at), setMenu(null))} className="relative z-[1] h-9 rounded-lg px-2 text-left font-semibold hover:bg-black/[.05]">
-              ✓ Keep it here
-            </button>
-          )}
-          <button type="button" role="menuitem" aria-expanded={edit} onClick={() => setEdit((v) => !v)} className="relative z-[1] h-9 rounded-lg px-2 text-left font-semibold hover:bg-black/[.05]" style={{ background: edit ? "rgba(217,180,95,.2)" : undefined }}>
-            ✎ Edit time and length
-          </button>
-          {edit && (
-            <div className="reveal relative z-[1] flex flex-col gap-1 rounded-lg px-1.5 py-1.5" style={{ background: "rgba(120,90,40,.08)" }}>
-              <span className="flex items-center gap-1">
-                <button type="button" onClick={() => keepAt(menu, menu.at - 15 * 60_000)} className={chip} style={{ border: "1px solid #b39a6a" }} aria-label="15 minutes earlier">
-                  −15
-                </button>
-                <span className="min-w-[64px] flex-1 text-center font-bold tabular-nums">{clock(menu.at)}</span>
-                <button type="button" onClick={() => keepAt(menu, menu.at + 15 * 60_000)} className={chip} style={{ border: "1px solid #b39a6a" }} aria-label="15 minutes later">
-                  +15
-                </button>
-              </span>
-              <span className="flex flex-wrap gap-1">
-                {[15, 30, 45, 60, 90].map((m) => (
-                  <button key={m} type="button" onClick={() => keepAt(menu, menu.at, m)} aria-pressed={m === menu.minutes} className={chip} style={m === menu.minutes ? { background: "var(--t-gold, #e2bb5c)", border: "1px solid #8a6116" } : { border: "1px solid #b39a6a" }}>
-                    {m < 60 ? `${m}m` : m === 90 ? "1½h" : "1h"}
-                  </button>
-                ))}
-              </span>
-            </div>
-          )}
-            </>
-          )}
-          {menu.meal && (() => {
-            const ev = dailyEvents(base).find((x) => x.key === menu.key);
-            if (!ev) return null;
-            return (
-              <>
-                <button type="button" role="menuitem" aria-expanded={every} onClick={() => setEvery((v) => !v)} className="relative z-[1] h-9 rounded-lg px-2 text-left font-semibold hover:bg-black/[.05]" style={{ background: every ? "rgba(217,180,95,.2)" : undefined }}>
-                  ✎ Rename or change every day
-                </button>
-                {every && <DailyEventEditor key={`${ev.key}:${ev.name}:${ev.icon}`} base={current} ev={ev} onDone={() => setMenu(null)} />}
-              </>
-            );
-          })()}
-          {!every && (
-            <>
-          {menu.kept && (
-            <button type="button" role="menuitem" onClick={() => (save(menu.key, null), setMenu(null))} className="relative z-[1] h-9 rounded-lg px-2 text-left hover:bg-black/[.05]">
-              ↺ Let it float again
-            </button>
-          )}
-          {(() => {
-            const isQuest = (looks[menu.key] ?? ((menu.meal ? essentials : habitLook) === "quest" ? "quest" : "hold")) === "quest";
-            return (
-              <>
-                <button type="button" role="menuitem" onClick={() => (setLook(menu.key, isQuest ? "hold" : "quest"), setMenu(null))} className="relative z-[1] h-9 rounded-lg px-2 text-left hover:bg-black/[.05]">
-                  {isQuest ? "◌ Show this one as a hold" : "▣ Show this one as a quest card"}
-                </button>
-              </>
-            );
-          })()}
-          <button type="button" role="menuitem" onClick={() => (save(menu.key, { off: true }), setMenu(null))} className="relative z-[1] h-9 rounded-lg px-2 text-left hover:bg-black/[.05]" style={{ color: "#8a3f2c" }}>
-            Skip for today
-          </button>
-            </>
-          )}
-        </div>
-      )}
-    </>
-  );
-}
-
-/** The hour's chance of rain written inside a blue-filled cloud. */
-function RainPct({ pct }: { pct: number }) {
-  return (
-    <svg width="32" height="17" viewBox="0 0 32 17" aria-label={`${pct}% chance of rain`} className="mt-px block">
-      <path d="M8 16a5 5 0 0 1-1-9.9A7 7 0 0 1 20.2 4.4 5.6 5.6 0 0 1 25 16z" fill="#5b8fd6" stroke="#2f5f99" strokeWidth="1" strokeLinejoin="round" />
-      <text x="16.2" y="12.6" textAnchor="middle" fontSize="7.6" fontWeight="700" fill="#fff" style={{ fontVariantNumeric: "tabular-nums" }}>
-        {pct}%
-      </text>
-    </svg>
-  );
-}
-
-/** A small rain cloud, filled blue (the day's chance of rain sits beside it). */
-function RainCloud() {
-  return (
-    <svg width="13" height="12" viewBox="0 0 24 22" aria-hidden>
-      <path d="M7 14.5a4.5 4.5 0 0 1-.6-9 6 6 0 0 1 11.3 1.6A3.8 3.8 0 0 1 17.5 14.5z" fill="#5b8fd6" stroke="#2f5f99" strokeWidth="1.3" strokeLinejoin="round" />
-      <path d="M8.5 17.5l-1 2.5M12.5 17.5l-1 2.5M16.5 17.5l-1 2.5" stroke="#2f5f99" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  );
-}

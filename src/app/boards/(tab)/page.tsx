@@ -1,5 +1,5 @@
 import { requireSession } from "@/lib/session";
-import { AppShell } from "@/components/layout/AppShell";
+import { AppShell, preloadShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { QuestsTabs } from "@/components/layout/QuestsTabs";
 import { CreateBoardForm } from "@/components/boards/CreateBoardForm";
@@ -14,6 +14,7 @@ import { levelCap } from "@/lib/data/bosses";
 
 export default async function BoardsPage() {
   const session = await requireSession();
+  preloadShell(session.user.id);
   const [boards, profile] = await Promise.all([
     listBoardsWithStatsForOwner(session.user.id),
     getProfileById(session.user.id),

@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react"
 import { useRouter } from "next/navigation";
 import { dailyCheckInAction, welcomeContextAction } from "@/app/actions";
 import { eveningDayKey, isEveningCheckInTime, setEveningMode } from "@/components/evening/evening-clock";
-import type { WelcomeAward } from "./WelcomeCard";
+import type { WelcomeAward } from "./welcome/types";
 import dynamic from "next/dynamic";
 
 // The welcome screen is a big piece of code needed once a day: it loads on its own (started as soon as

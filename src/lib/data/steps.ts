@@ -64,15 +64,15 @@ export async function listStepsForTask(taskId: string, ownerId: string): Promise
   return (data ?? []) as QuestStep[];
 }
 
-/** Adds steps_total / steps_done to each quest (left unset when steps aren't available). */
-export async function attachStepCounts<T extends Task>(tasks: T[], ownerId: string): Promise<T[]> {
-  if (tasks.length === 0) return tasks;
+/** Each quest's sub-quest counts, by quest id (null when steps aren't available). Needs only the ids, so it can load beside other loaders. */
+export async function stepCountsFor(ownerId: string, taskIds: string[]): Promise<Map<string, { total: number; done: number }> | null> {
+  if (taskIds.length === 0) return new Map();
   const { data, error } = await supabaseAdmin()
     .from("quest_steps")
     .select("id, task_id, done, state, parent_id")
     .eq("owner_id", ownerId)
-    .in("task_id", tasks.map((t) => t.id));
-  if (error) return tasks;
+    .in("task_id", taskIds);
+  if (error) return null;
   const counts = new Map<string, { total: number; done: number }>();
   // A step with sub-tasks is counted through them.
   const parents = new Set((data ?? []).map((s) => s.parent_id as string | null).filter(Boolean));
@@ -83,10 +83,22 @@ export async function attachStepCounts<T extends Task>(tasks: T[], ownerId: stri
     if (s.done) c.done += 1;
     counts.set(s.task_id as string, c);
   }
+  return counts;
+}
+
+/** Puts counts from `stepCountsFor` on each quest (left unset when steps aren't available). */
+export function withStepCounts<T extends Task>(tasks: T[], counts: Map<string, { total: number; done: number }> | null): T[] {
+  if (!counts) return tasks;
   return tasks.map((t) => {
     const c = counts.get(t.id);
     return c ? { ...t, steps_total: c.total, steps_done: c.done } : t;
   });
+}
+
+/** Adds steps_total / steps_done to each quest (left unset when steps aren't available). */
+export async function attachStepCounts<T extends Task>(tasks: T[], ownerId: string): Promise<T[]> {
+  if (tasks.length === 0) return tasks;
+  return withStepCounts(tasks, await stepCountsFor(ownerId, tasks.map((t) => t.id)));
 }
 
 /**

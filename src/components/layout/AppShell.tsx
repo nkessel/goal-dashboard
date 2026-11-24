@@ -146,6 +146,16 @@ export async function AppShell({
   );
 }
 
+/**
+ * Starts the shell's own reads (the profile and the level cap) at the top of a page, so they run beside the
+ * page's loaders instead of after them: the page draws its data first and the shell only then. The same
+ * requests within one render are shared, so the shell's later calls get these (tabs faster loads, Nov 23).
+ */
+export function preloadShell(profileId: string) {
+  void getProfileById(profileId).catch(() => null);
+  void levelCap(profileId).catch(() => 10);
+}
+
 async function MissingPortraits({ profileId }: { profileId: string }) {
   const missing = await countMissingPortraits(profileId).catch(() => 0);
   return missing > 0 ? <PortraitPainter missing={missing} /> : null;

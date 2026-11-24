@@ -764,6 +764,28 @@ export const FLOWS = [
             await h.settle(900);
             await h.check("celebration: back after the editor");
           }
+          // The chest that can't be read says so with Try again, never "0 in your purse" (b285e3e2).
+          let failOnce = true;
+          const failChest = (route) => {
+            if (failOnce && route.request().method() === "POST" && route.request().headers()["next-action"]) {
+              failOnce = false;
+              return route.abort();
+            }
+            return route.continue();
+          };
+          await h.page.route("**/*", failChest);
+          if (await h.tap(/^claim your reward$/i, "celebration: claim your reward", { optional: true, expectMove: true })) {
+            await h.settle(1200);
+            await h.check("celebration: chest wouldn't open");
+            await h.page.unroute("**/*", failChest);
+            if (await h.tap((p) => p.getByRole("button", { name: /^try again$/i }).first(), "chest: try again", { optional: true, expectMove: true })) {
+              await h.settle(1500);
+              await h.check("celebration: reward chest");
+            }
+            await h.tap((p) => p.getByRole("button", { name: /^back to quest complete$/i }).first(), "chest: back", { optional: true, expectMove: true });
+            await h.settle(600);
+          }
+          await h.page.unroute("**/*", failChest).catch(() => {});
           await h.tap(/continue your journey/i, "continue your journey", { optional: true, expectMove: true });
           await h.settle(800);
         }

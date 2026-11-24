@@ -98,7 +98,7 @@ then Undo). Touches `settleCompletion` in `lib/offline.ts`, `reopenTaskAction`, 
 ### 12. Insights batch — O
 [388c0f4e] a log of today's check-ins with a range drop-down; the check-in section's gear and the page's gear
 in the right shape and place; [10a509a0, f3cca214] sleep/wake times and notes on the chart; [a4df137c] thumbs-up a
-check-in; [bb5ca474] Wheel of Time spun by dragging, no turn count; [565812ea, 61806de0] read first.
+check-in; [bb5ca474] Wheel of Time spun by dragging, no turn count; [565812ea] read first; [61806de0] See all link on `review/journal-see-all`, waiting on review (Nov 23).
 ui-check: insights (phone and tablet).
 
 ### 13. Boards batch — O

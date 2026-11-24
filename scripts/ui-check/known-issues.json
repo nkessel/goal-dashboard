@@ -110,5 +110,9 @@
   {
     "match": "^today\\|popup-behind\\|.*When did you finish it\\?.*editor: earlier, the calendar",
     "reason": "Nov 21: More… opens the app's month calendar (DateField) over the 'When did you finish it?' card on purpose; the card is under the calendar while it's open."
+  },
+  {
+    "match": "^faces\\|console-error\\|.*net::ERR_FAILED",
+    "reason": "The faces flow aborts one server action on purpose to check that a chest that can't be read says so with Try again (b285e3e2); the browser logs that aborted request."
   }
 ]

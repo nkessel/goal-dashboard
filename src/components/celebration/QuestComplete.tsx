@@ -5,10 +5,10 @@ import { FeltAsk } from "@/components/ui/FeltAsk";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { settleCompletion } from "@/lib/offline";
+import { saveOrQueue, settleCompletion } from "@/lib/offline";
 import { createPortal } from "react-dom";
 import type { Reward } from "@/lib/data/types";
-import { claimRewardAction, getQuestForEditAction, listAvailableRewardsAction, reopenTaskAction } from "@/app/actions";
+import { claimRewardAction, getQuestForEditAction, listAvailableRewardsAction } from "@/app/actions";
 import { celebrateReward } from "./RewardCelebration";
 import type { Task } from "@/lib/data/types";
 import { QuestEditorDialog } from "@/components/tasks/LazyQuestEditorDialog";
@@ -98,14 +98,20 @@ export function QuestComplete(props: QuestCompleteProps) {
   const [received, setReceived] = useState<{ bonusXp: number; bonusCoins: number } | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [claiming, startClaim] = useTransition();
+  // The chest couldn't be read (offline, or a deploy mid-way): say so and offer a retry, never an
+  // empty chest with "0 in your purse" (feedback b285e3e2: "it said I had 0 coins").
+  const [chestFailed, setChestFailed] = useState(false);
+
+  function loadChest() {
+    setChestFailed(false);
+    listAvailableRewardsAction()
+      .then(setChest)
+      .catch(() => setChestFailed(true));
+  }
 
   function openChest() {
     setPhase("rewards");
-    if (chest === null) {
-      listAvailableRewardsAction()
-        .then(setChest)
-        .catch(() => setChest({ rewards: [], coins: 0 }));
-    }
+    if (chest === null) loadChest();
   }
 
   function claim(r: Reward, now: boolean) {
@@ -127,6 +133,8 @@ export function QuestComplete(props: QuestCompleteProps) {
         setClaimed(r);
       } catch (e) {
         setClaimError(e instanceof Error ? e.message : "Couldn't claim that one.");
+        // The purse may have changed since the chest opened: show what's there now.
+        if (!preview) listAvailableRewardsAction().then(setChest).catch(() => {});
       }
     });
   }
@@ -293,7 +301,9 @@ export function QuestComplete(props: QuestCompleteProps) {
             <RewardChest
               questTitle={title}
               rewards={chest?.rewards ?? null}
-              coins={chest?.coins ?? 0}
+              coins={chest?.coins ?? null}
+              failed={chestFailed && chest === null}
+              onRetry={loadChest}
               error={claimError}
               claimed={claimed}
               received={received}
@@ -308,9 +318,7 @@ export function QuestComplete(props: QuestCompleteProps) {
                 setReceived(null);
                 setChoosing(null);
                 // Fresh from the chest: what's left and the purse after that one.
-                listAvailableRewardsAction()
-                  .then(setChest)
-                  .catch(() => {});
+                loadChest();
               }}
             />
           ) : (
@@ -504,8 +512,9 @@ export function QuestComplete(props: QuestCompleteProps) {
                   onClose();
                   try {
                     // Wait for the completion to land first (or cancel it if it was still waiting offline).
+                    // Offline, the undo waits in the queue and goes once back online (the card stays open meanwhile).
                     const onlyHere = await settleCompletion(taskId);
-                    if (!onlyHere) await reopenTaskAction(taskId);
+                    if (!onlyHere) await saveOrQueue("reopenQuest", { id: taskId });
                   } catch {
                     // The server said no (or we're offline): the card shows it done again.
                     clearQuestNow(taskId);
@@ -532,6 +541,8 @@ function RewardChest({
   questTitle,
   rewards,
   coins,
+  failed,
+  onRetry,
   error,
   claimed,
   received,
@@ -547,7 +558,11 @@ function RewardChest({
   onBack: () => void;
   questTitle: string;
   rewards: Reward[] | null;
-  coins: number;
+  /** The purse; null until the chest has been read. */
+  coins: number | null;
+  /** Reading the chest failed: offer a retry instead of an empty chest. */
+  failed: boolean;
+  onRetry: () => void;
   error: string | null;
   claimed: Reward | null;
   received: { bonusXp: number; bonusCoins: number } | null;
@@ -688,12 +703,14 @@ function RewardChest({
         <p className="m-0 text-[14.5px]" style={{ color: "#6b6252" }}>
           Accept one treasure with your coins, or save them and keep going.
         </p>
-        <span
-          className="mt-1.5 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[15px] font-semibold tabular-nums"
-          style={{ background: "rgba(42,28,16,.82)", color: "#f2d27e", border: "1.5px solid #a88a3f" }}
-        >
-          <CoinIcon size={17} /> {coins} in your purse
-        </span>
+        {coins !== null && (
+          <span
+            className="mt-1.5 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[15px] font-semibold tabular-nums"
+            style={{ background: "rgba(42,28,16,.82)", color: "#f2d27e", border: "1.5px solid #a88a3f" }}
+          >
+            <CoinIcon size={17} /> {coins} in your purse
+          </span>
+        )}
       </div>
       {error && (
         <p className="m-0 text-center text-[14.5px] font-semibold" style={{ color: "#8c3b2a" }}>
@@ -701,7 +718,17 @@ function RewardChest({
         </p>
       )}
 
-      {rewards === null && (
+      {rewards === null && failed && (
+        <div className="flex flex-col items-center gap-2 py-4 text-center">
+          <p className="m-0 text-[15px]" style={{ color: "#6b6252" }}>
+            The chest wouldn&apos;t open just now.
+          </p>
+          <button type="button" onClick={onRetry} className="text-[15px] font-semibold underline" style={{ color: "#4f6d3c" }}>
+            Try again
+          </button>
+        </div>
+      )}
+      {rewards === null && !failed && (
         <p className="m-0 py-6 text-center text-[15px]" style={{ color: "#6b6252" }}>
           Opening the chest…
         </p>
@@ -720,7 +747,7 @@ function RewardChest({
         <div className="grid max-h-[46vh] grid-cols-2 gap-2.5 overflow-y-auto p-0.5 sm:grid-cols-3">
           {rewards.map((r) => {
             const cost = r.cost_coins ?? 0;
-            const short = Math.max(0, cost - coins);
+            const short = Math.max(0, cost - (coins ?? 0));
             return (
             <button
               key={r.id}

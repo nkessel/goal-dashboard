@@ -69,6 +69,8 @@ Say OK, give notes, or drop each of these, so the splits don't have to work arou
 
 ## Run D · Sonnet 5.5 · the big filing jobs
 
+**Status Nov 22 (first Run D session):** done: actions.ts split, T1, T5, W2, C1, E1, E2 (tags only), D2, D3. Not done (ran long): E2 Stats/Template/BoardTray, E3, E5, E8, I1-I6, Light 5 and 7 (the two Light items need `npm run perf` to measure and to prove nothing changes on screen).
+
 1. **The `actions.ts` split**, done the way Run A planned it, one area per commit. This goes first because every later session reads that file.
 2. **T1, T5:** the toucan's stores and chat sheet (T1 holds module state: one copy only).
 3. **W2:** the welcome toucan.
@@ -112,7 +114,7 @@ Say OK, give notes, or drop each of these, so the splits don't have to work arou
 4. **D5:** quest cards read their place and colour on first paint. Review page.
 5. **Cal 10a, 10c:** repeating events and quests. The Google side needs your real calendar.
 6. From the by-model list:
-   - undo-completion bugs
+   - ~~undo-completion bugs~~ (done Nov 23)
    - the sequence and sub-quest merge [dafe3364]
    - the screenshot tool
    - right-click menus as popups app-wide
@@ -122,7 +124,7 @@ Say OK, give notes, or drop each of these, so the splits don't have to work arou
    - **the FAB's check-in** [5156ffbe] (owner, Nov 16: "should be more developed… doesn't even have an option to add your own metrics"): the same check-in as on Insights (your own metrics, + metric, journal, faces), with the Insights check-in notes [a6fdd579, bd692d57, 78004f71] since they share the code. Asked about again Nov 19.
    - **the toucan's question can carry parts of the full welcome screen** (owner, Nov 20): its gear (settings in context) offers the big welcome screen's sections (sleep check-in, mood check-in, and the rest), each added as a button on the toucan's screen in the order chosen there (drag to order, eye to hide, as in `WelcomeArrange`). Builds on `review/faces-feel`'s `ToucanQuestion`.
    - habits in the day's plan, part 2
-   - tests for the XP and coin math
+   - ~~tests for the XP and coin math~~ (done Nov 23, `scripts/test-xp-math.mjs`)
 
 **Then switch to Sonnet 5.5 (Run H).**
 

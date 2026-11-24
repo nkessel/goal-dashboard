@@ -501,7 +501,11 @@ export function TodayTaskBoard({
 
   // The pointer over a section header (e.g. the closed Additional Quests bar)
   // wins outright, so a card can be dropped straight onto it.
+  // Over Today's calendar the card is over neither list: no list collisions, so the
+  // live move between the lists can't flip back and forth as the cards shift under
+  // the pointer (React #185 in the tablet UI check, Nov 22 and 23).
   const collision: CollisionDetection = (args) => {
+    if (overCal) return [];
     const zones = pointerWithin({ ...args, droppableContainers: args.droppableContainers.filter((c) => c.id === OTHER_ZONE || c.id === PRIORITY_ZONE) });
     const header = zones.find((z) => z.id === OTHER_ZONE);
     if (header) return [header];

@@ -1,4 +1,5 @@
 import "server-only";
+import { setQuestCardLook } from "./tasks";
 import { writeExtra } from "@/lib/data/extras";
 import { eventQuestXp } from "@/lib/event-quest-xp";
 import { supabaseAdmin } from "@/lib/supabase/server";
@@ -114,7 +115,10 @@ export async function makeEventQuests(
       const key = `g:${e.recurringEventId}`;
       series[t.id] = key;
       const card = lookFor(looks[key], dayOf(e.start))?.card;
-      if (card) cardLooks[t.id] = card;
+      if (card) {
+        cardLooks[t.id] = card;
+        await setQuestCardLook(ownerId, t.id, card).catch(() => {}); // the column is read; the old key stays current (D3)
+      }
     }
   }
   // Merge into the latest copy (another load may have written meanwhile).

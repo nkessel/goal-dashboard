@@ -8,6 +8,7 @@ import {
   createQuestAction,
   logEventAction,
   makeRefillQuestAction,
+  reopenTaskAction,
   saveCheckInAction,
   saveInventoryAction,
   saveNightAction,
@@ -50,6 +51,8 @@ const RUNNERS = {
   updateQuest: (a: { id: string; input: UpdateQuestInput }) => updateTaskAction(a.id, a.input),
   placeQuest: (a: { id: string; placement: "today" | "additional" | "none" }) => setTaskPlacementAction(a.id, a.placement),
   questSteps: (a: { id: string; steps: StepInput }) => saveQuestStepsAction(a.id, a.steps),
+  // "Undo quest completion" while offline, for a completion the server already has.
+  reopenQuest: (a: { id: string }) => reopenTaskAction(a.id),
   completeQuest: (a: { id: string; at: string }) => {
     const fd = new FormData();
     fd.set("taskId", a.id);
@@ -158,18 +161,29 @@ export async function saveOrQueue<K extends OfflineKind>(kind: K, args: ArgsOf<K
     queueOffline(kind, args, key);
     return { queued: true };
   }
-  try {
-    const run = (RUNNERS[kind] as (a: ArgsOf<K>) => Promise<ResultOf<K>>)(args);
-    // A quest's completion still being sent: "Undo quest completion" waits for it (see settleCompletion).
-    const id = kind === "completeQuest" ? (args as { id: string }).id : null;
-    if (id) completing.set(id, run.catch(() => undefined));
-    const result = (await run.finally(() => id && completing.delete(id))) as ResultOf<K>;
-    return { queued: false, result };
-  } catch (e) {
-    if (!isNetworkError(e)) throw e;
-    queueOffline(kind, args, key);
-    return { queued: true };
+  const send = async (): Promise<{ queued: true } | { queued: false; result: ResultOf<K> }> => {
+    try {
+      const result = await (RUNNERS[kind] as (a: ArgsOf<K>) => Promise<ResultOf<K>>)(args);
+      return { queued: false, result };
+    } catch (e) {
+      if (!isNetworkError(e)) throw e;
+      queueOffline(kind, args, key);
+      return { queued: true };
+    }
+  };
+  // A quest's completion still being sent: "Undo quest completion" waits for it (see settleCompletion), until it
+  // has either reached the server or been put in the queue (a dropped connection), so Undo finds it either way.
+  const id = kind === "completeQuest" ? (args as { id: string }).id : null;
+  const p = send();
+  if (id) {
+    const done = p.then(
+      () => undefined,
+      () => undefined
+    );
+    completing.set(id, done);
+    void done.then(() => completing.get(id) === done && completing.delete(id));
   }
+  return p;
 }
 
 const completing = new Map<string, Promise<unknown>>();
@@ -204,6 +218,7 @@ const WHAT: Record<OfflineKind, string> = {
   placeQuest: "Quest's place",
   questSteps: "Sub-quests",
   completeQuest: "Completed quest",
+  reopenQuest: "Quest undone",
   completeRite: "Habit done",
   uncompleteRite: "Habit undone",
   tickStep: "Sub-habit",
@@ -232,11 +247,22 @@ export async function flushOffline(): Promise<number> {
     for (;;) {
       const op = mine()[0];
       if (!op) break;
+      // A queued completion on its way: "Undo quest completion" waits until it has landed (then reopens it on the
+      // server) or stayed in the queue (then drops it), instead of dropping it mid-send and leaving it done.
+      const cid = op.kind === "completeQuest" ? (op.args as { id: string }).id : null;
+      let release: () => void = () => {};
+      if (cid) {
+        const held = new Promise<void>((r) => (release = r));
+        completing.set(cid, held);
+        void held.then(() => completing.get(cid) === held && completing.delete(cid));
+      }
       try {
         await (RUNNERS[op.kind] as (a: unknown) => Promise<unknown>)(op.args);
         sent++;
         set({ ops: state.ops.filter((o) => o.id !== op.id) });
+        release();
       } catch (e) {
+        release();
         if (isNetworkError(e)) {
           scheduleRetry();
           break;

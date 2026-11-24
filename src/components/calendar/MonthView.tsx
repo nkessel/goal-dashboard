@@ -6,7 +6,7 @@ import Link from "next/link";
 import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 import { WEEKDAY_LABELS, formatDateParam, getMonthGridWeeks, isSameDay, parseDateParam } from "@/lib/calendar-dates";
-import { getTaskDisplayWindow, showsOnCalendar } from "@/lib/calendar-task-window";
+import { calendarItems } from "@/lib/calendar-items";
 import { creatureFor, questArt } from "./CalendarTaskChip";
 
 export function MonthView({
@@ -29,6 +29,7 @@ export function MonthView({
   const weeks = getMonthGridWeeks(month);
   // Items are placed by the viewer's own local day, so only after mounting.
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
+  const items = mounted ? calendarItems(tasks, events) : [];
 
   return (
     <div
@@ -60,8 +61,10 @@ export function MonthView({
           week.map((day) => {
             const inMonth = day.getMonth() === month.getMonth();
             const isToday = isSameDay(day, today);
-            const dayTasks = mounted ? tasks.filter((t) => showsOnCalendar(t) && isSameDay(getTaskDisplayWindow(t).start, day)) : [];
-            const dayEvents = mounted ? events.filter((e) => isSameDay(new Date(e.start), day)) : [];
+            // The one item list (planner step 4): quests that show on the calendar, then events, by the day they start.
+            const onDay = mounted ? items.filter((it) => isSameDay(new Date(it.start), day)) : [];
+            const dayTasks = onDay.flatMap((it) => (it.task ? [it.task] : []));
+            const dayEvents = onDay.flatMap((it) => (it.event ? [it.event] : []));
             const dots = dayTasks.slice(0, isAdventure ? 2 : 3);
             const eventDots = dayEvents.slice(0, Math.max(0, 3 - dots.length));
             const overflow = dayTasks.length + dayEvents.length - dots.length - eventDots.length;

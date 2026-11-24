@@ -2,8 +2,6 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import * as tasksData from "@/lib/data/tasks";
 import * as ritesData from "@/lib/data/rites";
-import * as rewardsData from "@/lib/data/rewards";
-import * as xp from "@/lib/data/xp";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import {
   archiveTaskForOwner,
@@ -65,11 +63,8 @@ async function undoIt(ownerId: string, c: LoggedChange): Promise<{ summary: stri
     case "complete_quest": {
       const row = await questById(ownerId, need());
       if (!row || row.status !== "completed") return { summary: "That quest isn't completed any more, so there was nothing to undo.", notes };
+      // Reopening takes back everything the completion paid, its early-bird bonus included.
       await reopenTaskForOwner(ownerId, need());
-      // The app's own "undo quest completion" leaves an early-bird bonus paid; undoing a Duet completion takes it back too.
-      const after = (c.after ?? {}) as { early_xp?: number; early_coins?: number };
-      if ((after.early_xp ?? 0) > 0) await xp.awardXp(ownerId, -(after.early_xp ?? 0), "early_bird", need());
-      if ((after.early_coins ?? 0) > 0) await rewardsData.addCoins(ownerId, -(after.early_coins ?? 0));
       await setPlacementColumns(ownerId, need(), before as { is_manual_priority: boolean; in_additional: boolean; sort_order: number });
       notes.push("XP and coins (early-bird bonus included) were taken back. If it was part of a sequence, the next quest that stepped forward stays where it is.");
       return { summary: `Reopened "${row.title}" and put it back where it was on Today.`, notes };

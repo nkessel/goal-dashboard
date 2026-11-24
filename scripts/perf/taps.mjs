@@ -166,7 +166,7 @@ for (const sc of SCENARIOS) {
   await ctx.addCookies([{ name: "authjs.session-token", value: cookie, domain: "localhost", path: "/", httpOnly: true, sameSite: "Lax" }]);
   await ctx.addInitScript(recorder);
   const page = await ctx.newPage();
-  page.setDefaultTimeout(5000);
+  page.setDefaultTimeout(Number(opt("timeout", 5000)));
   // Background page fetches: a screen that keeps asking the server while idle (a prefetch loop) shows up here.
   let fetches = 0;
   page.on("request", (r) => {

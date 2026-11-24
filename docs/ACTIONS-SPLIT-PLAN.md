@@ -1,5 +1,7 @@
 # Plan: split `src/app/actions.ts` by area
 
+**DONE Nov 22 (Run D, Sonnet): 15 commits, `actions.ts` 5,357 lines to an 18-line barrel; 14 area files (the plan's 13 plus `habit-ticks.ts`, 338 actions: 19 added since the plan are listed in the area files) and `_shared.ts` (7 helpers).** Built by a script that moves each function with its leading comments and regenerates the imports; each commit passed tsc, eslint (only the old `eventId` prefer-const in `_shared.ts`) and `next build --webpack`.
+
 Planned Nov 18 (Run A of `planning/2026-11-18-chronological-dev-plan.md`, Opus). **Built in Run D (Sonnet), one area per commit.** Nothing visible changes; it ships straight to `main` once the checks below pass.
 
 ## Why

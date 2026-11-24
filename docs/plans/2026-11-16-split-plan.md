@@ -243,16 +243,39 @@ Baselines from S3 (Nov 22, `main` at the Cal 3 commit, clean `next build --webpa
 | `/notifications` | 310 kB | gzip kB | kB |
 | `/power-ups` | 333 kB | gzip kB | kB |
 
-**Tap-cost perf (`npm run perf`) for editor, toucan, calendar, welcome, today: not captured.** This cloud session has no Playwright browser installed (`/opt/pw-browsers` is missing) and browsers may not be installed from a shell, so neither `npm run perf` nor the UI check could run here. To fill in: `PERF_NAMES=1 npx next build --webpack` with the UI check's env, then `node scripts/perf/taps.mjs --only editor,toucan,calendar,welcome,today --throttle 4 --out ui-check-out/baseline/perf.json`, and paste the table here.
+**Tap-cost perf (`npm run perf`), captured Nov 23 (`main` at b39d5b4, `--throttle 4`, phone, fake database; raw numbers in `ui-check-out/baseline/perf.json`, git-ignored).** Build with `PERF_NAMES=1` and the UI check's env **including `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54329`** (a build against another port draws error pages and every tap reads 0). The run needs `--timeout 30000` (new option; the default 5 s is too short for a cold first load in a container). Renders = components React ran; ms = tap to next frame.
 
-- [x] S1 (Nov 18, `--snapshot` / `--compare`, see docs/ui-check.md) · [x] S2 (Nov 21, flow `questextras`) · [~] S3 (Nov 22: `today` split into `today` + `today2`; size table done; perf numbers still to do, needs a session with a browser)
-- [x] L1 (Nov 21) · [x] L2 (Nov 22) · [ ] L3
-- [ ] T1 · [ ] T2 · [ ] T3 · [ ] T4 · [ ] T5 · [ ] T6 · [ ] T7
-- [ ] W1 · [ ] W2 · [ ] W3 · [ ] W4 · [ ] W5
-- [ ] I1 · [ ] I2 · [ ] I3 · [ ] I4 · [ ] I5 · [ ] I6
-- [ ] E1 · [ ] E2 · [ ] E3 · [ ] E4 · [ ] E5 · [ ] E6 · [ ] E7 · [ ] E8 · [ ] E9
-- [ ] C1 · [ ] C2 · [ ] C3 · [ ] C4
-- [x] D0 (Nov 21) · [x] D1 (Nov 21) · [ ] D2 · [ ] D3 · [ ] D4 · [ ] D5
+| Tap | renders | ms | processor busy (ms) |
+|---|---|---|---|
+| today: idle 2s | 22 (111 page redraws) | 16 | 717 |
+| today: open feedback | 3 | 192 | 504 |
+| today: quest ⋯ menu open | 19 | 144 | 382 |
+| today: Daily Habits open | 44 | 120 | 491 |
+| today: **tick a habit** | **529** | 288 | 890 |
+| today: + open | 7 | 56 | 314 |
+| today: toucan open | 16 | 72 | 483 |
+| toucan: idle 2s | 11 (23 page redraws) | 0 | 155 |
+| editor: open a quest | 89 | 104 | 584 |
+| editor: type in the title | 23 | 64 | 294 |
+| editor: XP pill open | 36 | 216 | 565 |
+| editor: Time pill open | 23 | 136 | 389 |
+| editor: Due pill open | 23 | 168 | 428 |
+| editor: close the editor | 41 | 88 | 484 |
+| calendar: idle 2s | 11 (7 page redraws) | 24 | 135 |
+| calendar: display settings open | 80 | 232 | 459 |
+| calendar: **open a quest card** | **402** | 208 | 1066 |
+| welcome: idle 2s | 0 (96 page redraws) | 24 | 488 |
+
+Findings: 30 taps, 1540 renders, median 88 ms. The two worst are ticking a habit on Today (529 renders: every quest row redraws) and opening a quest card on the calendar (402). Today's idle shows 111 page redraws in 2 s and the welcome idle 96: an always-running animation that is not on the graphics card (see HANDOFF "Light in use"); worth a look. **Perf scenario bugs still open:** editor "5 XP more" can't be tapped (E9 starts by fixing it), and the welcome scenario's Journal / Emotional check-in / Habits taps are not found.
+
+- [x] S1 (Nov 18, `--snapshot` / `--compare`, see docs/ui-check.md) · [x] S2 (Nov 21, flow `questextras`) · [x] S3 (Nov 22 `today` split + size table; Nov 23 perf numbers)
+- [x] L1 (Nov 21) · [x] L2 (Nov 22) · [x] L3 (Nov 22, Run C)
+- [x] T1 (Nov 22, Run D) · [x] T2 · [x] T3 · [x] T4 (Nov 22, Run C; `tomorrowMorning` moved into `NudgeNote.tsx` for now, T1 moves it to `snooze-store.ts`) · [x] T5 (Nov 22, Run D) · [ ] T6 · [x] T7 (Nov 23, Run E; `toucan/nudges.ts`)
+- [x] W1 (Nov 22, Run C; `CONFETTI_COLORS` moved with `PIECES`) · [x] W2 (Nov 22, Run D) · [x] W3 (Nov 22, Run C) · [x] W4 (Nov 23, Run E; `welcome/use-card.ts`, `welcome/use-held-screen.ts`) · [x] W5 (Nov 23, Run E; `useWiseLine` keeps the line's state in the card so it lasts while arranging)
+- [x] I1 · [x] I2 · [x] I3 · [x] I4 · [x] I5 · [x] I6 (Nov 23, Run D part 2; two extra files: `Ask.tsx` for `Question`, `Choices`, `Choice`, shared by the board step and the wizard, and `OFTEN`, `XP_MAX` live in `types.ts`; the When panel and its helpers sit in `AttrPills.tsx`)
+- [x] E1 (Nov 22, Run D) · [x] E2 (Nov 22-23, Run D: Tags, Template (`TemplateList`, `EditorSaveTemplate`), BoardTray (`EditorStandsFor`, `EditorAlsoOn`); Stats skipped: it has no part of its own, its pill, tray and line sit inside the XP row and `statSplit` is read by Save, so it moved with `EditorXp` as props) · [x] E3 (the place pill and panel only; card look and drive are not pills, drive sits in the place panel, the card look pickers sit in the colour and picture trays) · [x] E4 (Nov 23, Run E) · [x] E5 (Xp, Time, ShowsIn, Scales, Matrix, Sequence) · [x] E6 (Nov 23, Run E; two commits) · [x] E7 (Nov 23, Run E; `useQuestScheduling` + `EditorScheduling`, the due chip's words stay in the dialog) · [~] E8 (Header and Presets done; Portrait and Footer left) · [ ] E9 (not started: needs `npm run perf`, see WAITING)
+- [x] C1 (Nov 22, Run D) · [x] C2 (Nov 23, Run E part 2, with the calendar design's step 4 on `wip/calendar-items`; not on `main` until the snapshot compare in WAITING is clean) · [ ] C3 · [ ] C4
+- [x] D0 (Nov 21) · [x] D1 (Nov 21) · [x] D2 (Nov 22, Run D: migration 0099) · [x] D3 (Nov 22, Run D) · [ ] D4 · [ ] D5
 
 By model: Haiku 5.5 takes 8 steps, Sonnet 5.5 takes 24, Opus 5.5 takes 11. None needs Fable.
 

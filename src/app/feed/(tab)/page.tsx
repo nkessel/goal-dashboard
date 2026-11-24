@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/session";
-import { AppShell } from "@/components/layout/AppShell";
+import { AppShell, preloadShell } from "@/components/layout/AppShell";
 import { CreateFab } from "@/components/create/CreateFab";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { FriendDirectory } from "@/components/social/FriendDirectory";
@@ -34,6 +34,7 @@ import { Forums, type AuthorView } from "@/components/social/Forums";
 
 export default async function FeedPage() {
   const session = await requireSession();
+  preloadShell(session.user.id);
   const profileId = session.user.id;
 
   // One wave: each list starts as soon as what it needs has arrived (no queue of waits).
