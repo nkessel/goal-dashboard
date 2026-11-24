@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 100 note (Nov 24, ~19:00 UTC):** `main` unchanged since run 97; no new feedback notes after d8f914be (16:43 UTC). Nothing unclaimed that ships straight. Nothing built.
+
 - **Dev loop 2 runs 98–99 note (Nov 24, evening UTC, last 18:56):** `main` unchanged since run 97; no new feedback notes since d8f914be (16:43 UTC). Nothing unclaimed that ships straight. Nothing built.
 
 - **Dev loop 2 run 97 note (Nov 24, 17:58 to 18:40 UTC):** shipped the three Duet gaps from d8f914be (see SHIPPED). d8f914be left open: its wider ask (every app interaction through Duet) is a bigger, ongoing piece; what is still missing is listed in `docs/DUET.md` › Not done from here.
