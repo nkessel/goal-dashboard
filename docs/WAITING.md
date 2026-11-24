@@ -8,7 +8,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 - **For a session with a browser (Dev loop 2), unclaimed (Nov 24, 21:15 UTC):** `review/leaf-why` @ 3b54536 is built (tsc, build clean) but has had no UI check. Run `npm run ui-check -- --only leaflog,insights,today --devices phone,tablet` on it, fix errors on the branch, then publish a review page with screenshots of every changed state (the leaf panel, after Log it, the hold follow-up, the toucan ask on Today, the event log tag and opened row), each marked with its code (WI-1, WI-2, WI-3, WB-1, WB-2, WR-1, WR-3, WR-4, WR-5) as an anchor, and add its link to the branch's WAITING entry. Watch: the fixture leaf log makes the toucan ask on Today in other flows (overlap warnings). Insights notes need migration 0100 on the real DB, so apply 0100 at merge, before the deploy.
 
-- **Dev loop 2 runs 100–103 note (Nov 24, ~19:00 to 20:56 UTC):** `main` unchanged since run 97; no new feedback notes after d8f914be (16:43 UTC). Nothing unclaimed that ships straight. Nothing built.
+- **Dev loop 2 runs 100–105 note (Nov 24, ~19:00 to 21:56 UTC):** `main` unchanged since run 97; no new feedback notes after d8f914be (16:43 UTC). Run 105: run 104 holds the only open work (leaf-why UI check). Nothing unclaimed that ships straight. Nothing built.
 
 - **Dev loop 2 runs 98–99 note (Nov 24, evening UTC, last 18:56):** `main` unchanged since run 97; no new feedback notes since d8f914be (16:43 UTC). Nothing unclaimed that ships straight. Nothing built.
 
