@@ -1327,6 +1327,19 @@ export const FLOWS = [
               await h.settle(400);
               if (on) await h.check("chart: a month, XP as coins");
             }
+            // XP totals line: hidden by default, a checkbox in the gear shows it (owner, Nov 24, note a82f71a1).
+            for (const on of [true, false]) {
+              await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), `chart gear, XP totals ${on}`, { optional: true, expectMove: true });
+              if (on) {
+                await h.page.getByRole("dialog", { name: /chart view settings/i }).getByText(/xp totals and daily average/i).first().scrollIntoViewIfNeeded().catch(() => {});
+                await h.settle(300);
+                await h.check("chart: view settings, XP totals checkbox");
+              }
+              await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByText(/xp totals and daily average/i).first(), `XP totals ${on ? "on" : "off"}`, { optional: true });
+              await h.page.keyboard.press("Escape");
+              await h.settle(400);
+              if (on) await h.check("chart: a month, XP totals line on");
+            }
           }
           await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), "chart gear, week again", { optional: true, expectMove: true });
           await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: /^week$/i }).first(), "chart: week again", { optional: true });

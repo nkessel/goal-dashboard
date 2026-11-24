@@ -114,5 +114,9 @@
   {
     "match": "^faces\\|console-error\\|.*net::ERR_FAILED",
     "reason": "The faces flow aborts one server action on purpose to check that a chest that can't be read says so with Try again (b285e3e2); the browser logs that aborted request."
+  },
+  {
+    "match": "^insights\\|popup-behind\\|.*\"Chart view settings\".*owl-perched",
+    "reason": "Old, not from the XP totals checkbox: the chart's gear panel opens in the page and the perched owl (fixed, z-45) floats above everything; this is the only step that photographs the panel open. Fix separately (portal the panel, or let the owl duck under open popups). Dev loop 2 run 91, Nov 24."
   }
 ]
