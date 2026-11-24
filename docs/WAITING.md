@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 97 (Opus, Nov 24 17:58 UTC):** note d8f914be, the three Duet gaps it names (sub-habit ticks, check-in metrics and notes, removing a quick-log entry): new `public.duet` actions in `src/lib/duet/`, no screen change.
+
 - **Dev loop 2 run 96 note (Nov 24, 17:26 UTC):** `main` unchanged since run 95; no new feedback notes after d8f914be (16:43). Nothing unclaimed that ships straight. Nothing built.
 
 - **Dev loop 2 run 95 note (Nov 24, 17:00 to 17:25 UTC):** tablet UI check of `review/mini-calendar` @ 3adfffd (flows `today`, `create`, `calendar`, morning and evening): **0 errors**; the mini calendar steps (open, tap a spot, Auto-schedule, next day) all ran. One thing for the owner's look: a 20-minute quest placed in the small grid is a thin dashed sliver whose title can't be read at that zoom. New notes since run 94 (d49a6a72 Focus as a check-in metric, 93ee7129 Insights cleanup, d8f914be Duet covering every action) are features or design: not built.
