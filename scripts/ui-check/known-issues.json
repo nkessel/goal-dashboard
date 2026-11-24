@@ -114,5 +114,13 @@
   {
     "match": "^faces\\|console-error\\|.*net::ERR_FAILED",
     "reason": "The faces flow aborts one server action on purpose to check that a chest that can't be read says so with Try again (b285e3e2); the browser logs that aborted request."
+  },
+  {
+    "match": "^tabsinstant\\|console-error\\|.*Failed to load resource: net::ERR_FAILED",
+    "reason": "The tabsinstant flow's \"uncached\" pass refuses the app's tab preloads on purpose (so each tab's stand-in shows while it loads); the browser logs each refused preload."
+  },
+  {
+    "match": "^tabsinstant\\|layout-shift\\|.*(stand-in|loaded)",
+    "reason": "In the tabsinstant flow the real screen replaces the tab's stand-in in place, which the shift check counts as a jump with no tap. That swap is the feature; the screens' own shifts are checked by their own flows."
   }
 ]

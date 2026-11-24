@@ -334,6 +334,7 @@ export function startFakeDb({ port = 54329, fixtures = {}, quiet = true } = {}) 
     res.end(body === undefined ? "" : JSON.stringify(body));
   }
 
+  let delayMs = 0;
   const server = http.createServer(async (req, res) => {
     log.requests++;
     const url = new URL(req.url, "http://x");
@@ -345,9 +346,16 @@ export function startFakeDb({ port = 54329, fixtures = {}, quiet = true } = {}) 
     try {
       if (url.pathname === "/__reset") {
         resetIds();
+        delayMs = 0;
         seed(typeof fixtures === "function" ? fixtures() : fixtures);
         return respond(res, 200, { ok: true });
       }
+      // A flow can slow every answer down (the tabsinstant flow: so a tab's stand-in shows while its data loads).
+      if (url.pathname === "/__delay") {
+        delayMs = Number(url.searchParams.get("ms") || 0);
+        return respond(res, 200, { ok: true, delayMs });
+      }
+      if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
       if (url.pathname.startsWith("/storage/") || url.pathname.startsWith("/auth/")) return respond(res, 200, {});
       const m = url.pathname.match(/^\/rest\/v1\/(rpc\/)?(\w+)$/);
       if (!m) return respond(res, 404, { message: "not found" });

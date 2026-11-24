@@ -540,36 +540,61 @@ export const FLOWS = [
   {
     // Tabs that feel instant (owner, Nov 22): tapping a bottom-bar tab commits at once onto the tab's stand-in
     // (its loading.tsx) and the slide plays there; the real screen then replaces it in place. The screen's data
-    // is held back ~1.4s here so the stand-in moment can be seen and screenshot.
+    // is held back here (the fake database answers 1.4s late while a tab loads), so the stand-in moment can be
+    // seen and screenshot. A tab whose screen the app had already preloaded may open at once with no stand-in:
+    // that's fine (nothing to wait for), so it's noted, not an error.
     name: "tabsinstant",
     timeoutMs: 300_000,
     async run(h) {
-      await h.goto("/", { name: "tabsinstant" });
-      await h.settle(1200);
-      await h.page.route(/_rsc=/, async (route) => {
-        await new Promise((r) => setTimeout(r, 1400));
-        await route.continue().catch(() => {});
-      });
-      for (const [href, label] of [["/calendar", "Calendar"], ["/boards", "Quests"], ["/insights", "Insights"], ["/feed", "Friends"], ["/", "Today"]]) {
-        const tab = h.page.locator(`nav[data-app-nav] a[href="${href}"]`);
-        if (!(await tab.count())) { h.record({ kind: "tabsinstant", severity: "error", target: label, detail: `no ${href} tab` }); continue; }
-        await tab.click({ timeout: 3000 }).catch(() => {});
-        const shown = await h.page.waitForSelector("main[data-standin]", { timeout: 4000 }).then(() => true).catch(() => false);
-        if (!shown) {
-          h.record({ kind: "tabsinstant", severity: "error", target: label, detail: `${href}: no stand-in showed after the tap` });
-        } else {
-          await h.settle(150);
-          await h.check(`${label}: stand-in, mid-slide`);
-          await h.settle(500);
-          await h.check(`${label}: stand-in, at rest`);
+      const slowDb = (ms) => fetch(`http://127.0.0.1:54329/__delay?ms=${ms}`, { method: "POST" }).catch(() => {});
+      const TABS = [["/calendar", "Calendar"], ["/boards", "Quests"], ["/insights", "Insights"], ["/feed", "Friends"], ["/", "Today"]];
+      // Two passes. "cached": as the app runs, every tab but the Calendar is preloaded and opens at once (no
+      // stand-in needed). "uncached": every preload is refused (as when they've gone stale), so each tab is
+      // fetched on the tap and shows its stand-in while its data loads.
+      const refusePreloads = async (route) => {
+        const req = route.request();
+        if (req.headers()["next-router-prefetch"]) return route.abort().catch(() => {});
+        return route.continue().catch(() => {});
+      };
+      for (const pass of ["cached", "uncached"]) {
+        if (pass === "uncached") await h.page.route(/_rsc=/, refusePreloads);
+        await h.goto("/", { name: "tabsinstant" });
+        await h.settle(1200);
+        let shownAny = false;
+        for (const [href, label] of TABS) {
+          const tab = h.page.locator(`nav[data-app-nav] a[href="${href}"]`);
+          if (!(await tab.count())) { h.record({ kind: "tabsinstant", severity: "error", target: label, detail: `no ${href} tab` }); continue; }
+          // A finger resting on the tab starts its prefetch (the Calendar is prefetched only then); let that land first.
+          if (pass === "cached") {
+            await tab.dispatchEvent("pointerdown").catch(() => {});
+            await h.settle(1000);
+          }
+          // Long enough in the uncached pass for the check's own audit to finish while the stand-in still shows.
+          await slowDb(pass === "cached" ? 1400 : 3500);
+          await tab.click({ timeout: 3000 }).catch(() => {});
+          const shown = await h.page.waitForSelector("main[data-standin]", { timeout: 2500 }).then(() => true).catch(() => false);
+          const name = pass === "cached" ? label : `${label} (not preloaded)`;
+          if (!shown) {
+            const already = await h.page.evaluate((p) => location.pathname === p && !!document.querySelector("main:not([data-standin])"), href);
+            if (!already) h.record({ kind: "tabsinstant", severity: "error", target: label, detail: `${href} (${pass}): neither a stand-in nor the screen showed after the tap` });
+          } else {
+            shownAny = true;
+            await h.settle(150);
+            await h.check(`${name}: stand-in, mid-slide`);
+            await h.settle(500);
+            if (await h.page.locator("main[data-standin]").count()) await h.check(`${name}: stand-in, at rest`);
+          }
+          await h.page.waitForSelector("main[data-standin]", { state: "detached", timeout: 15000 }).catch(() => h.record({ kind: "tabsinstant", severity: "error", target: label, detail: `${href} (${pass}): the stand-in never gave way to the screen` }));
+          await slowDb(0);
+          await h.settle(700);
+          if (await h.page.evaluate(() => document.documentElement.hasAttribute("data-nav-pending"))) h.record({ kind: "tabsinstant", severity: "error", target: label, detail: `${href} (${pass}): the wait marker stayed on after the screen loaded` });
+          await h.check(`${name}: loaded`);
         }
-        await h.page.waitForSelector("main[data-standin]", { state: "detached", timeout: 8000 }).catch(() => h.record({ kind: "tabsinstant", severity: "error", target: label, detail: `${href}: the stand-in never gave way to the screen` }));
-        await h.settle(700);
-        if (await h.page.evaluate(() => document.documentElement.hasAttribute("data-nav-pending"))) h.record({ kind: "tabsinstant", severity: "error", target: label, detail: `${href}: the wait marker stayed on after the screen loaded` });
-        await h.check(`${label}: loaded`);
+        if (!shownAny) h.record({ kind: "tabsinstant", severity: "error", target: "tabs", detail: `${pass}: no tab showed its stand-in while its data loaded` });
       }
+      await h.page.unroute(/_rsc=/, refusePreloads);
       // A popup over a tab never shows a stand-in under it.
-      await h.page.unroute(/_rsc=/);
+      await slowDb(0);
       await h.goto("/settings", { name: "tabsinstant-settings" });
       if (await h.page.locator("main[data-standin]").count()) h.record({ kind: "tabsinstant", severity: "error", target: "settings", detail: "a stand-in showed under Settings" });
     },
