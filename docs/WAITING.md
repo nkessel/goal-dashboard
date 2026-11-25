@@ -119,6 +119,8 @@ Started in the owner's Claude project threads; written here so another account c
 
 ## Open for the next Dev loop 2 run (not claimed)
 
+- **UI check `import` (phone, tablet) after the import card's One day and Archive button (Nov 25, import swipe thread; no browser there):** the When panel's One day chip (wraps on a phone?), the foot's Archive ask row (Archive · Delete · Cancel) on the card and on a small list row. Fix layout errors straight on `main`.
+
 - **Undo quest completion (Run G picks, Opus, Nov 23, shipped to `main`, no browser here): UI check.** Server and offline-queue fixes, no new look (see SHIPPED Nov 23). A browser session: `npm run ui-check -- --only today,calcomplete,calfail,offline,questextras --devices phone,tablet`, then by hand on the fake database: complete a quest on Today, press "Undo quest completion" in the celebration (card open at once, XP and coins back); the same from Victories Today's Undo and the quest editor's Undo on a done quest; with the connection off, complete then undo (the card stays open, nothing is sent once back online), and undo a quest done before going offline (it is sent once back online).
 
 - **Auto-scheduler counts (Run H, Sonnet, Nov 23, shipped to `main`, no browser here): UI check.** Open the calendar's auto-scheduler (phone and tablet) with a habit already placed: the header number equals the sum of the section numbers; Habits shows only habits still waiting for a time and matches its ✨ All N; in Folders the first three numbered quests are the soonest-due.

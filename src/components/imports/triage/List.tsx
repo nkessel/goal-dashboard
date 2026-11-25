@@ -73,7 +73,7 @@ export function ListRow({ card, first, onEdit, onRetag, onRate, attrs, shownAttr
       <span className="text-[11.5px] leading-snug" style={{ color: "#6b5631" }}>
         <LandsLine card={card} attrs={attrs} />
       </span>
-      <ImportFoot card={card} small later={more} onLater={() => setMore((v) => !v)} onImport={onImport} onDone={onDone} onDelete={onDelete} />
+      <ImportFoot card={card} small later={more} onLater={() => setMore((v) => !v)} onImport={onImport} onDone={onDone} onArchive={onSkip} onDelete={onDelete} />
       <LaterRow open={more} small done={card.kind === "done"} onSnooze={onSnooze} onSkip={onSkip} onDelete={onDelete} onQuick={onQuick} />
     </li>
   );

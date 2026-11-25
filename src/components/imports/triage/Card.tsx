@@ -86,7 +86,7 @@ export function CardView({ card, frame, onEdit, onRetag, onRate, attrs, shownAtt
       <span className="text-[12.5px] leading-snug" style={{ color: "#6b5631" }}>
         <LandsLine card={card} attrs={attrs} />
       </span>
-      <ImportFoot card={card} later={later} onLater={() => setLater((v) => !v)} onImport={onImport} onDone={onDone} onDelete={onDelete} />
+      <ImportFoot card={card} later={later} onLater={() => setLater((v) => !v)} onImport={onImport} onDone={onDone} onArchive={onSkip} onDelete={onDelete} />
       <LaterRow open={later} done={card.kind === "done"} onSnooze={onSnooze} onSkip={onSkip} onDelete={onDelete} onQuick={onQuick} />
     </div>
   );
@@ -103,7 +103,7 @@ export function LandsLine({ card, attrs }: { card: ImportCard; attrs: Attrs }) {
     const boardId = attrs.board === undefined ? (findBoard(boards, card.board_hint)?.id ?? null) : attrs.board;
     const board = boards.find((b) => b.id === boardId);
     const due = attrs.due === undefined ? (card.due_on ?? null) : attrs.due;
-    words = landsWords(board?.title ?? null, attrs.slot ?? null, card.plan_within_days ?? null, due, firmOf(attrs, due));
+    words = landsWords(board?.title ?? null, attrs.slot ?? null, card.plan_within_days ?? null, due, firmOf(attrs, due), !!attrs.oneDay);
   }
   return <>{words}</>;
 }
@@ -113,13 +113,14 @@ export function LandsLine({ card, attrs }: { card: ImportCard; attrs: Attrs }) {
  * that the user knows what's happening to it when they accept the import"). Nothing goes on the calendar
  * without the user's own pick: a picked time puts it there; "Schedule within" puts it on the auto-scheduler's list.
  */
-export function landsWords(board: string | null, slot: { start: string; end: string } | null, withinDays: number | null, due: string | null, firm = true): string {
+export function landsWords(board: string | null, slot: { start: string; end: string } | null, withinDays: number | null, due: string | null, firm = true, oneDay = false): string {
   const where = board ? `Goes on the ${board} board and in Additional Quests` : "Goes in Additional Quests";
   const by = due ? (firm ? `, to be done by ${dueChipLabel(due)} (fixed)` : `, aiming for ${dueChipLabel(due)}`) : "";
   const later = " It won't be on your calendar until you Auto-schedule it.";
   if (slot) return `${where}, and on your calendar ${slotWords(slot)}${by}.`;
   if (due) return `${where}, and onto the auto-scheduler's list ${firm ? `to be placed before ${dueChipLabel(due)} (fixed)` : `to get a time around ${dueChipLabel(due)}`}.${later}`;
   if (withinDays != null) return `${where}, and onto the auto-scheduler's list to get a time ${withinWords(withinDays)}.${later}`;
+  if (oneDay) return `${where}, for one day. No timeframe, so the auto-scheduler leaves it alone.`;
   return `${where}. Not on your calendar.`;
 }
 
@@ -134,12 +135,32 @@ export function withinWords(days: number): string {
  * The card's foot (owner, Nov 12): a trash can at the lower left (deleted after a moment, with Undo),
  * "Already done ✓" beside Import as in the quest editor (logs it done: XP now, nothing left open), then Import.
  */
-export function ImportFoot({ card, small = false, later, onLater, onImport, onDone, onDelete }: { card: ImportCard; small?: boolean; later: boolean; onLater: () => void; onImport: () => void; onDone: () => void; onDelete: () => void }) {
+export function ImportFoot({ card, small = false, later, onLater, onImport, onDone, onArchive, onDelete }: { card: ImportCard; small?: boolean; later: boolean; onLater: () => void; onImport: () => void; onDone: () => void; onArchive: () => void; onDelete: () => void }) {
   const canDone = card.kind === "quest" || card.kind === "schedule" || card.kind === "shopping" || card.kind === "project";
+  // Archive (owner, Nov 25): asks Archive, Delete or Cancel, right here in the foot.
+  const [asking, setAsking] = useState(false);
+  const h = small ? "h-8 px-3 text-[13px]" : "h-9 px-3.5 text-[13.5px]";
+  if (asking)
+    return (
+      <div className="reveal flex flex-wrap items-center gap-1.5" data-import-foot data-archive-ask>
+        <span className="text-[13px]" style={{ color: "#6b5631" }}>
+          Put it away?
+        </span>
+        <button type="button" onClick={() => (setAsking(false), onArchive())} title="Into the Archived list at the bottom (bring it back any time)" className={`${h} rounded-full font-semibold`} style={chip(false)}>
+          Archive
+        </button>
+        <button type="button" onClick={() => (setAsking(false), onDelete())} title="Deleted for good (Undo for a few seconds)" className={`${h} rounded-full font-semibold`} style={{ color: "#fff", background: "#8b2c1a", border: "1px solid #6b1f12" }}>
+          Delete
+        </button>
+        <button type="button" onClick={() => setAsking(false)} className={`${h} rounded-full`} style={{ color: "#6b5631" }}>
+          Cancel
+        </button>
+      </div>
+    );
   return (
     <div className="flex items-center gap-1.5" data-import-foot>
-      <button type="button" onClick={onDelete} aria-label="Delete this item" title="Delete (Undo for a few seconds)" className={`${small ? "h-8 w-8" : "h-10 w-10"} flex shrink-0 items-center justify-center rounded-full hover:bg-black/[.06]`} style={{ color: "#8b2c1a" }}>
-        <TrashIcon size={small ? 15 : 17} />
+      <button type="button" onClick={() => setAsking(true)} aria-label="Archive or delete…" title="Archive or delete" className={`${small ? "h-8 w-8" : "h-10 w-10"} flex shrink-0 items-center justify-center rounded-full hover:bg-black/[.06]`} style={{ color: "#6b5631" }}>
+        <ArchiveIcon size={small ? 15 : 17} />
       </button>
       {/* Snooze (owner, Nov 12: between delete and Already done): opens Tomorrow / Next week / Next month / Other… / Archive in place. */}
       <button type="button" onClick={onLater} aria-label="Snooze…" aria-expanded={later} title="Snooze or archive" className={`${small ? "h-8 w-8" : "h-10 w-10"} flex shrink-0 items-center justify-center rounded-full`} style={{ color: "#6b5631", background: later ? "rgba(217,180,95,.28)" : "transparent" }}>
@@ -158,6 +179,14 @@ export function ImportFoot({ card, small = false, later, onLater, onImport, onDo
         {importLabel(card.kind)}
       </button>
     </div>
+  );
+}
+
+export function ArchiveIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M3.5 4.5h17v4h-17zM5 8.5V19.5h14V8.5M10 12.5h4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
