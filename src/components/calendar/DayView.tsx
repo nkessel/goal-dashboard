@@ -4,7 +4,7 @@ import type { CalUi } from "@/lib/cal-ui";
 import Link from "next/link";
 import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
-import { addDays, formatDateParam, isSameDay, parseDateParam, startOfWeek } from "@/lib/calendar-dates";
+import { addDays, formatDateParam, formatLocal, isSameDay, parseDateParam, startOfWeek } from "@/lib/calendar-dates";
 import { WeekView } from "./WeekView";
 import { useNowMinute } from "@/lib/use-now-minute";
 import type { CardShow } from "./CalendarLayers";
@@ -61,7 +61,7 @@ export function DayView({
                   opacity: isAdventure && !selected ? 0.7 : 1,
                 }}
               >
-                {day.toLocaleDateString(undefined, { weekday: "narrow" })}
+                {formatLocal(day, { weekday: "narrow" })}
               </span>
               <span
                 className="flex h-8 w-8 items-center justify-center rounded-full text-[14px] tabular-nums"

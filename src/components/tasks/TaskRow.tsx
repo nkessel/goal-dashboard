@@ -197,7 +197,6 @@ export function TaskRow({
   const [scheduling, setScheduling] = useState(false);
   const [doneEarlier, setDoneEarlier] = useState(false);
   // Completing from the card asks when first: Just now, or another day and time (owner, Nov 21).
-  const [askWhen, setAskWhen] = useState(false);
   const [sequencing, setSequencing] = useState(false);
   // A sequence fans out into all its quests on a tap, and stacks back on the next (owner, Nov 9–10).
   const [fanned, setFanned] = useState(false);
@@ -352,10 +351,9 @@ export function TaskRow({
     });
   }
 
-  function pick(action: QuestAction, fromMenu = true, sure = false) {
+  function pick(action: QuestAction, fromMenu = true) {
     setMenu(null);
     setError(null);
-    if (action === "complete" && !sure) return setAskWhen(true);
     if (action === "edit") return setEditing(true);
     if (action === "calendar") return setScheduling(true);
     if (action === "focus") return openFocusMode({ ...task, categoryLabel });
@@ -939,20 +937,6 @@ export function TaskRow({
         />
       )}
       {sequencing && <SequenceDialog taskId={task.id} title={task.title} isAdventure={isAdventure} onClose={() => setSequencing(false)} />}
-      {askWhen && (
-        <DoneEarlierDialog
-          title={task.title}
-          isAdventure={isAdventure}
-          askNow
-          onNow={() => (setAskWhen(false), pick("complete", true, true))}
-          onPick={(when) => (setAskWhen(false), completeEarlier(when))}
-          onEdit={() => {
-            setAskWhen(false);
-            setEditing(true);
-          }}
-          onClose={() => setAskWhen(false)}
-        />
-      )}
       {doneEarlier && (
         <DoneEarlierDialog
           title={task.title}

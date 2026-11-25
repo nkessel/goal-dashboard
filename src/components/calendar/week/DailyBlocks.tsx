@@ -7,6 +7,7 @@ import { DailyEventEditor, useDailySettings } from "../DailyEvents";
 import type { DailyLayer, EssentialsLook, HabitLook } from "../CalendarLayers";
 import { SCHEDULER_DEFAULTS, dailyEvents, holdAt, localDayKey, mealsOn, type DayHold, type SchedulerSettings } from "@/lib/auto-schedule";
 import { habitBlocksOn } from "@/lib/timed-habits";
+import { formatLocal } from "@/lib/calendar-dates";
 import { fromFeedback } from "@/lib/from-feedback";
 
 /**
@@ -177,7 +178,7 @@ export function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, is
 
   // The grid is parchment in every theme: a soft brown ink reads on it.
   const ink = isAdventure ? "#6b5631" : "var(--t-ink-soft)";
-  const clock = (ms: number) => new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const clock = (ms: number) => formatLocal(ms, { hour: "numeric", minute: "2-digit" });
   const chip = "h-8 rounded-full px-2.5 text-[12.5px] font-semibold";
   return (
     <>
@@ -237,7 +238,7 @@ export function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, is
       {habits.map((b) => {
         const top = topOf(new Date(b.start));
         const height = Math.max(18, topOf(new Date(b.end)) - top - 2);
-        const time = new Date(b.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+        const time = formatLocal(b.start, { hour: "numeric", minute: "2-digit" });
         const quest = (looks[`h:${b.habit.id}`] ?? (habitLook === "quest" ? "quest" : "hold")) === "quest";
         const t: HoldTarget = { key: `h:${b.habit.id}`, label: b.habit.title, at: b.start, minutes: Math.round((b.end - b.start) / 60_000), kept: !!b.kept, crowded: !!b.crowded, meal: false };
         const crowdedLook: React.CSSProperties = b.crowded ? { background: "linear-gradient(rgba(178,84,66,.2), rgba(178,84,66,.2)), linear-gradient(180deg,#f6e8c4,#e8d29c)", border: "1.5px dashed rgba(160,70,52,.7)" } : {};

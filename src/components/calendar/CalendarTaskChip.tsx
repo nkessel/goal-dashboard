@@ -17,7 +17,7 @@ import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
-import { formatTimeRange } from "@/lib/calendar-dates";
+import { formatLocal, formatTimeRange } from "@/lib/calendar-dates";
 import { coinsForXp } from "@/lib/coins";
 import { CoinIcon } from "@/components/ui/Icons";
 import type { CardShow } from "./CalendarLayers";
@@ -403,7 +403,7 @@ function QuestCard({
   return (
     <button
       type="button"
-      title={`Edit "${task.title}"${done && task.completed_at ? `\nCompleted ${new Date(task.completed_at).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}${agenda.length ? `\nAgenda: ${agenda.map((a) => a.title).join("; ")}` : ""}`}
+      title={`Edit "${task.title}"${done && task.completed_at ? `\nCompleted ${formatLocal(new Date(task.completed_at), { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}${agenda.length ? `\nAgenda: ${agenda.map((a) => a.title).join("; ")}` : ""}`}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => {
         e.stopPropagation();
@@ -492,7 +492,7 @@ function QuestCard({
         {doneNote && (
           <span className="block truncate" style={{ color: failed ? "#8a2a1c" : "#4e6a35", fontSize: smallPx, fontStyle: "italic", lineHeight: `${smallLine}px` }}>
             {/* When it was done (owner, Nov 5: "show when I completed quests in the past days"), or failed. */}
-            {task.completed_at ? `${failed ? "Failed" : "Done"} ${new Date(task.completed_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).replace(/\s?([AP])M/i, (_, m: string) => m.toLowerCase() + "m")}` : failed ? "Failed" : "Completed"}
+            {task.completed_at ? `${failed ? "Failed" : "Done"} ${formatLocal(new Date(task.completed_at), { hour: "numeric", minute: "2-digit" }).replace(/\s?([AP])M/i, (_, m: string) => m.toLowerCase() + "m")}` : failed ? "Failed" : "Completed"}
           </span>
         )}
         {placeLine && (

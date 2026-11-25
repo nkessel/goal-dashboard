@@ -19,6 +19,7 @@ import {
   HOUR_END,
   formatDateParam,
   formatHourLabel,
+  formatLocal,
   formatShortTimeRange,
   isSameDay,
   parseDateParam,
@@ -487,6 +488,19 @@ export function WeekView({
     }
     setSpan(s);
   }
+  /** The slider: at most one zoom a frame, however fast a finger sends its moves (iPhone: up to 120 a second). */
+  const slideTo = useRef<number | null>(null);
+  function slideDays(next: number) {
+    cancelAnimationFrame(zoomAnim.current);
+    const queued = slideTo.current != null;
+    slideTo.current = next;
+    if (queued) return;
+    requestAnimationFrame(() => {
+      const s = slideTo.current;
+      slideTo.current = null;
+      if (s != null) zoomDays(s);
+    });
+  }
   /** Glide to a number of days (the − and + beside the slider). */
   function zoomDaysTo(target: number) {
     cancelAnimationFrame(zoomAnim.current);
@@ -792,7 +806,7 @@ export function WeekView({
               color: isToday ? (isAdventure ? "var(--t-gold-deep)" : "var(--t-accent)") : isAdventure ? "#4a3a22" : "var(--t-ink-soft)",
             }}
           >
-            {day.toLocaleDateString(undefined, { weekday: vis >= 6 && colWidth > 0 && colWidth < 52 ? "narrow" : "short" })}
+            {formatLocal(day, { weekday: vis >= 6 && colWidth > 0 && colWidth < 52 ? "narrow" : "short" })}
           </span>
           <span
             className={`flex ${compact ? "h-5 min-w-5" : "h-6 min-w-6"} items-center justify-center rounded-full px-1 text-[13px] tabular-nums`}
@@ -1187,7 +1201,7 @@ export function WeekView({
           </>
         )}
         </span>
-        {seamless && <DaysZoom span={shown} isAdventure={isAdventure} onChange={(s) => (cancelAnimationFrame(zoomAnim.current), zoomDays(s))} onStep={zoomDaysTo} />}
+        {seamless && <DaysZoom span={shown} isAdventure={isAdventure} onChange={slideDays} onStep={zoomDaysTo} />}
       </div>
       {/* The day headings stay at the top once they reach it: the same bar, drawn the same way, so it never seems to
           change (owner's note 38bf14ef, Nov 16; it used to be a compressed copy that faded in). It hands back to the

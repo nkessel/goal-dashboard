@@ -599,8 +599,88 @@ export const FLOWS = [
       if (h.isPhone && (await h.tap((p) => p.locator("[data-today-cal-tab]").first(), "calendar tab", { expectMove: true }))) {
         await h.settle(600);
         await h.check("calendar slid out");
-        await h.tap((p) => p.getByRole("button", { name: /^close the calendar$/i }).first(), "calendar away", { optional: true, expectMove: true });
-        await h.settle(500);
+        // Open › to the full calendar, then drag the days slider and pinch-free zoom: the owner saw it not draw
+        // properly and the app crash here on his iPhone (Nov 25).
+        if (await h.tap((p) => p.getByRole("link", { name: /^open ›$/i }).first(), "open the full calendar", { optional: true, expectMove: true })) {
+          await h.settle(1500);
+          await h.check("full calendar from today's slide-out");
+          const zoom = h.page.locator("[data-days-zoom] input[type=range]").first();
+          const zb = (await zoom.count()) ? await zoom.boundingBox().catch(() => null) : null;
+          if (zb) {
+            // A real drag, end to end and back, the way a thumb slides it.
+            await h.page.mouse.move(zb.x + zb.width - 4, zb.y + zb.height / 2);
+            await h.page.mouse.down();
+            await h.page.mouse.move(zb.x + 4, zb.y + zb.height / 2, { steps: 25 });
+            await h.page.mouse.move(zb.x + zb.width * 0.6, zb.y + zb.height / 2, { steps: 20 });
+            await h.page.mouse.up();
+            await h.settle(2000);
+            await h.page.evaluate(() => (window.__uiShifts || []).splice(0)).catch(() => {});
+            await h.check("full calendar: days slider dragged");
+            // The same with a finger (iPhone sends touches, not a mouse), all the way out to the most days and back.
+            const tb = await zoom.boundingBox().catch(() => null);
+            if (tb) {
+              const cdp = await h.page.context().newCDPSession(h.page);
+              const y = tb.y + tb.height / 2;
+              const touch = (type, x) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y }] });
+              await touch("touchStart", tb.x + tb.width * 0.6);
+              for (let i = 0; i <= 30; i++) await touch("touchMove", tb.x + tb.width * 0.6 - (tb.width * 0.6 - 2) * (i / 30)), await h.page.waitForTimeout(16);
+              await touch("touchEnd", tb.x + 2);
+              await h.settle(2500);
+              const t2 = await zoom.boundingBox().catch(() => null);
+              if (t2) {
+                const y2 = t2.y + t2.height / 2;
+                const touch2 = (type, x) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y: y2 }] });
+                await touch2("touchStart", t2.x + 2);
+                for (let i = 0; i <= 30; i++) await touch2("touchMove", t2.x + 2 + (t2.width - 4) * (i / 30)), await h.page.waitForTimeout(16);
+                await touch2("touchEnd", t2.x + t2.width - 2);
+              }
+              await h.settle(2500);
+              await cdp.detach().catch(() => {});
+              await h.page.evaluate(() => (window.__uiShifts || []).splice(0)).catch(() => {});
+              await h.check("full calendar: days slider by finger, out and back");
+              if (process.env.UI_CHECK_MEASURE) {
+                await h.goto("/calendar?view=day", { name: "todaycal" });
+                await h.settle(1500);
+                const cdp2 = await h.page.context().newCDPSession(h.page);
+                await cdp2.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+                const r = await h.page.evaluate(async () => {
+                  const el = document.querySelector("[data-days-zoom] input[type=range]");
+                  if (!el) return null;
+                  const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+                  const long = [];
+                  const po = new PerformanceObserver((l) => l.getEntries().forEach((e) => long.push(Math.round(e.duration))));
+                  po.observe({ type: "longtask", buffered: false });
+                  const heap0 = performance.memory?.usedJSHeapSize ?? 0;
+                  const t0 = performance.now();
+                  let frames = 0;
+                  for (let k = 0; k < 3; k++)
+                    for (let i = 0; i <= 60; i++) {
+                      const v = k % 2 ? 1000 * (i / 60) : 1000 * (1 - i / 60);
+                      set.call(el, String(Math.round(v)));
+                      el.dispatchEvent(new Event("input", { bubbles: true }));
+                      await new Promise((res) => requestAnimationFrame(() => res()));
+                      frames++;
+                    }
+                  const ms = performance.now() - t0;
+                  await new Promise((res) => setTimeout(res, 300));
+                  po.disconnect();
+                  return { frames, msPerFrame: Math.round(ms / frames), longTasks: long.length, worst: Math.max(0, ...long), heap0: Math.round(heap0 / 1e6), heap1: Math.round((performance.memory?.usedJSHeapSize ?? 0) / 1e6), nodes: document.querySelectorAll("*").length };
+                }).catch((e) => ({ err: String(e).slice(0, 200) }));
+                await cdp2.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+                await cdp2.detach().catch(() => {});
+                h.record({ kind: "measure", severity: "warn", target: "calendar slider x4 cpu", detail: JSON.stringify(r) });
+                await h.settle(3000);
+                const m =await h.page.evaluate(() => ({ nodes: document.querySelectorAll("*").length, heap: Math.round((performance.memory?.usedJSHeapSize ?? 0) / 1e6), url: location.search })).catch(() => null);
+                h.record({ kind: "measure", severity: "warn", target: "calendar", detail: JSON.stringify(m) });
+              }
+            }
+          } else h.record({ kind: "zoom", severity: "error", target: "days zoom", detail: "No days slider on the calendar opened from Today" });
+          await h.goto("/", { name: "todaycal" });
+          await h.settle(1200);
+        } else {
+          await h.tap((p) => p.getByRole("button", { name: /^close the calendar$/i }).first(), "calendar away", { optional: true, expectMove: true });
+          await h.settle(500);
+        }
       }
       if (!h.isPhone) {
         // Drag the first of Today's Quests onto 2 PM with a mouse.
@@ -720,14 +800,9 @@ export const FLOWS = [
       // A victory: the celebration asks too, above Claim your reward · Continue Your Journey.
       if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu for complete", { optional: true })) {
         if (await h.tap((p) => p.getByRole("menuitem", { name: /^✓?\s*complete this/i }).first(), "complete from the menu", { optional: true, expectMove: true })) {
-          // Completing from a card asks when first (owner, Nov 21): Just now, or Other… for a day and time.
-          await h.settle(500);
-          await h.check("complete: when did you finish");
-          if (await h.tap((p) => p.getByRole("button", { name: /^other…$/i }).first(), "complete: other", { optional: true, expectMove: true })) {
-            await h.check("complete: other day and time");
-            await h.tap((p) => p.getByRole("button", { name: /^other…$/i }).first(), "complete: other closed", { optional: true });
-          }
-          await h.tap((p) => p.getByRole("button", { name: /^just now$/i }).first(), "complete: just now", { expectMove: true });
+          // Completing from a card completes it now (owner, Nov 25, eb3348b1: "checking a quest should complete it right
+          // now, I can use the context menu for past entries"); no "When did you finish it?" in between.
+          if (await h.page.getByRole("dialog", { name: /when was it completed/i }).count()) h.record({ kind: "complete-ask", severity: "error", target: "complete", detail: "Completing from a card still asks when it was finished" });
           await h.settle(3500);
           await h.check("celebration: how do you feel");
           if (await h.tap((p) => p.locator("[data-felt-ask] [role=radio][aria-label=Great]").first(), "celebration: great", { optional: true, expectMove: true })) await h.check("celebration: felt kept");
