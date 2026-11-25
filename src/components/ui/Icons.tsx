@@ -147,3 +147,13 @@ export function PrioritizeIcon({ size = 16 }: { size?: number }) {
     </svg>
   );
 }
+
+/** A speaker: sound waves when on, a cross when muted (line icon in the surrounding ink). */
+export function SpeakerIcon({ on, size = 18 }: { on: boolean; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      {on ? <path d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /> : <path d="M16 9.5l5 5M21 9.5l-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />}
+    </svg>
+  );
+}

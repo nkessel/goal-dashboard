@@ -261,6 +261,16 @@ export const FLOWS = [
       // The Check in button folds away as the check-in opens, so it's closed with its ×.
       await h.tap(/^check in/i, "open check-in", { expectMove: true });
       await h.check("check-in open");
+      // Last night on Today's dark card: the time under the bedtime ruler must read on dark, and the five sleep faces
+      // are solid cream tiles like the bedtime and wake pills (they were a grey wash, Nov 25).
+      if (await h.tap(/last night.s sleep time:/i, "check-in: bedtime ruler", { optional: true, expectMove: true })) {
+        await h.check("check-in bedtime ruler");
+        // Done closes the ruler first, so the faces aren't moving under the tap as it folds away.
+        await h.tap((p) => p.getByRole("button", { name: /^done$/i }).first(), "check-in: ruler done", { optional: true, expectMove: true });
+      }
+      if (await h.tap((p) => p.getByRole("radio", { name: /^good$/i }).first(), "check-in: sleep face", { optional: true })) {
+        await h.check("check-in sleep face picked");
+      }
       await esc(h);
       // A quest card's board tag opens the board right there: what's on it, and "See quest in board" (owner, Nov 12).
       if (await h.tap((p) => p.locator("[data-board-tag]:not([disabled])").first(), "card: board tag", { optional: true, expectMove: true })) {

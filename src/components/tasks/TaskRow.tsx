@@ -892,7 +892,7 @@ export function TaskRow({
           />
           {(task.due_at || (task.is_on_calendar && task.scheduled_start)) && (
             <span
-              className="flex items-center gap-1 whitespace-nowrap text-[12px] font-semibold leading-none"
+              className="flex flex-wrap items-center gap-x-1 gap-y-0.5 whitespace-nowrap text-[12px] font-semibold leading-none"
               style={{ color: isOverdue ? "var(--t-warn)" : isAdventure ? "#5a4a30" : metaColor }}
               title={isOverdue ? `Overdue · ${new Date((task.due_at ?? task.scheduled_start)!).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: onDevice ? undefined : FIRST_ZONE })}` : dueLabel((task.due_at ?? task.scheduled_start)!, onDevice ? undefined : FIRST_ZONE)}
             >
@@ -902,7 +902,12 @@ export function TaskRow({
               ) : (
                 "📅"
               )}
-              {isOverdue ? overdueWords((task.due_at ?? task.scheduled_start)!, onDevice ? undefined : FIRST_ZONE) : dueShort((task.due_at ?? task.scheduled_start)!, onDevice ? undefined : FIRST_ZONE)}
+              {/* "Overdue · Nov 24" is wider than the 66px column: the day goes on its own line under "Overdue". */}
+              {isOverdue
+                ? overdueWords((task.due_at ?? task.scheduled_start)!, onDevice ? undefined : FIRST_ZONE)
+                    .split(" · ")
+                    .map((w) => <span key={w}>{w}</span>)
+                : dueShort((task.due_at ?? task.scheduled_start)!, onDevice ? undefined : FIRST_ZONE)}
             </span>
           )}
         </div>

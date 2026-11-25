@@ -114,5 +114,9 @@
   {
     "match": "^faces\\|console-error\\|.*net::ERR_FAILED",
     "reason": "The faces flow aborts one server action on purpose to check that a chest that can't be read says so with Try again (b285e3e2); the browser logs that aborted request."
+  },
+  {
+    "match": "^today\\|covered-by-bar\\|<aside .today-cal.*sits on .*<span \\.tr-label>",
+    "reason": "Tablet: the bedtime/wake time ruler scrolls sideways inside its own box; the hour labels scrolled past its right edge are clipped by the ruler (see the screenshot) and only sit under Today's calendar geometrically."
   }
 ]

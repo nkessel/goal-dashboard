@@ -29,7 +29,8 @@ export const sleepTone = (q: number | null) => (q ? (q >= 4 ? 1 : q <= 2 ? -1 : 
 
 /**
  * "How was your sleep?": five faces, one tap (owner, Nov 21, Nov 24 and Nov 25), and under them a small
- * "+ Sleep notes" button that opens a short answer. Colours follow the card it sits in (--t-cream, --ec-gold).
+ * "+ Sleep notes" button that opens a short answer. Colours follow the card it sits in (--t-cream, --ec-gold); the face tiles are solid cream like the bedtime and wake pills,
+ * so they read the same on Today's dark card and on parchment (a see-through wash turned grey on the dark card).
  */
 export function SleepFeel({ quality, onQuality, note, onNote }: { quality: number | null; onQuality: (q: number | null) => void; note: string; onNote: (t: string) => void }) {
   const [noting, setNoting] = useState(note.trim() !== "");
@@ -43,7 +44,7 @@ export function SleepFeel({ quality, onQuality, note, onNote }: { quality: numbe
           const on = quality === f.v;
           const c = SLEEP_FACE_COLOR[i];
           return (
-            <button key={f.v} type="button" role="radio" aria-checked={on} onClick={() => onQuality(on ? null : f.v)} className="flex w-[54px] flex-col items-center gap-0.5 rounded-xl py-1.5 transition-transform duration-150 active:scale-95" style={{ background: on ? `${c}33` : "rgba(255,250,238,.55)", boxShadow: on ? `inset 0 0 0 1.5px ${c}` : "inset 0 0 0 1px rgba(139,112,64,.3)", transform: on ? "scale(1.06)" : undefined, opacity: quality === null || on ? 1 : 0.6 }}>
+            <button key={f.v} type="button" role="radio" aria-checked={on} onClick={() => onQuality(on ? null : f.v)} className="flex w-[54px] flex-col items-center gap-0.5 rounded-xl py-1.5 transition-transform duration-150 active:scale-95" style={{ background: on ? `linear-gradient(${c}33, ${c}33), #fbf5e6` : "#fbf5e6", boxShadow: on ? `inset 0 0 0 1.5px ${c}` : "inset 0 0 0 1px rgba(139,112,64,.3)", transform: on ? "scale(1.06)" : undefined, opacity: quality === null || on ? 1 : 0.6 }}>
               <SleepFace mouth={f.mouth} color={c} />
               <span className="text-[11.5px] font-semibold" style={{ color: c }}>
                 {f.label}
