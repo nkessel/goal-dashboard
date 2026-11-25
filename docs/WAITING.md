@@ -4,7 +4,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Dev loop 2 runs 109–114 note (Nov 25, to ~03:00 UTC; run 114 re-checked at 02:57: no new feedback notes, `main` unchanged):** `main` unchanged since run 97 (docs only); no new feedback notes since d8f914be (Nov 24, 16:43 UTC). Nothing unclaimed that ships straight. Nothing built.
+- **Dev loop 2 runs 109–115 note (Nov 25, to ~03:30 UTC; run 115 re-checked at 03:26: no new feedback notes, `main` unchanged):** `main` unchanged since run 97 (docs only); no new feedback notes since d8f914be (Nov 24, 16:43 UTC). Nothing unclaimed that ships straight. Nothing built.
 
 - **Dev loop 2 runs 107–108 note (Nov 24, 23:25 and 23:56 UTC):** `main` unchanged since run 97 (docs only); no new feedback notes since d8f914be (16:43 UTC). Nothing unclaimed that ships straight. Nothing built.
 
