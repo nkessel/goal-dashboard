@@ -337,6 +337,7 @@ export function startFakeDb({ port = 54329, fixtures = {}, quiet = true } = {}) 
   const server = http.createServer(async (req, res) => {
     log.requests++;
     const url = new URL(req.url, "http://x");
+    log.urls?.push(`${Date.now()} ${req.method} ${url.pathname}${url.search}`);
     let body = "";
     for await (const c of req) body += c;
     const prefer = req.headers.prefer || "";

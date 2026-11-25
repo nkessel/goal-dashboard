@@ -26,6 +26,7 @@ import { setHabitTicks, useHabitTicks } from "@/lib/use-habit-ticks";
 import type { HabitTicksSeed } from "@/lib/habit-ticks";
 import { setHabitManyAction, setHabitXpNowAction, tickHabitAgainAction, undoHabitTickAction } from "@/app/actions";
 import { SwipeReveal } from "@/components/ui/SwipeReveal";
+import { xpGained } from "@/lib/xp-live";
 import { Fold } from "@/components/ui/Fold";
 
 /**
@@ -379,6 +380,7 @@ export function DailyHabits({
     setError(null);
     const before = ticks.today[h.id] ?? 0;
     setHabitTicks({ today: { ...ticks.today, [h.id]: before + 1 } });
+    xpGained(h.xp_value);
     startTransition(async () => {
       try {
         const r = await tickHabitAgainAction(h.id, day);
@@ -386,6 +388,7 @@ export function DailyHabits({
         celebrateTick(h, r.xp, r.coinsEarned, r.extra + 1);
       } catch (e) {
         setHabitTicks({ today: { ...ticks.today, [h.id]: before } });
+        xpGained(-h.xp_value);
         setError(e instanceof Error ? e.message : "Couldn't save that.");
       }
     });
@@ -396,12 +399,14 @@ export function DailyHabits({
     const extra = ticks.today[h.id] ?? 0;
     if (extra < 1) return toggle(h, true);
     setHabitTicks({ today: { ...ticks.today, [h.id]: extra - 1 } });
+    xpGained(-h.xp_value);
     startTransition(async () => {
       try {
         const r = await undoHabitTickAction(h.id, day);
         setHabitTicks({ today: { ...ticks.today, [h.id]: r.extra } });
       } catch {
         setHabitTicks({ today: { ...ticks.today, [h.id]: extra } });
+        xpGained(h.xp_value);
         setError("Couldn't undo that.");
       }
     });
@@ -415,6 +420,8 @@ export function DailyHabits({
     if (next && isMany(h.id)) celebrateTick(h, h.xp_value, h.coin_value ?? coinsForXp(h.xp_value), 1);
     setError(null);
     setOptimistic((o) => ({ ...o, [h.id]: next }));
+    // The XP on screen moves now, not when the page's refresh lands (owner's note 2983ab5d).
+    xpGained(next ? h.xp_value : -h.xp_value);
     if (next && h.xp_value > 0 && !isMany(h.id)) {
       setPop({ id: h.id, xp: h.xp_value });
       setTimeout(() => setPop((p) => (p?.id === h.id ? null : p)), 1400);
@@ -434,6 +441,7 @@ export function DailyHabits({
         }
       } catch (e) {
         setOptimistic((o) => ({ ...o, [h.id]: !next }));
+        xpGained(next ? -h.xp_value : h.xp_value);
         setError(e instanceof Error ? e.message : "Couldn't save that.");
       }
     });
@@ -450,6 +458,10 @@ export function DailyHabits({
     const all = stepsComplete(subs, (id) => !!after.get(id)) ?? wasDone;
     setError(null);
     setStepOpt((o) => ({ ...o, ...Object.fromEntries(subs.map((st) => [`${h.id}|${st.id}`, after.get(st.id)!])) }));
+    // This sub-habit's own XP, and the habit's if this tick finishes (or reopens) it, show at once.
+    const stepXp = (subs.find((st) => st.id === stepId)?.xp ?? 0) * (on ? 1 : -1);
+    const habitXp = all === wasDone ? 0 : all ? h.xp_value : -h.xp_value;
+    xpGained(stepXp + habitXp, habitXp);
     if (all !== wasDone) {
       setOptimistic((o) => ({ ...o, [h.id]: all }));
       if (all && h.xp_value > 0) {
@@ -463,6 +475,7 @@ export function DailyHabits({
       } catch (e) {
         setStepOpt((o) => ({ ...o, [`${h.id}|${stepId}`]: !on }));
         setOptimistic((o) => ({ ...o, [h.id]: wasDone }));
+        xpGained(-(stepXp + habitXp), -habitXp);
         setError(e instanceof Error ? e.message : "Couldn't save that.");
       }
     });
