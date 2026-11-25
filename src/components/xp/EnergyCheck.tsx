@@ -12,6 +12,7 @@ import { TrackedEvents } from "@/components/insights/TrackedEvents";
 import { saveOrQueue } from "@/lib/offline";
 import { addCheckNoteAction, addJournalEntryAction, addToTopOfTodayAction, deleteCheckNoteAction, updateCheckNoteAction, createQuestAction, listTakeoffQuestsAction, saveNightAction, setCheckMetricsAction, wheelOfTimeAction } from "@/app/actions";
 import { EMPTY_NIGHT, NightFields, nightIsEmpty, type NightDraft, MoonIcon, SunIcon, TimeToken } from "./NightFields";
+import { SleepFeel, sleepTone } from "./SleepFeel";
 import { DateField } from "@/components/ui/DateField";
 import { shiftDay } from "@/lib/wheel-of-time";
 import { DRAFT_COOKIE, draftCookieValue, type CheckInInit } from "@/lib/checkin-init";
@@ -347,22 +348,49 @@ export function EnergyCheck({
   };
 
   const nightTouched = !!wheel && !noSleep && JSON.stringify(night) !== nightBase;
+  // How the night felt and a line about it, under last night's times (owner, Nov 21, 24 and 25).
+  const [sleepQuality, setSleepQuality] = useState<number | null>(null);
+  const [sleepNote, setSleepNote] = useState("");
+  const sleepFeelSet = !!wheel && !noSleep && (sleepQuality !== null || sleepNote.trim() !== "");
+  const sleepDirty = nightTouched || sleepFeelSet;
+  const [sleepSaved, setSleepSaved] = useState(false);
+  /** Last night's times, factors, face and note (whatever was entered), saved as their own entry. */
+  async function saveSleepParts() {
+    if (nightTouched) await saveNightToo(night);
+    if (sleepFeelSet && sleepQuality !== null) await saveOrQueue("saveCheckIn", { energy: null, metrics: [{ metric: "Sleep quality", level: sleepQuality * 2 }], at: new Date().toISOString() });
+    if (sleepFeelSet && sleepNote.trim()) await saveOrQueue("logEvent", { title: "😴 Sleep note", details: sleepNote.trim().slice(0, 400), tone: sleepTone(sleepQuality), at: new Date().toISOString() });
+    if (sleepDirty) {
+      setWheel(null);
+      setNight(EMPTY_NIGHT);
+      setSleepQuality(null);
+      setSleepNote("");
+    }
+  }
+  // Its own button saves the sleep apart from the mood check-in (owner, Nov 25).
+  function saveSleep() {
+    if (!sleepDirty) return;
+    setError(null);
+    startSaving(async () => {
+      try {
+        await saveSleepParts();
+        setSleepSaved(true);
+        setTimeout(() => setSleepSaved(false), 2600);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Couldn't save your sleep.");
+      }
+    });
+  }
   function save(after?: () => void) {
     setError(null);
     const all = expanded ? rows.filter((m) => vals[m] !== undefined).map((m) => ({ metric: m, level: vals[m] })) : [];
     // Last night's sleep alone is enough to save.
-    if (!energySet && !all.length && !nightTouched && !nightsFilled.length) return after?.();
+    if (!energySet && !all.length && !sleepDirty && !nightsFilled.length) return after?.();
     startSaving(async () => {
       try {
         // Other nights only change their times; anything else logged for them stays.
         for (const n of nightsFilled) await saveNightAction({ day: n.day, bed: n.bed || null, wake: n.wake || null, effort: [], hindrances: [], keep: true });
         if (nightsFilled.length) setOtherNights([]);
-        const nightLogged = nightTouched;
-        if (nightLogged) {
-          await saveNightToo(night);
-          setWheel(null);
-          setNight(EMPTY_NIGHT);
-        }
+        await saveSleepParts();
         if (energySet || all.length) {
           const out = await saveOrQueue("saveCheckIn", { energy: energySet ? value : null, metrics: all, at: new Date().toISOString() });
           if (out.queued) {
@@ -424,7 +452,7 @@ export function EnergyCheck({
     setOtherNights((o) => [...o, { id: (o.at(-1)?.id ?? 0) + 1, day: shiftDay(earliest, -1), bed: "", wake: "" }]);
   }
   const nightsFilled = otherNights.filter((n) => n.day && (n.bed || n.wake));
-  const canSave = energySet || Object.keys(vals).length > 0 || nightTouched || nightsFilled.length > 0;
+  const canSave = energySet || Object.keys(vals).length > 0 || sleepDirty || nightsFilled.length > 0;
   // Only after a saved check-in at 3.5 or below — and not once hidden for today, or in the evening.
   const low = !editing && saved !== null && saved <= LOW && mayOffer;
 
@@ -576,22 +604,24 @@ export function EnergyCheck({
     </div>
   ) : null;
   // On the welcome screen each slider has its own − and + right beside it, for an exact value.
-  const slider = (v: number, onChange: (n: number) => void, aria: string, color: string) =>
+  // Not moved yet: greyed, so it's plain it hasn't been set (owner, Nov 21 and Nov 25).
+  const slider = (v: number, onChange: (n: number) => void, aria: string, color: string, unset = false) =>
     simple ? (
       <span className="flex min-w-0 flex-1 items-center gap-1">
         <button type="button" onClick={() => onChange(Math.max(1, Math.round((v - sliderStep) * 10) / 10))} aria-label={`${aria}: less`} className="ec-step relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[15px] leading-none">
           −
         </button>
-        {rawSlider(v, onChange, aria, color)}
+        {rawSlider(v, onChange, aria, color, unset)}
         <button type="button" onClick={() => onChange(Math.min(10, Math.round((v + sliderStep) * 10) / 10))} aria-label={`${aria}: more`} className="ec-step relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[15px] leading-none">
           +
         </button>
       </span>
     ) : (
-      rawSlider(v, onChange, aria, color)
+      rawSlider(v, onChange, aria, color, unset)
     );
-  const rawSlider = (v: number, onChange: (n: number) => void, aria: string, color: string) => (
+  const rawSlider = (v: number, onChange: (n: number) => void, aria: string, color: string, unset = false) => (
     <input
+      data-unset={unset ? "true" : "false"}
       type="range"
       min={1}
       max={10}
@@ -617,9 +647,24 @@ export function EnergyCheck({
             {/* Last night only on the day's first check-in (owner, Nov 18); the Sleep log below has it any time. */}
             {!noSleep && !(savedAt && new Date(savedAt).toDateString() === new Date().toDateString()) && (
               <Fold open={!!wheel} eager>
-                <NightFields value={night} onChange={setNight} effort={wheel?.effort ?? []} hindrances={wheel?.hindrances ?? []} />
+                <div className="flex flex-col gap-2">
+                  <NightFields value={night} onChange={setNight} effort={wheel?.effort ?? []} hindrances={wheel?.hindrances ?? []} />
+                  <SleepFeel quality={sleepQuality} onQuality={setSleepQuality} note={sleepNote} onNote={setSleepNote} />
+                  <Fold open={sleepDirty}>
+                    <div className="flex justify-center">
+                      <button type="button" onClick={saveSleep} disabled={isSaving} className="hover-glow h-8 rounded-full px-4 text-[13px] font-bold disabled:opacity-60" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+                        {isSaving ? "Saving…" : "Save sleep"}
+                      </button>
+                    </div>
+                  </Fold>
+                </div>
               </Fold>
             )}
+            <Fold open={sleepSaved}>
+              <span className="confirm-pop block text-center text-[12.5px] font-semibold" style={{ color: "var(--ec-gold, #f2d27e)" }}>
+                ✓ Sleep saved
+              </span>
+            </Fold>
             <div className="flex items-center gap-2">
               {/* The welcome screen's check-in is always open, so no caret there. */}
               {!(simple && full) && caret}
@@ -627,7 +672,7 @@ export function EnergyCheck({
                 <span className={`${label} transition-opacity`} style={{ color: "var(--t-cream)", opacity: energySet ? 1 : 0.6 }}>
                   Energy
                 </span>
-                {slider(value, setValue, "Energy level, 1 to 10", `hsl(${hue} 60% 48%)`)}
+                {slider(value, setValue, "Energy level, 1 to 10", `hsl(${hue} 60% 48%)`, !energySet)}
                 <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums transition-opacity" style={{ color: `hsl(${hue} 70% var(--ec-l, 68%))`, opacity: energySet ? 1 : 0.6 }}>
                   {energySet ? fmt(value) : "–"}
                 </span>
@@ -652,13 +697,13 @@ export function EnergyCheck({
                   const set = vals[m] !== undefined;
                   const v = vals[m] ?? 5.5;
                   return (
-                    // Untouched metrics aren't saved (their name and value sit faded, the slider stays bright); moving one counts it.
+                    // Untouched metrics aren't saved (their name, value and slider sit greyed); moving one counts it.
                     <div key={m} className="flex items-center gap-2">
                       {!(simple && full) && <span aria-hidden className="w-5 shrink-0" />}
                       <span className={`${label} transition-opacity`} style={{ color: "var(--t-cream)", opacity: set ? 1 : 0.6 }} title={m === DAY_METRIC ? "How was your day? (optional)" : m}>
                         {simple ? m.charAt(0).toUpperCase() + m.slice(1) : m}
                       </span>
-                      {slider(v, (n) => setVals((o) => ({ ...o, [m]: n })), m === DAY_METRIC ? "How was your day, 1 to 10 (optional)" : `${m}, 1 to 10`, "#c9a24a")}
+                      {slider(v, (n) => setVals((o) => ({ ...o, [m]: n })), m === DAY_METRIC ? "How was your day, 1 to 10 (optional)" : `${m}, 1 to 10`, "#c9a24a", !set)}
                       <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums transition-opacity" style={{ color: "var(--ec-value, #f2d58a)", opacity: set ? 1 : 0.6 }}>
                         {set ? fmt(v) : "–"}
                       </span>

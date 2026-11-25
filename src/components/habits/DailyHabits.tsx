@@ -52,8 +52,11 @@ export function DailyHabits({
   core = [],
   bare = false,
   additional = false,
+  nested = null,
   ticks: ticksSeed = null,
 }: {
+  /** Additional Habits, nested at the foot of this section's tray, as Additional Quests sits under Today's Quests (owner, Nov 25). */
+  nested?: React.ReactNode;
   /** The habits not up today, as their own section under Daily Habits, like Additional Quests (owner, Nov 18). */
   additional?: boolean;
   /** Habits that count every tick, and today's ticks after the first, so cards are right from the first paint. */
@@ -80,10 +83,10 @@ export function DailyHabits({
   const day = useLocalDay();
   // Closed until opened (the header still shows how the day is going).
   // Kept across a redraw (ticking a habit refreshes Today, which can draw the list anew), so the tray stays open.
-  const [open, setOpen] = useState(() => trayOpen.get(bare ? "bare" : "main") ?? false);
+  const [open, setOpen] = useState(() => trayOpen.get(bare ? "bare" : additional ? "more" : "main") ?? false);
   useEffect(() => {
-    trayOpen.set(bare ? "bare" : "main", open);
-  }, [open, bare]);
+    trayOpen.set(bare ? "bare" : additional ? "more" : "main", open);
+  }, [open, bare, additional]);
   const [look, setLook] = useState<HeaderLook>("togo");
   const [mark, setMark] = useState<HabitMark>("seedling");
   const [lookMenu, setLookMenu] = useState(false);
@@ -1060,6 +1063,7 @@ export function DailyHabits({
               </button>
             </li>
           </ul>
+          {nested && <div className="mt-3">{nested}</div>}
           </>)}
           </div>
         </div>

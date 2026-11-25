@@ -314,11 +314,20 @@ export default async function Home() {
                   theme={theme}
                   between={
                     habits && rites?.some((r) => "slot" in r) ? (
-                      // Daily Habits, then the habits not up today as their own section, like Additional Quests (owner, Nov 18).
-                      <div className="flex flex-col gap-6">
-                        <DailyHabits ticks={ticksSeed} listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} planned={plannedHabits} core={habitPlan.core} />
-                        <DailyHabits additional ticks={ticksSeed} listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} planned={plannedHabits} core={habitPlan.core} />
-                      </div>
+                      // Daily Habits, with the habits not up today nested in its tray as Additional Habits (owner, Nov 18 and Nov 25).
+                      <DailyHabits
+                        ticks={ticksSeed}
+                        listenHref={listenBoard ? `/boards/${listenBoard.id}` : null}
+                        habits={habits}
+                        completions={habitHistory}
+                        skips={habitSkips}
+                        stepChecks={stepChecks ?? []}
+                        cleaning={profile?.life_wheel?.cleaning ?? null}
+                        theme={theme}
+                        planned={plannedHabits}
+                        core={habitPlan.core}
+                        nested={<DailyHabits additional ticks={ticksSeed} listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} planned={plannedHabits} core={habitPlan.core} />}
+                      />
                     ) : null
                   }
                   habitsInToday={

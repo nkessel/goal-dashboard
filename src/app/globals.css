@@ -1676,6 +1676,9 @@ html[data-fog-lift]::after { animation: fog-lift 0.9s ease forwards; }
   background: radial-gradient(circle at 35% 30%, #fff6d8, #d9b45f 60%, #a88a3f);
   border: 2px solid #4a3913;
 }
+/* Not set yet: grey until it's moved (owner, Nov 21 and Nov 25). */
+.energy-range { transition: filter 0.2s, opacity 0.2s; }
+.energy-range[data-unset="true"] { filter: grayscale(1); opacity: 0.5; }
 .energy-range:focus-visible {
   outline: 2px solid var(--t-gold);
   outline-offset: 2px;
@@ -3245,7 +3248,7 @@ html[data-welcome-open] [data-app-shell] *, html[data-welcome-open] [data-perche
 .time-ruler-type { color: #2a1c10; background: #fffdf6; border: 1.5px solid #b39a6a; }
 .time-ruler-type:focus { border-color: #8a6116; box-shadow: 0 0 0 3px rgba(217, 180, 95, 0.35); }
 /* The sleep row's middle: a thin arrow that stretches, the time slept on it. */
-.night-span { color: var(--ec-soft, #6b5631); }
+.night-span { color: var(--ec-soft, rgba(239, 230, 204, 0.8)); }
 /* The Sleep button, once its own Save went through: a small stamp. */
 .sleep-stamp { animation: sleep-stamp 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 @keyframes sleep-stamp { 0% { scale: 1.1; } 100% { scale: 1; } }
