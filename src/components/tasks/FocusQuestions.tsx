@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { focusQuestionsAction, saveFocusQuestionsAction } from "@/app/actions";
 import { Fold } from "@/components/ui/Fold";
-import { CloseIcon } from "@/components/ui/Icons";
 
 /** The lantern beside Today's Quests (owner, Nov 4): opens the focusing questions under the header. */
 export function FocusQuestionsButton({ open, onToggle }: { open: boolean; onToggle: () => void }) {
@@ -22,15 +21,19 @@ export function FocusQuestionsButton({ open, onToggle }: { open: boolean; onTogg
 
 /**
  * One focusing question at a time, with ‹ › to step through them; ✎ edits the list in place
- * (type over one, ✕ removes it, "+ Add a question"). Kept on the account.
+ * (type over one, the bin removes it after "Delete this question?", "+ Add a question"). Kept on the account.
+ * Owner, Nov 25: an × read as closing the panel and deleted his question, so delete is a bin and asks first.
  */
 export function FocusQuestions({ open, children }: { open: boolean; /** The day's tools under the question (Prioritize, Auto-schedule). */ children?: React.ReactNode }) {
   const [list, setList] = useState<string[] | null>(null);
   const [i, setI] = useState(0);
   const [editing, setEditing] = useState(false);
+  const [asking, setAsking] = useState<number | null>(null);
+  // Read fresh each time it opens, so a list changed elsewhere (or put back) is the one you edit and save.
   useEffect(() => {
-    if (open && list === null) focusQuestionsAction().then(setList, () => setList(["What helps me thrive?"]));
-  }, [open, list]);
+    if (open && !editing) focusQuestionsAction().then(setList, () => setList((l) => l ?? ["What helps me thrive?"]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- on opening only
+  }, [open]);
   const save = (next: string[]) => {
     setList(next);
     void saveFocusQuestionsAction(next.filter((q) => q.trim())).catch(() => {});
@@ -59,27 +62,43 @@ export function FocusQuestions({ open, children }: { open: boolean; /** The day'
           </div>
         ) : (
           <div className="flex flex-col gap-1">
-            {qs.map((q, k) => (
-              <div key={k} className="flex items-center gap-1">
-                <input
-                  value={q}
-                  onChange={(e) => setList(qs.map((x, j) => (j === k ? e.target.value : x)))}
-                  onBlur={() => save(qs)}
-                  maxLength={160}
-                  aria-label={`Question ${k + 1}`}
-                  className="bare-input h-8 flex-1 bg-transparent px-1 text-[15px] focus:outline-none"
-                  style={{ color: "var(--t-cream)", borderBottom: "1px solid rgba(217,180,95,.4)" }}
-                />
-                <button type="button" onClick={() => save(qs.filter((_, j) => j !== k))} aria-label={`Remove “${q}”`} className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-black/10">
-                  <CloseIcon size={10} />
-                </button>
-              </div>
-            ))}
+            {qs.map((q, k) =>
+              asking === k ? (
+                <div key={k} role="alertdialog" aria-label="Delete this question?" className="flex flex-wrap items-center gap-2 rounded-xl px-2 py-1.5" style={{ background: "rgba(163,60,42,.25)", border: "1px solid rgba(232,140,110,.55)" }}>
+                  <span className="min-w-0 flex-1 text-[14px]">
+                    Delete <b>“{q.trim() || "this question"}”</b>?
+                  </span>
+                  <button type="button" onClick={() => setAsking(null)} className="h-8 rounded-full px-3 text-[13.5px] font-semibold" style={{ color: "#e8c873", border: "1px solid rgba(217,180,95,.5)" }}>
+                    Keep it
+                  </button>
+                  <button type="button" onClick={() => (setAsking(null), save(qs.filter((_, j) => j !== k)))} className="h-8 rounded-full px-3 text-[13.5px] font-bold" style={{ background: "#c0533a", color: "#fff6ee" }}>
+                    Delete
+                  </button>
+                </div>
+              ) : (
+                <div key={k} className="flex items-center gap-1">
+                  <input
+                    value={q}
+                    onChange={(e) => setList(qs.map((x, j) => (j === k ? e.target.value : x)))}
+                    onBlur={() => save(qs)}
+                    maxLength={160}
+                    aria-label={`Question ${k + 1}`}
+                    className="bare-input h-8 flex-1 bg-transparent px-1 text-[15px] focus:outline-none"
+                    style={{ color: "var(--t-cream)", borderBottom: "1px solid rgba(217,180,95,.4)" }}
+                  />
+                  <button type="button" onClick={() => (q.trim() ? setAsking(k) : save(qs.filter((_, j) => j !== k)))} aria-label={`Delete “${q}”`} title="Delete this question" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/10" style={{ color: "#e8a08a" }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M4 7h16M9.5 7V4.8h5V7M6.5 7l.9 12.2h9.2L17.5 7M10 10.5v5.5M14 10.5v5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+              ),
+            )}
             <div className="flex items-center justify-between">
               <button type="button" onClick={() => setList([...qs, ""])} className="h-8 text-[13.5px] font-semibold" style={{ color: "#e8c873" }}>
                 + Add a question
               </button>
-              <button type="button" onClick={() => (save(qs), setEditing(false))} className="h-8 rounded-full px-3 text-[13.5px] font-bold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+              <button type="button" onClick={() => (save(qs), setAsking(null), setEditing(false))} className="h-8 rounded-full px-3 text-[13.5px] font-bold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
                 Done
               </button>
             </div>
