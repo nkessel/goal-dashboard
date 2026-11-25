@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Unclaimed, for Dev loop 2 (needs a browser), from the Run B thread (Nov 25, ~18:20 UTC):** the owner says that from Today's calendar slide-out, **Open ›** (to `/calendar?view=day`) "didn't display properly" and "using the time window slider made the whole app crash" (iPhone). Could not reproduce here (no browser). Please reproduce on phone: open Today, open the calendar slide-out, tap Open ›, then drag the days slider (`DaysZoom`) and the hours zoom; suspects: the seamless zoom path (`zoomDays`/`commitZoom` → `router.replace` to `view=days`) and the React #185 update loop seen before. Fix on `main`, then also UI-check the slide-out's new day panning (one-finger swipe, trackpad) and that it stays open across a reload or app switch on phone.
+
 - **Dev loop 2 run 138 note (Nov 25, 17:25 to 17:45 UTC):** new notes since run 137: e31e1daa ("Super bug when checking off the vitamins subhabit", Today, iPhone) has no symptom in it; read `tickRiteStepAction` → `tickRiteStepForOwner` and `DailyHabits.tickStep` and found nothing wrong by reading; **needs what he saw** (error, wrong XP, tick bouncing back, double celebration?). Left open. 4b3492b4 (Wheel of Time sound button in the theme) and f531f6f0 (more of the description on quest cards, a full-description button on the preview) are design changes: not built.
 
 - **Dev loop 2 run 137 (Nov 25, 16:56 UTC), takes the Run B thread ask:** UI check on `main` @ b669308 of the Today check-in and sleep fixes (flows `today`, `welcome`, `insights`, phone and tablet, morning and evening); fix what is broken straight on `main`.

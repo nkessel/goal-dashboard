@@ -31,6 +31,24 @@ function saveShown(on: boolean) {
   window.dispatchEvent(new Event(EVENT));
 }
 
+// Slid out on a phone, it stays out until you close it, also when you switch apps and come back (owner, Nov 25):
+// iPhone can reload the page in the background, so the choice is kept in this browser.
+const PEEK_KEY = "today-cal-peek";
+function readPeek() {
+  try {
+    return window.localStorage.getItem(PEEK_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function savePeek(on: boolean) {
+  try {
+    window.localStorage.setItem(PEEK_KEY, on ? "1" : "0");
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 /** Slide Today's day calendar out on a phone (a quest card dragged to the screen's right edge asks for it). */
 export function peekTodayCalendar() {
   window.dispatchEvent(new Event("today-cal-peek"));
@@ -44,10 +62,19 @@ export function peekTodayCalendar() {
  */
 export function TodayWithCalendar({ calendar, children }: { calendar: React.ReactNode; children: React.ReactNode }) {
   const shown = useSyncExternalStore(subscribe, readShown, () => true);
-  const [peek, setPeek] = useState(false);
+  const [peek, setPeekState] = useState(false);
+  const setPeek = (on: boolean) => {
+    setPeekState(on);
+    savePeek(on);
+  };
+  // Back as you left it (phones only: on wider screens it sits beside Today anyway).
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
+    if (readPeek() && !window.matchMedia("(min-width: 768px)").matches) setPeekState(true);
+  }, []);
   const panel = useRef<HTMLElement>(null);
   useEffect(() => {
-    const open = () => setPeek(true);
+    const open = () => (setPeekState(true), savePeek(true));
     window.addEventListener("today-cal-peek", open);
     return () => window.removeEventListener("today-cal-peek", open);
   }, []);
@@ -58,7 +85,8 @@ export function TodayWithCalendar({ calendar, children }: { calendar: React.Reac
       if (fromFeedback(e) || document.body.hasAttribute("data-quest-drag")) return;
       const t = e.target as Element | null;
       if (panel.current?.contains(t) || t?.closest?.("[data-today-cal-tab], [role=menu], [role=dialog], [aria-modal]")) return;
-      setPeek(false);
+      setPeekState(false);
+      savePeek(false);
     };
     document.addEventListener("pointerdown", away);
     return () => document.removeEventListener("pointerdown", away);
@@ -78,7 +106,7 @@ export function TodayWithCalendar({ calendar, children }: { calendar: React.Reac
           <h2 className="m-0 min-w-0 flex-1 truncate font-display text-[17px]" style={{ color: "var(--t-cream, var(--t-ink))", textShadow: "0 1px 2px rgba(0,0,0,.45)" }}>
             Today&rsquo;s calendar
           </h2>
-          <Link href="/calendar?view=day" className="shrink-0 text-[12.5px] font-semibold underline-offset-2 hover:underline" style={{ color: "var(--t-gold)" }}>
+          <Link href="/calendar?view=day" onClick={() => savePeek(false)} className="shrink-0 text-[12.5px] font-semibold underline-offset-2 hover:underline" style={{ color: "var(--t-gold)" }}>
             Open ›
           </Link>
           <button

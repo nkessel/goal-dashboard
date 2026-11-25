@@ -67,12 +67,15 @@ export function WeekView({
   essentials = "dashed",
   habitLook = "quest",
   embedded = false,
+  onPanDays,
   ui,
 }: {
   /** What the server read from the `cal-ui` cookie: starting values, so the first picture is the final one. */
   ui?: CalUi;
   /** Inside a box of its own that scrolls (Today's day calendar): it scrolls that box, not the page, and stays on its day. */
   embedded?: boolean;
+  /** Embedded only: a sideways swipe or drag moves this many days, and the box stays where it is (Today's calendar pans its day). */
+  onPanDays?: (n: number) => void;
   daily?: DailyLayer;
   essentials?: EssentialsLook;
   habitLook?: HabitLook;
@@ -585,6 +588,11 @@ export function WeekView({
   const [fluid, setFluid] = useState<{ dx: number; w: number | null; n?: number } | null>(null);
   const dragged = useRef(false);
   const goTo = (startOffset: number, n: number) => {
+    // Inside Today's box: never leave the page; the box pans its own day.
+    if (embedded) {
+      if (startOffset) onPanDays?.(startOffset);
+      return;
+    }
     const first = new Date(days[seamless ? Math.max(0, Math.min(days.length - 1, firstIdx)) : 0]);
     first.setDate(first.getDate() + startOffset);
     const key = formatDateParam(first);
