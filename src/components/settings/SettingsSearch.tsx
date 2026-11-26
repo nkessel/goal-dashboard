@@ -44,15 +44,23 @@ export function revealSetting(row: string, group?: string) {
   if (!box) return;
   const toggle = box.querySelector<HTMLButtonElement>("[data-settings-toggle]");
   if (toggle?.getAttribute("aria-expanded") === "false") toggle.click();
-  window.setTimeout(() => {
+  // The group opens in the same moment as its section (as soon as it's mounted, a frame or two
+  // later), and the scroll waits until both have slid open: opening it after the scroll had
+  // started moved the page under the reader and left the group short of the top (UI check, Nov 26).
+  const started = performance.now();
+  const openGroup = () => {
     const g = group ? box.querySelector<HTMLElement>(`[data-settings-group="${group}"]`) : null;
+    if (group && !g && performance.now() - started < 300) return void requestAnimationFrame(openGroup);
     g?.dispatchEvent(new Event("settings-group-open"));
-    const target = g ?? box;
-    target.scrollIntoView({ block: "start", behavior: "smooth" });
-    target.classList.remove("settings-spotlight");
-    void target.offsetWidth;
-    target.classList.add("settings-spotlight");
-  }, 340);
+    window.setTimeout(() => {
+      const target = g ?? box;
+      target.scrollIntoView({ block: "start", behavior: "smooth" });
+      target.classList.remove("settings-spotlight");
+      void target.offsetWidth;
+      target.classList.add("settings-spotlight");
+    }, 340);
+  };
+  requestAnimationFrame(openGroup);
 }
 
 export function SettingsSearch({ isAdventure }: { isAdventure: boolean }) {
