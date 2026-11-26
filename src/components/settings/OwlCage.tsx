@@ -60,10 +60,11 @@ export function OwlCage({ toucan = null, compact = false }: { toucan?: unknown; 
     <div
       className={compact ? "parchment flex min-w-0 flex-1 basis-0 cursor-pointer items-center gap-2 rounded-[14px] px-2.5 py-1.5" : "flex items-center gap-3 rounded-2xl px-3 py-2.5"}
       style={compact ? undefined : { background: "rgba(20,14,30,.06)", border: "1px dashed rgba(139,112,64,.5)" }}
-      onClick={compact && !empty ? setFree : undefined}
+      // No settings link on the tile (owner, Nov 26, 0dc0e616): with the bird free, a tap on the empty cage opens his settings.
+      onClick={compact ? (empty ? () => revealSetting("toucan-spirit") : setFree) : undefined}
       data-owl-cage=""
     >
-      <button ref={cageRef} type="button" onClick={compact || empty ? undefined : setFree} aria-label={empty ? "The toucan’s cage (empty)" : "Open the cage and set the bird free"} title={empty ? "Drag the toucan here to let him rest" : "Open the cage"} className={`owl-cage relative shrink-0 h-20 w-16 ${freeing ? "is-opening" : ""}`} style={compact ? { zoom: 0.625 } as React.CSSProperties : undefined}>
+      <button ref={cageRef} type="button" onClick={compact || empty ? undefined : setFree} aria-label={empty ? "The toucan’s cage (empty)" : "Open the cage and set the bird free"} title={empty ? (compact ? "Toucan Spirit settings" : "Drag the toucan here to let him rest") : "Open the cage"} className={`owl-cage relative shrink-0 h-20 w-16 ${freeing ? "is-opening" : ""}`} style={compact ? { zoom: 0.625 } as React.CSSProperties : undefined}>
         {!freeing && !empty && spirit && (
           // The toucan, in whatever it's wearing, sits behind the bars.
           <span aria-hidden className="pointer-events-none absolute inset-x-0 top-[36px] flex justify-center">
@@ -108,23 +109,11 @@ export function OwlCage({ toucan = null, compact = false }: { toucan?: unknown; 
         <span className="min-w-0 text-[13px] leading-snug" style={{ color: "var(--t-ink)" }}>
           <span className="block font-semibold">His cage</span>
           Drag the toucan here to let him rest
-          {compact && (
-            // His settings sit with his cage (owner, Nov 10): opens the Toucan Spirit section below.
-            <button type="button" onClick={(e) => (e.stopPropagation(), revealSetting("toucan-spirit"))} className="mt-0.5 block text-[12.5px] font-semibold underline-offset-2 hover:underline" style={{ color: "#8a6116" }}>
-              Toucan Spirit settings ›
-            </button>
-          )}
         </span>
       ) : compact ? (
         <span className="min-w-0 text-[13px] leading-snug" style={{ color: "var(--t-ink)" }}>
           <span className="block font-semibold">Your toucan</span>
           Tap the cage to set him free
-          {compact && (
-            // His settings sit with his cage (owner, Nov 10): opens the Toucan Spirit section below.
-            <button type="button" onClick={(e) => (e.stopPropagation(), revealSetting("toucan-spirit"))} className="mt-0.5 block text-[12.5px] font-semibold underline-offset-2 hover:underline" style={{ color: "#8a6116" }}>
-              Toucan Spirit settings ›
-            </button>
-          )}
         </span>
       ) : (
         <span className="text-[14px] leading-snug" style={{ color: "var(--t-ink)" }}>

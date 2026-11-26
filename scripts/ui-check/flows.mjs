@@ -1309,6 +1309,12 @@ export const FLOWS = [
     async run(h) {
       await h.goto("/settings", { name: "settings" });
       await h.check("top");
+      // The empty cage tile opens his settings, no link on it (owner, Nov 26, 0dc0e616).
+      await h.goto("/settings", { name: "settings cage" });
+      if (await h.tap((p) => p.locator("[data-owl-cage]").first(), "cage tile: open toucan settings", { optional: true, expectMove: true })) {
+        await h.settle(900);
+        await h.check("cage: toucan settings");
+      }
       // Roller trim (owner, Nov 20): Settings › Boards offers Ornaments · Lines · Plain with a preview.
       await h.goto("/settings?open=boards-look", { name: "settings roller trim" });
       await h.check("roller trim: ornaments");

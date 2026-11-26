@@ -73,7 +73,7 @@ export function ImportsWaiting({ count, hideable = false }: { count: number; /**
           📜
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="font-display text-[16.5px] leading-tight">{count === 1 ? "1 item to sort" : `${count} items to sort`}</span>
+          <span className="font-display text-[16.5px] leading-tight">{count === 1 ? "1 item to import" : `${count} items to import`}</span>
           <span className="text-[12.5px]" style={{ color: "#6b5631" }}>
             One card at a time: import, snooze or skip
           </span>
