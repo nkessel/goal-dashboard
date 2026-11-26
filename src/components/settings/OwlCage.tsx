@@ -6,6 +6,8 @@ import { useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { cleanToucan } from "@/lib/toucan";
+import { useToucanMode } from "@/components/toucan/talk";
+import { useToucanStyle } from "@/lib/toucan-style-store";
 
 const subscribe = (cb: () => void) => {
   window.addEventListener("owl-caged", cb);
@@ -45,6 +47,8 @@ export function OwlCage({ toucan = null, compact = false }: { toucan?: unknown; 
   const cageRef = useRef<HTMLButtonElement>(null);
   // An empty cage stays on show (owner, Nov 5: "what happened to the bird cage?? add it back"): drop him on it to let him rest.
   const empty = !caged && !freeing;
+  const mode = useToucanMode();
+  const style = useToucanStyle();
 
   function setFree() {
     if (freeing) return;
@@ -105,7 +109,14 @@ export function OwlCage({ toucan = null, compact = false }: { toucan?: unknown; 
           </g>
         </svg>
       </button>
-      {empty ? (
+      {empty && compact ? (
+        // The tile opens his settings, so it says what matters there (owner, Nov 26, 2220252c):
+        // just wisdom or a guide, and whether the check-in quiz still needs taking.
+        <span className="min-w-0 text-[13px] leading-snug" style={{ color: "var(--t-ink)" }} title="Drag the toucan here to let him rest">
+          <span className="block font-semibold">{mode === "simple" ? "Wisdom only" : mode === "lite" ? "Light guide" : "Full guide"}</span>
+          {mode === "simple" ? "No check-ins" : style.done ? "Checks in your way" : "Check-in not set up"}
+        </span>
+      ) : empty ? (
         <span className="min-w-0 text-[13px] leading-snug" style={{ color: "var(--t-ink)" }}>
           <span className="block font-semibold">His cage</span>
           Drag the toucan here to let him rest

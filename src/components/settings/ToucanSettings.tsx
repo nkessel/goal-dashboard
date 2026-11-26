@@ -126,7 +126,7 @@ export function ToucanSettings({ initialMode, initialRetired }: { initialMode: T
 
   return (
     <div className="flex flex-col gap-2.5" style={{ color: "var(--t-ink)" }}>
-      <FoldGroup title="How much he does" value={TOUCAN_MODES.find((m) => m.key === mode)?.label}>
+      <FoldGroup title="How much he does" hint="Just wisdom when you tap him, or a guide who keeps watch. A guide checks in the way you set in his check-in quiz." value={TOUCAN_MODES.find((m) => m.key === mode)?.label}>
       <div className="flex flex-col gap-1.5">
       <div role="radiogroup" aria-label="How much the toucan does" className="flex flex-col gap-1.5">
         {TOUCAN_MODES.map((m) => (
