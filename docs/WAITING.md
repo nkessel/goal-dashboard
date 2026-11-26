@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 169 (Nov 26, 20:56 UTC to ~22:15):** 72002f7e (sleep faces inside the sleep card) on `review/sleep-faces-in-card`: `xp/NightFields.tsx`, `xp/SleepCheckIn.tsx`, `xp/EnergyCheck.tsx`.
+
 - **Dev loop 2 run 168 note (Nov 26, 19:56 to ~20:30 UTC):** no new notes since run 163. Fixed the tablet `settings search` jump run 167 left (see SHIPPED).
 
 - **Dev loop 2 run 167 note (Nov 26, 18:56 to ~20:15 UTC):** no new notes since run 163. Built 8bce3027 and 0dc0e616 on `review/settings-nov26` (entry below). UI check `settings`, `import` (phone, tablet, morning, evening): 2 errors, both in the untouched `settings bubble` step on tablet (Settings groups jump when search opens "His speech bubble"), not from this change; left for a bug run. Still left for review branches: 0a7213f1 + 7dd7c890 + 85212313 (tutorial), 2220252c (Toucan settings explainer), 72002f7e (sleep smileys).
