@@ -7,6 +7,7 @@ import { CheckinIcon } from "@/components/xp/CheckinIcon";
 import { CHECKIN_ICONS, CHECKIN_STYLES, FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, checkinIconOf, checkinStyleOf, loadFx, saveFx, subscribeFx, welcomeOn, type FeedbackStyle, type FxSettings, EFFECTS_LEVELS } from "@/lib/celebration-fx";
 import { SentBurst } from "@/components/feedback/FeedbackDock";
 import { WelcomeCard } from "@/components/xp/WelcomeCard";
+import { ToucanQuestion } from "@/components/xp/ToucanQuestion";
 import { welcomeContextAction } from "@/app/actions";
 import { lineForDay } from "@/lib/greetings";
 import { ReflectionList } from "./ReflectionList";
@@ -267,7 +268,10 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
             <Play /> Preview: welcome back
           </button>
         </div>
-      {welcomePreview && (
+      {welcomePreview && fx.welcomeMode === "toucan" && welcomePreview.mode === "day" && (
+        <ToucanQuestion preview onClose={() => setWelcomePreview(null)} />
+      )}
+      {welcomePreview && !(fx.welcomeMode === "toucan" && welcomePreview.mode === "day") && (
         <WelcomeCard
           mode={welcomePreview.mode}
           heading={greetingFor(fx, welcomePreview.key)}
@@ -428,7 +432,10 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
       {sentPreview && (
         <SentBurst key={sentPreview.key} kind="feedback" xp={2} x={typeof window === "undefined" ? 200 : window.innerWidth / 2} y={typeof window === "undefined" ? 300 : window.innerHeight / 2} isAdventure style={sentPreview.style} onClose={() => setSentPreview(null)} />
       )}
-      {welcomePreview && (
+      {welcomePreview && fx.welcomeMode === "toucan" && welcomePreview.mode === "day" && (
+        <ToucanQuestion preview onClose={() => setWelcomePreview(null)} />
+      )}
+      {welcomePreview && !(fx.welcomeMode === "toucan" && welcomePreview.mode === "day") && (
         <WelcomeCard
           mode={welcomePreview.mode}
           heading={greetingFor(fx, welcomePreview.key)}
