@@ -648,8 +648,10 @@ export function EnergyCheck({
             {!noSleep && !(savedAt && new Date(savedAt).toDateString() === new Date().toDateString()) && (
               <Fold open={!!wheel} eager>
                 <div className="flex flex-col gap-2">
-                  <NightFields value={night} onChange={setNight} effort={wheel?.effort ?? []} hindrances={wheel?.hindrances ?? []} />
-                  <SleepFeel quality={sleepQuality} onQuality={setSleepQuality} note={sleepNote} onNote={setSleepNote} />
+                  {/* The sleep faces sit inside the sleep card (owner, Nov 26). */}
+                  <NightFields value={night} onChange={setNight} effort={wheel?.effort ?? []} hindrances={wheel?.hindrances ?? []}>
+                    <SleepFeel quality={sleepQuality} onQuality={setSleepQuality} note={sleepNote} onNote={setSleepNote} />
+                  </NightFields>
                   <Fold open={sleepDirty}>
                     <div className="flex justify-center">
                       <button type="button" onClick={saveSleep} disabled={isSaving} className="hover-glow h-8 rounded-full px-4 text-[13px] font-bold disabled:opacity-60" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>

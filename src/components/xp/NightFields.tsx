@@ -263,7 +263,7 @@ const WheelIcon = () => (
  * tap on its time), how long that was, and the Wheel of Time, which opens the
  * Factors of sleep: yesterday's Right Effort and Hindrances, as chips.
  */
-export function NightFields({ value, onChange, effort, hindrances, onLists, day, heading = true }: { value: NightDraft; onChange: (n: NightDraft) => void; effort: string[]; hindrances: string[]; /** Edit the two lists right here (saved to the Wheel of Time). */ onLists?: (lists: { effort: string[]; hindrances: string[] }) => void; /** This morning's app day (YYYY-MM-DD), to name the day each list is for. */ day?: string; /** The "Last night" title (the welcome screen's Sleep button already says it). */ heading?: boolean }) {
+export function NightFields({ value, onChange, effort, hindrances, onLists, day, heading = true, children }: { value: NightDraft; onChange: (n: NightDraft) => void; effort: string[]; hindrances: string[]; /** Edit the two lists right here (saved to the Wheel of Time). */ onLists?: (lists: { effort: string[]; hindrances: string[] }) => void; /** This morning's app day (YYYY-MM-DD), to name the day each list is for. */ day?: string; /** The "Last night" title (the welcome screen's Sleep button already says it). */ heading?: boolean; /** Shown at the card's foot, inside it (the sleep faces: owner, Nov 26). */ children?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   // Which time's ruler is open under the line (kept a moment while it slides shut).
   const [editing, setEditing] = useState<"bed" | "wake" | null>(null);
@@ -462,6 +462,7 @@ export function NightFields({ value, onChange, effort, hindrances, onLists, day,
           )}
         </div>
       </div>
+      {children}
     </div>
   );
 }

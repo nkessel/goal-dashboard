@@ -139,14 +139,18 @@ export function SleepCheckIn({ register, label, icon, onFilled }: { register: (s
         <div className="drawer-inner" inert={!open}>
           <div className="mt-2 flex w-full flex-col gap-2 text-left" style={{ ["--t-cream" as string]: "var(--t-ink)", ["--ec-soft" as string]: "var(--t-ink-soft)", ["--ec-gold" as string]: "#8a6116" }}>
             {lists ? (
-              <NightFields value={night} onChange={setNight} effort={lists.effort} hindrances={lists.hindrances} onLists={saveLists} day={today} heading={false} />
+              // How was your sleep? Five faces, then + Sleep notes (owner, Nov 24), inside the sleep card (owner, Nov 26).
+              <NightFields value={night} onChange={setNight} effort={lists.effort} hindrances={lists.hindrances} onLists={saveLists} day={today} heading={false}>
+                <SleepFeel quality={quality} onQuality={setQuality} note={note} onNote={setNote} />
+              </NightFields>
             ) : (
-              <p className="m-0 text-center text-[13px] italic" style={{ color: SOFT }}>
-                Opening…
-              </p>
+              <>
+                <p className="m-0 text-center text-[13px] italic" style={{ color: SOFT }}>
+                  Opening…
+                </p>
+                <SleepFeel quality={quality} onQuality={setQuality} note={note} onNote={setNote} />
+              </>
             )}
-            {/* How was your sleep? Five faces, then + Sleep notes (owner, Nov 24). */}
-            <SleepFeel quality={quality} onQuality={setQuality} note={note} onNote={setNote} />
             {/* Its own Save, once there's something to save. */}
             {dirty && (
               <div className="flex justify-center">
