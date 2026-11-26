@@ -34,6 +34,9 @@ Take them in order. Each is the owner's own ask (note id prefix in brackets; rea
 12. **Ask the owner before doing anything:** the email to Daniel about his Champion title [13b4b2d4] (sending a message on his behalf needs his OK and wording).
 13. Then `docs/FEEDBACK-OPEN.md` and `docs/REPEAT-ASKS.md`, and section 1 below.
 
+14. **Sub-habit celebration says when it's logged** (owner, Nov 26 chat): "Logged at 10:36 PM · Change" with Now / Just today / Another time. **Waits on his codes** on https://claude.ai/artifact/8ehmPsKjCzh4f5E3MwVTTC (LT-1A or 1B, LT-2A or 2B, LT-3A or 3B; my picks 1A, 2A, 3A). Sub-habits have no celebration card yet, and `rite_step_checks` has only `day`, so a time needs a nullable column.
+15. **Meditation habit: one minute counts, best sit tracked** (owner, Nov 26 chat, after current reviews, not urgent): "keep trying to improve my best focus time (time in meditation), while also making the habit so accessible that I can do just one minute and succeed". A plain habit "Meditate (1 minute counts)" exists (added via Duet). To do: a coded mockup for his review (how a sit's minutes are logged, the personal best shown, a gentle nudge toward it), then build only on his picks. Related: exercise is his most important habit and his level-1 Final Boss is 3 exercise sessions; he says it's the hardest.
+
 **Needs a real-iPhone look (from Nov 10):** prioritize cards' swipe, the Schedule… window's card drag, sequence fan-out, the welcome feedback button drag, Morning routine title rename, Quest Drop (sound, swipes, the music link opening the music app); opening the Home Screen app right after a deploy (should show the screen once, no reload; Nov 19); tapping a sub-habit's XP number opens the keyboard, and holding a sub-habit's name drags it to reorder (Nov 22). The calendar's days slider after Open › from Today's calendar (crashed on his iPhone Nov 25; made lighter, Chromium never crashed).
 
 ---
