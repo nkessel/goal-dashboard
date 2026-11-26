@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 171 claim (Nov 26, 22:56 UTC to ~00:00):** tutorial notes 0a7213f1, 85212313 (back, Settings pick-up, snooze length) on `review/tour-back`; `tour/Walkthrough.tsx`, `tour/RestartTour.tsx`, `lib/tour-store.ts`.
+
 - **Dev loop 2 run 170 note (Nov 26, 21:56 to ~22:55 UTC):** no new notes since run 163. Built 2220252c on `review/settings-nov26` as ST-3 (entry below). UI check `settings`, `toucanask` (phone, tablet, morning, evening): 0 errors. Still left for a review branch: 0a7213f1 + 7dd7c890 + 85212313 (tutorial).
 
 - **Dev loop 2 run 169 note (Nov 26, 20:56 to ~21:45 UTC):** no new notes since run 163. Built 72002f7e on `review/sleep-faces-in-card` (entry below). UI check `today`, `welcome` (phone, tablet, morning, evening): 0 errors. Still left for review branches: 0a7213f1 + 7dd7c890 + 85212313 (tutorial), 2220252c (Toucan settings explainer).
