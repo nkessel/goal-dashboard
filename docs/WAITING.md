@@ -4,7 +4,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Dev loop 2 runs 164–165 note (Nov 26, 15:56 and 16:56 UTC):** no new notes since run 163's seven, `main` code unchanged since d23a9f7. Nothing built.
+- **Dev loop 2 runs 164–166 note (Nov 26, 15:56, 16:56 and 17:56 UTC):** no new notes since run 163's seven, `main` code unchanged since d23a9f7. Nothing built.
 
 - **Dev loop 2 run 163 note (Nov 26, ~15:30 UTC):** seven new notes since 18a22b59; shipped 6fd68426 (see SHIPPED). Left for review branches (design or wording): 0a7213f1 + 7dd7c890 + 85212313 (tutorial: back, reopen from Settings, editable text, other snooze length), 8bce3027 ("items to import" wording), 0dc0e616 + 2220252c (Toucan settings: cage link, explainer text), 72002f7e (sleep smileys in the check-in container).
 
