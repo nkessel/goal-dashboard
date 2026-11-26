@@ -1007,6 +1007,11 @@ export const FLOWS = [
       // Snooze sits at the card's lower left and opens its choices in place.
       await h.tap((p) => p.getByRole("button", { name: /snooze or skip the walkthrough/i }), "tour: snooze choices", { expectMove: true });
       await h.check("tour: snooze choices");
+      // Other… › Pick a day… (owner, Nov 26: another snooze length).
+      await h.tap((p) => card(p).getByRole("button", { name: /^other/i }), "tour: snooze other", { optional: true, expectMove: true });
+      await h.check("tour: snooze other");
+      await h.tap((p) => card(p).getByRole("button", { name: /^pick a day/i }), "tour: snooze pick a day", { optional: true, expectMove: true });
+      await h.check("tour: snooze pick a day");
       await h.tap((p) => p.getByRole("button", { name: /snooze or skip the walkthrough/i }), "tour: snooze choices closed", { optional: true });
       await h.page.locator("#tour-name").fill("Robin").catch(() => {});
       await next("let's begin", "character");
@@ -1017,6 +1022,9 @@ export const FLOWS = [
       await h.check("tour: character described");
       // The fake database can't paint: skip the step, which sets out the two starter quests and tours the home screen.
       await next("skip this step", "home: you");
+      await next("next", "home: due soon");
+      // ‹ Back, the opposite of Skip (owner, Nov 26).
+      await next("‹ back", "home: back to you");
       for (const shot of ["home: due soon", "home: daily habits", "home: today's quests", "home: additional quests", "home: victories today"]) await next("next", shot);
       await next("next", "two starter quests");
       if ((await h.page.getByText(/explore the realm/i).count()) < 2) throw new Error("Starter quest “Explore the realm” isn't on Today");
@@ -1072,6 +1080,13 @@ export const FLOWS = [
       }
       await h.page.evaluate(() => (localStorage.removeItem("tour-look"), window.dispatchEvent(new Event("tour-look-change"))));
       // Leave the walkthrough finished for the flows after this one.
+      // Skipped part-way: Settings › Help offers to pick up where it was left (owner, Nov 26).
+      await h.page.evaluate(() => localStorage.setItem("tour-state", JSON.stringify({ step: "end", done: true, left: "home-habits", at: Date.now() + 2e9 })));
+      await h.goto("/settings?open=help-support", { name: "tour: settings help" });
+      await h.settle(800);
+      if (!(await h.page.getByRole("button", { name: /pick up where i left off/i }).count())) throw new Error("Settings › Help has no “Pick up where I left off”");
+      await h.page.getByRole("button", { name: /pick up where i left off/i }).first().scrollIntoViewIfNeeded().catch(() => {});
+      await h.check("tour: settings pick up");
       await h.page.evaluate(() => localStorage.setItem("tour-state", JSON.stringify({ step: "end", done: true, at: Date.now() + 2e9 })));
     },
   },

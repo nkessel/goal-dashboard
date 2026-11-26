@@ -237,6 +237,29 @@ function thisEvening() {
   return d.getTime() > Date.now() + 30 * 60_000 ? d.getTime() : Date.now() + 3 * 3_600_000;
 }
 
+/** A day picked in "Pick a day…" (yyyy-mm-dd), at 9 in the morning there. */
+function dayMorning(v: string) {
+  const [y, m, d] = v.split("-").map(Number);
+  return y && m && d ? new Date(y, m - 1, d, 9, 0, 0, 0).getTime() : NaN;
+}
+
+/** "‹ Back": the step before this one (owner, Nov 26: "the opposite of skip"). None once a quest is made, or at the end. */
+function prevStep(step: string): string | null {
+  if (step === "character") return "intro";
+  if (step === "home-hero") return "character";
+  if (step === "quests") return ORDER_HOME[ORDER_HOME.length - 1];
+  const h = ORDER_HOME.indexOf(step);
+  if (h > 0) return ORDER_HOME[h - 1];
+  const e = ORDER_EXPLORE.indexOf(step);
+  if (e >= 0) return e === 0 ? "quests" : ORDER_EXPLORE[e - 1];
+  const c = ORDER_CREATE.indexOf(step);
+  // From "Create" on, the quest is made: going back past it would ask to make it again.
+  const made = ORDER_CREATE.indexOf("cr-engage");
+  if (c === 0) return "quests";
+  if (c > 0 && c !== made) return ORDER_CREATE[c - 1];
+  return null;
+}
+
 /** The clock, read outside render's own lines (snooze checks and stamps). */
 const nowMs = () => Date.now();
 
@@ -253,7 +276,7 @@ export function Walkthrough({ since }: { since?: string | null } = {}) {
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [busy, setBusy] = useState(false);
   const [celebrating, setCelebrating] = useState(false);
-  const [snoozing, setSnoozing] = useState<false | "menu" | "other">(false);
+  const [snoozing, setSnoozing] = useState<false | "menu" | "other" | "day">(false);
   const [nameDraft, setNameDraft] = useState("");
   const [, wake] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -580,7 +603,8 @@ export function Walkthrough({ since }: { since?: string | null } = {}) {
     if (!step || busy) return;
     if (step === "intro") return go("character", { name: nameDraft.trim().slice(0, 40) || null });
     if (step === "character") return void startQuests();
-    if (step === "quests" || step === "done") return go("end");
+    if (step === "quests") return go("end", { left: "quests" });
+    if (step === "done") return go("end");
     if (step === "ex-feedback") return go(seenIn(readTour(), "create") ? "done" : "quests", { hidden: withMark(readTour(), "explore") });
     if (step === "cr-claim") return go(seenIn(readTour(), "explore") ? "done" : "quests");
     const h = ORDER_HOME.indexOf(step);
@@ -723,6 +747,11 @@ export function Walkthrough({ since }: { since?: string | null } = {}) {
           >
             <SnoozeIcon size={16} />
           </button>
+          {step && prevStep(step) && (
+            <button type="button" onClick={() => !busy && go(prevStep(step)!)} className="tour-skip h-8 px-1 text-[12.5px] underline-offset-2 hover:underline">
+              ‹ Back
+            </button>
+          )}
           {step !== "done" && (
             <button type="button" onClick={skipStep} className="tour-skip h-8 px-1 text-[12.5px] underline-offset-2 hover:underline">
               Skip this step
@@ -750,15 +779,30 @@ export function Walkthrough({ since }: { since?: string | null } = {}) {
                 <button type="button" className={choice} onClick={() => snooze(tomorrowMorning())}>Tomorrow</button>
                 <button type="button" className={choice} onClick={() => setSnoozing("other")}>Other…</button>
               </>
+            ) : snoozing === "day" ? (
+              <>
+                <input
+                  type="date"
+                  aria-label="Snooze until this day"
+                  className="tour-chip h-8 rounded-full px-3 text-[13px] font-semibold"
+                  onChange={(e) => {
+                    const t = dayMorning(e.target.value);
+                    if (t > Date.now()) snooze(t);
+                  }}
+                />
+                <button type="button" className={choice} onClick={() => setSnoozing("other")}>‹ Back</button>
+              </>
             ) : (
               <>
                 <button type="button" className={choice} onClick={() => snooze(Date.now() + 3 * 3_600_000)}>3 hours</button>
                 <button type="button" className={choice} onClick={() => snooze(thisEvening())}>This evening</button>
                 <button type="button" className={choice} onClick={() => snooze(Date.now() + 3 * 86_400_000)}>In 3 days</button>
+                <button type="button" className={choice} onClick={() => snooze(Date.now() + 7 * 86_400_000)}>Next week</button>
+                <button type="button" className={choice} onClick={() => setSnoozing("day")}>Pick a day…</button>
                 <button type="button" className={choice} onClick={() => setSnoozing("menu")}>‹ Back</button>
               </>
             )}
-            <button type="button" onClick={() => go("end")} className="tour-skip ml-auto h-8 px-1 text-[12.5px] underline underline-offset-2">
+            <button type="button" onClick={() => go("end", { left: step })} className="tour-skip ml-auto h-8 px-1 text-[12.5px] underline underline-offset-2">
               Skip the whole walkthrough
             </button>
           </div>

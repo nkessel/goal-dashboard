@@ -52,3 +52,19 @@ export function restartTour() {
   // Tips you closed stay closed; the walkthrough's own progress marks (they start with _) start over.
   writeTour({ step: "intro", done: false, hidden: (t?.hidden ?? []).filter((h) => !h.startsWith("_")), name: t?.name ?? null });
 }
+
+/** Where "Pick up where I left off" (Settings › Help) would start: the step a skip or a snooze left, or null. */
+export function resumeStep(t: TourState | null): string | null {
+  if (!t) return null;
+  if (t.step === "end") return t.left ?? null;
+  if (t.done || t.step === "intro") return null;
+  return t.step;
+}
+
+/** Pick up the walkthrough where it was left (owner, Nov 26: "come back to the tutorial at any time in the settings"). */
+export function resumeTour() {
+  const t = readTour();
+  const at = resumeStep(t);
+  if (!t || !at) return restartTour();
+  writeTour({ ...t, step: at, done: false, until: null, left: null });
+}

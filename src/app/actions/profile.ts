@@ -230,7 +230,7 @@ export async function reorderRewardsAction(ids: string[]) {
 }
 
 // The new-adventurer walkthrough (owner, Nov 13): where each account is in it, kept on the account.
-export type TourState = { step: string; done?: boolean; hidden?: string[]; practiceId?: string | null; realId?: string | null; since?: string | null; at?: number; /** What the person asked the toucan to call them. */ name?: string | null; /** Snoozed until (ms). */ until?: number | null; /** The two starter quests on Today (owner, Nov 15). */ exploreId?: string | null; createId?: string | null };
+export type TourState = { step: string; done?: boolean; hidden?: string[]; practiceId?: string | null; realId?: string | null; since?: string | null; at?: number; /** What the person asked the toucan to call them. */ name?: string | null; /** Snoozed until (ms). */ until?: number | null; /** The two starter quests on Today (owner, Nov 15). */ exploreId?: string | null; createId?: string | null; /** The step "Skip the whole walkthrough" left (Settings › Help picks up there). */ left?: string | null };
 
 export async function tourAction(): Promise<TourState | null> {
   const ownerId = await requireProfileId();
@@ -288,6 +288,7 @@ export async function saveTourAction(state: TourState) {
     until: typeof state.until === "number" && Number.isFinite(state.until) ? state.until : null,
     exploreId: state.exploreId && /^[0-9a-f-]{36}$/i.test(state.exploreId) ? state.exploreId : null,
     createId: state.createId && /^[0-9a-f-]{36}$/i.test(state.createId) ? state.createId : null,
+    left: state.left ? String(state.left).slice(0, 40) : null,
   };
   const { error } = await writeExtra(ownerId, "tour", clean);
   if (error) throw new Error(error.message);
