@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 172 note (Nov 26, 23:56 UTC):** no new notes since run 163, `main` only docs since run 168. Nothing built.
+
 - **Dev loop 2 run 171 note (Nov 26, 22:56 to ~23:35 UTC):** no new notes since run 163. Built 0a7213f1 + 85212313 on `review/tour-back` (entry below); 7dd7c890 (edit the walkthrough words) asked as TB-4. UI check `tour` (phone, tablet, morning, evening): 0 errors. Every Nov 26 note is now built or asked on a review page.
 
 - **Dev loop 2 run 170 note (Nov 26, 21:56 to ~22:55 UTC):** no new notes since run 163. Built 2220252c on `review/settings-nov26` as ST-3 (entry below). UI check `settings`, `toucanask` (phone, tablet, morning, evening): 0 errors. Still left for a review branch: 0a7213f1 + 7dd7c890 + 85212313 (tutorial).
