@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Run B scheduled run note (Nov 27, 23:26 UTC):** no new notes (only 72002f7e, on `review/sleep-faces-in-card`), `main` code unchanged. Run 194's `tabs-instant` claim (20:58) is now past 2 hours with nothing pushed; left for a dedicated build run. Nothing built.
+
 - **Dev loop 2 run 194 (claimed Nov 27, 20:58 UTC):** building the decided `review/tabs-instant` items (TI-5A shaped stand-ins, TI-6 buttons stay, Insights reload shift), then UI check and merge. Files: `src/app/**/loading.tsx`, the tab stand-ins, CreateFab, FeedbackDock, FocusTimerPill, NotificationsButton, TopRightAvatar.
 
 - **Run B scheduled run note (Nov 27, later):** no new notes (only 72002f7e, on `review/sleep-faces-in-card`), `main` code unchanged. Nothing built.
