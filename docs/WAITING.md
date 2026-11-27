@@ -4,7 +4,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Dev loop 2 runs 172–176 note (Nov 26, 23:56 to Nov 27, 02:56 UTC):** no new notes since run 163 (the two open ones, 2220252c and 72002f7e, are on review branches), `main` only docs since run 168. Nothing built.
+- **Dev loop 2 runs 172–177 note (Nov 26, 23:56 to Nov 27, 03:56 UTC):** no new notes since run 163 (the two open ones, 2220252c and 72002f7e, are on review branches), `main` only docs since run 168. Nothing built.
 
 - **Run B scheduled run note (Nov 27):** no new notes since Nov 26 15:04 (all built or asked on review branches), `main` only docs since run 168. Nothing built.
 
