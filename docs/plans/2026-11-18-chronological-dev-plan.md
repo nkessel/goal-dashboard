@@ -108,7 +108,7 @@ Say OK, give notes, or drop each of these, so the splits don't have to work arou
 
 ## Run G · Opus 5.5 · deeper fixes and the bigger features
 
-1. **Cal 7a:** essentials as real events: they float, are never covered, and you can drag them.
+1. **Cal 7a:** essentials as real events: they float, are never covered, and you can drag them. First case: Call Dad, any time 8 AM to 8:30 PM, preferred 2:30 to 7:15 PM (owner, Nov 27). Built with PRIORITIES item 16: drag a habit or essential into a quest, and non-[bracketed] events shown as quests, all from the Opus design pass's coded page (made after the WH/MC merge), only on his codes.
 2. **C3:** one hook per calendar gesture. It's simpler now that Cal 5 exists.
 3. **Light 1, Light 2:** the Evening Routine stars, and ticking a habit redrawing 450 rows.
 4. **D5:** quest cards read their place and colour on first paint. Review page.
