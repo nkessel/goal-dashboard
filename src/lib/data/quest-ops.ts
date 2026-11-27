@@ -16,6 +16,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { computeLevelForXp } from "@/lib/levels";
 import { coinsForXp } from "@/lib/coins";
 import { earlyBirdBonus, earlyBirdCoins } from "@/lib/next-action";
+import { stepsComplete } from "@/lib/habit-steps";
 import type { Task } from "@/lib/data/types";
 
 /** Coins to add on completion so the quest pays exactly its custom coin value. */
@@ -555,4 +556,44 @@ export async function setCoreHabitForOwner(ownerId: string, riteId: string, core
   if (core) next.push(riteId);
   await saveHabitPlan(ownerId, { ...plan, core: next });
   revalidatePath("/");
+}
+
+/** A sub-habit with its own XP or coins pays them when ticked (and takes them back when unticked). */
+export async function payRiteStep(ownerId: string, step: ritesData.RiteStep, sign: 1 | -1) {
+  // One after the other: both read and write the profile's coins.
+  if (step.xp) await xp.awardXp(ownerId, sign * step.xp, "task_completed").catch(() => {});
+  if (step.coins) await rewardsData.addCoins(ownerId, sign * step.coins).catch(() => {});
+}
+
+/**
+ * Tick (or untick) one sub-habit for `day`. Ticking the last required one completes the
+ * habit (XP and all); unticking a required one of a completed habit undoes that.
+ * `changed` is false when the tick was already that way.
+ */
+export async function tickRiteStepForOwner(ownerId: string, riteId: string, stepId: string, day: string, on: boolean) {
+  assertDay(day);
+  // Fewer round trips one after another, so a tick's XP shows sooner (owner's note 2983ab5d: "quite laggy").
+  const db = supabaseAdmin();
+  const [rite, { data: doneRow }] = await Promise.all([
+    ritesData.getRite(riteId, ownerId),
+    db.from("rite_completions").select("id").eq("owner_id", ownerId).eq("rite_id", riteId).eq("day", day).maybeSingle(),
+  ]);
+  if (!rite) throw new Error("That habit isn't here anymore.");
+  const changed = await ritesData.setRiteStepCheck(ownerId, riteId, stepId, day, on);
+  const steps = ritesData.cleanRiteSteps(rite.steps);
+  const step = steps.find((st) => st.id === stepId);
+  const [, checksAll] = await Promise.all([changed && step ? payRiteStep(ownerId, step, on ? 1 : -1) : null, ritesData.listRiteStepChecks(ownerId, day)]);
+  const checks = (checksAll ?? []).filter((c) => c.rite_id === riteId && c.day === day);
+  const ticked = new Set(checks.map((c) => c.step_id));
+  // Only the required sub-habits finish it; with none required, ticks never complete or undo it.
+  const all = stepsComplete(steps, (id) => ticked.has(id));
+  let completed: { xp: number; coinsEarned: number } | null = null;
+  let uncompleted = false;
+  if (all === true && !doneRow) completed = await completeRiteForOwner(ownerId, riteId, day);
+  else if (all === false && doneRow) {
+    await uncompleteRiteForOwner(ownerId, riteId, day);
+    uncompleted = true;
+  }
+  revalidatePath("/");
+  return { done: all ?? !!doneRow, xp: completed?.xp ?? 0, coinsEarned: completed?.coinsEarned ?? 0, changed, completed: !!completed, uncompleted, stepXp: changed && step ? (step.xp ?? 0) : 0, stepCoins: changed && step ? (step.coins ?? 0) : 0 };
 }

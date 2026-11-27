@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore, useTransition } from "react";
+import { LiveXp } from "./LiveXp";
 import { deleteTaskAction, reopenTaskAction } from "@/app/actions";
 import type { Task } from "@/lib/data/types";
 import { CoinIcon, DiamondIcon, CloseIcon } from "@/components/ui/Icons";
@@ -146,7 +147,7 @@ export function VictoriesToday({
           size={23}
           aside={
             <span className="hidden shrink-0 whitespace-nowrap pl-1 text-[15px] sm:inline" style={{ color: "var(--t-ink)" }}>
-              Today&apos;s XP: <span className="font-semibold">{totalXp}</span>
+              Today&apos;s XP: <span className="font-semibold"><LiveXp base={totalXp} kind="today" /></span>
             </span>
           }
         >
@@ -159,7 +160,7 @@ export function VictoriesToday({
       {closed ? (
         <ClosedSummary
           parts={[
-            fx.victoriesShowXp ? <>Today&apos;s XP: <span className="font-semibold">{totalXp}</span></> : null,
+            fx.victoriesShowXp ? <>Today&apos;s XP: <span className="font-semibold"><LiveXp base={totalXp} kind="today" /></span></> : null,
             fx.victoriesShowCount && victoryCount > 0 ? <>{victoryCount} {victoryCount === 1 ? "victory" : "victories"}</> : null,
             fx.victoriesShowCoins && coinsToday > 0 ? <span className="inline-flex items-center gap-0.5"><CoinIcon size={13} />+{coinsToday}</span> : null,
             fx.victoriesShowLatest && latest ? <span className="truncate italic">{latest}</span> : null,
@@ -167,7 +168,7 @@ export function VictoriesToday({
         />
       ) : isAdventure ? (
         <p className="m-0 mt-1 text-center text-[14.5px] sm:hidden" style={{ color: "var(--t-ink)" }}>
-          Today&apos;s XP: <span className="font-semibold">{totalXp}</span>
+          Today&apos;s XP: <span className="font-semibold"><LiveXp base={totalXp} kind="today" /></span>
         </p>
       ) : (
         <div className="flex items-center justify-between">
@@ -175,7 +176,7 @@ export function VictoriesToday({
             Completed today
           </h2>
           <span className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
-            {totalXp} pts
+            <LiveXp base={totalXp} kind="today" /> pts
           </span>
         </div>
       )}

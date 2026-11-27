@@ -19,7 +19,26 @@ const newId = () => Math.random().toString(36).slice(2, 10);
  * a ⋯ menu (right-click too) for Give XP, Give coins, Required to finish, and Remove.
  * A line at the bottom adds one.
  */
-export function SubHabitList({ list, onChange, autoFocus = false, noun = "sub-habit", coins = true }: { list: SubHabit[]; onChange: (next: SubHabit[]) => void; autoFocus?: boolean; noun?: string; /** False where a row pays XP only (a quest's sub-quests). */ coins?: boolean }) {
+export function SubHabitList({
+  list,
+  onChange,
+  autoFocus = false,
+  noun = "sub-habit",
+  coins = true,
+  done,
+  onTick,
+}: {
+  list: SubHabit[];
+  onChange: (next: SubHabit[]) => void;
+  autoFocus?: boolean;
+  noun?: string;
+  /** False where a row pays XP only (a quest's sub-quests). */
+  coins?: boolean;
+  /** Ticked today (a habit's editor): its round check shows done, as on the card. */
+  done?: (id: string) => boolean;
+  /** Tapping the round check ticks it, as on the card (saved rows only). */
+  onTick?: (id: string) => void;
+}) {
   const [draft, setDraft] = useState("");
   const [menu, setMenu] = useState<string | null>(null);
   const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 6 } }));
@@ -66,6 +85,8 @@ export function SubHabitList({ list, onChange, autoFocus = false, noun = "sub-ha
               sub={s}
               noun={noun}
               coins={coins}
+              ticked={done?.(s.id) ?? false}
+              onTick={onTick ? () => onTick(s.id) : undefined}
               menuOpen={menu === s.id}
               onMenu={() => setMenu((m) => (m === s.id ? null : s.id))}
               onChange={(patch) => set(s.id, patch)}
@@ -100,7 +121,7 @@ export function SubHabitList({ list, onChange, autoFocus = false, noun = "sub-ha
   );
 }
 
-function Row({ sub, noun, coins, menuOpen, onMenu, closeMenu, onChange, onRemove }: { sub: SubHabit; noun: string; coins: boolean; menuOpen: boolean; onMenu: () => void; closeMenu: () => void; onChange: (patch: Partial<SubHabit>) => void; onRemove: () => void }) {
+function Row({ sub, noun, coins, ticked, onTick, menuOpen, onMenu, closeMenu, onChange, onRemove }: { sub: SubHabit; noun: string; coins: boolean; ticked: boolean; onTick?: () => void; menuOpen: boolean; onMenu: () => void; closeMenu: () => void; onChange: (patch: Partial<SubHabit>) => void; onRemove: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sub.id });
   const whole = noun === "sub-habit" ? "the habit" : "the rite";
   const hold = (e: React.SyntheticEvent) => e.stopPropagation();
@@ -122,8 +143,24 @@ function Row({ sub, noun, coins, menuOpen, onMenu, closeMenu, onChange, onRemove
         className={`flex min-h-9 items-center gap-2 rounded-lg px-1.5 transition-colors ${isDragging ? "cursor-grabbing" : "cursor-grab hover:bg-black/[.035]"}`}
         style={isDragging ? { background: "rgba(255,248,228,.92)", boxShadow: "0 8px 18px rgba(0,0,0,.18)" } : undefined}
       >
-        {/* The round check it gets on its card, drawn empty here; dashed when it isn't needed to finish. */}
-        <span aria-hidden className="h-[16px] w-[16px] shrink-0 rounded-full" style={{ border: `1.5px ${sub.optional ? "dashed" : "solid"} #a58c66` }} />
+        {/* The round check it gets on its card, ticked as it is today (owner's note 7ba2172e); dashed when it isn't needed to finish. */}
+        {onTick ? (
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={ticked}
+            aria-label={ticked ? `Untick ${sub.title}` : `Tick ${sub.title}`}
+            onClick={onTick}
+            onPointerDown={hold}
+            onMouseDown={hold}
+            onTouchStart={hold}
+            className="-m-2 flex shrink-0 items-center justify-center p-2"
+          >
+            <SubCheck ticked={ticked} optional={!!sub.optional} />
+          </button>
+        ) : (
+          <SubCheck ticked={ticked} optional={!!sub.optional} />
+        )}
         <input
           value={sub.title}
           onChange={(e) => onChange({ title: e.target.value.slice(0, 120) })}
@@ -228,5 +265,21 @@ function Row({ sub, noun, coins, menuOpen, onMenu, closeMenu, onChange, onRemove
         </span>
       </div>
     </div>
+  );
+}
+
+function SubCheck({ ticked, optional }: { ticked: boolean; optional: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className="flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full transition-colors"
+      style={ticked ? { background: "radial-gradient(circle at 35% 30%, #a8d88a, #58a04a 60%, #3d7a32)", border: "1.5px solid #2f5a26" } : { border: `1.5px ${optional ? "dashed" : "solid"} #a58c66` }}
+    >
+      {ticked && (
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+          <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+    </span>
   );
 }

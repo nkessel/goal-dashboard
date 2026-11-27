@@ -19,6 +19,7 @@ import {
   HOUR_END,
   formatDateParam,
   formatHourLabel,
+  formatLocal,
   formatShortTimeRange,
   isSameDay,
   parseDateParam,
@@ -67,12 +68,15 @@ export function WeekView({
   essentials = "dashed",
   habitLook = "quest",
   embedded = false,
+  onPanDays,
   ui,
 }: {
   /** What the server read from the `cal-ui` cookie: starting values, so the first picture is the final one. */
   ui?: CalUi;
   /** Inside a box of its own that scrolls (Today's day calendar): it scrolls that box, not the page, and stays on its day. */
   embedded?: boolean;
+  /** Embedded only: a sideways swipe or drag moves this many days, and the box stays where it is (Today's calendar pans its day). */
+  onPanDays?: (n: number) => void;
   daily?: DailyLayer;
   essentials?: EssentialsLook;
   habitLook?: HabitLook;
@@ -484,6 +488,19 @@ export function WeekView({
     }
     setSpan(s);
   }
+  /** The slider: at most one zoom a frame, however fast a finger sends its moves (iPhone: up to 120 a second). */
+  const slideTo = useRef<number | null>(null);
+  function slideDays(next: number) {
+    cancelAnimationFrame(zoomAnim.current);
+    const queued = slideTo.current != null;
+    slideTo.current = next;
+    if (queued) return;
+    requestAnimationFrame(() => {
+      const s = slideTo.current;
+      slideTo.current = null;
+      if (s != null) zoomDays(s);
+    });
+  }
   /** Glide to a number of days (the − and + beside the slider). */
   function zoomDaysTo(target: number) {
     cancelAnimationFrame(zoomAnim.current);
@@ -585,6 +602,11 @@ export function WeekView({
   const [fluid, setFluid] = useState<{ dx: number; w: number | null; n?: number } | null>(null);
   const dragged = useRef(false);
   const goTo = (startOffset: number, n: number) => {
+    // Inside Today's box: never leave the page; the box pans its own day.
+    if (embedded) {
+      if (startOffset) onPanDays?.(startOffset);
+      return;
+    }
     const first = new Date(days[seamless ? Math.max(0, Math.min(days.length - 1, firstIdx)) : 0]);
     first.setDate(first.getDate() + startOffset);
     const key = formatDateParam(first);
@@ -784,7 +806,7 @@ export function WeekView({
               color: isToday ? (isAdventure ? "var(--t-gold-deep)" : "var(--t-accent)") : isAdventure ? "#4a3a22" : "var(--t-ink-soft)",
             }}
           >
-            {day.toLocaleDateString(undefined, { weekday: vis >= 6 && colWidth > 0 && colWidth < 52 ? "narrow" : "short" })}
+            {formatLocal(day, { weekday: vis >= 6 && colWidth > 0 && colWidth < 52 ? "narrow" : "short" })}
           </span>
           <span
             className={`flex ${compact ? "h-5 min-w-5" : "h-6 min-w-6"} items-center justify-center rounded-full px-1 text-[13px] tabular-nums`}
@@ -1179,7 +1201,7 @@ export function WeekView({
           </>
         )}
         </span>
-        {seamless && <DaysZoom span={shown} isAdventure={isAdventure} onChange={(s) => (cancelAnimationFrame(zoomAnim.current), zoomDays(s))} onStep={zoomDaysTo} />}
+        {seamless && <DaysZoom span={shown} isAdventure={isAdventure} onChange={slideDays} onStep={zoomDaysTo} />}
       </div>
       {/* The day headings stay at the top once they reach it: the same bar, drawn the same way, so it never seems to
           change (owner's note 38bf14ef, Nov 16; it used to be a compressed copy that faded in). It hands back to the

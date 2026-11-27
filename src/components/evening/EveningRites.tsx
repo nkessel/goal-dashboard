@@ -919,6 +919,8 @@ export function EveningRites({
         <RiteEditorDialog
           rite={"new" in editing ? undefined : editing}
           defaultCore={"new" in editing ? editing.core : true}
+          stepDone={"new" in editing ? undefined : (id) => stepDone(editing.id, id)}
+          onTickStep={"new" in editing ? undefined : (id) => tickStep(editing, id)}
           onClose={() => setEditing(null)}
         />
       )}

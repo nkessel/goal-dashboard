@@ -54,15 +54,18 @@ export async function today(ownerId: string, args: Args): Promise<Out> {
   const core = new Set(ids(plan.core));
   const picked = new Set(ids(plan.days?.[day]));
   const since = new Date(Date.parse(`${day}T12:00:00Z`) - 800 * 86_400_000).toISOString().slice(0, 10);
-  const [done, skips] = await Promise.all([
+  const [done, skips, stepChecks] = await Promise.all([
     ritesData.listCompletionsFor(ownerId, rows.map((r) => r.id), since),
     ritesData.listHabitSkips(ownerId, since).then((s) => s ?? []),
+    ritesData.listRiteStepChecks(ownerId, day).then((c) => (c ?? []).filter((x) => x.day === day)),
   ]);
   const wd = weekdayOf(day);
   const view = (h: (typeof rows)[number]) => {
     const rep = cleanRepeat(h.repeat);
     const mine = done.filter((c) => c.rite_id === h.id).map((c) => c.day);
     const mineSkips = skips.filter((c) => c.rite_id === h.id).map((c) => c.day);
+    const steps = ritesData.cleanRiteSteps(h.steps);
+    const ticked = new Set(stepChecks.filter((c) => c.rite_id === h.id).map((c) => c.step_id));
     const due = slotOf(h) !== "day" ? true : rep ? repeatIsUp(rep, day, mine, mineSkips) : !h.days || h.days.length === 0 || h.days.includes(wd);
     return {
       id: h.id,
@@ -73,6 +76,8 @@ export async function today(ownerId: string, args: Args): Promise<Out> {
       xp: h.xp_value,
       repeats: rep ? `every ${rep.every} ${rep.unit}${rep.every === 1 ? "" : "s"}` : dayNames(h.days),
       time: h.due_time ?? null,
+      // Sub-habits (tick_subhabit): ticking the last required one completes the habit.
+      ...(steps.length ? { sub_habits: steps.map((st) => ({ id: st.id, title: st.title, done: ticked.has(st.id), ...(st.optional ? { optional: true } : {}), ...(st.xp ? { xp: st.xp } : {}) })) } : {}),
       ...(slotOf(h) === "day" ? { in_todays_quests: core.has(h.id) || picked.has(h.id) } : {}),
     };
   };

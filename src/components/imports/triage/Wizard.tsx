@@ -310,7 +310,7 @@ export function PlanStep({ draft, noted, onChange, onDone }: { draft: Draft; not
           Other…
         </Choice>
         <Choice on={draft.planDays === null} onClick={() => pick(null)}>
-          No need to schedule
+          One day (no timeframe)
         </Choice>
       </Choices>
       <div className="drawer-body" data-open={custom || undefined}>

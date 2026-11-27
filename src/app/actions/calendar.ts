@@ -580,3 +580,26 @@ export async function findFeedAction(url: string) {
   const { findFeed } = await import("@/lib/data/ics");
   return findFeed(u);
 }
+
+/**
+ * Another day for Today's calendar, when you pan it sideways (owner, Nov 25: "couldn't pan to different days from
+ * the today screen calendar"). Read-only: the day's quests and Google events, a day either side for time zones.
+ */
+export async function todayCalendarDayAction(dayKey: string) {
+  const { profileId, accessToken } = await requireSessionMaybeGoogle();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) throw new Error("Bad day");
+  const { addDays, parseDateParam } = await import("@/lib/calendar-dates");
+  const { listEventsAllCalendars } = await import("@/lib/google-calendar");
+  const { cookies } = await import("next/headers");
+  const day = parseDateParam(dayKey);
+  const from = addDays(day, -1);
+  const to = addDays(day, 2);
+  const skip = decodeURIComponent((await cookies()).get("cal-skip")?.value ?? "").split("|").filter(Boolean);
+  const [tasks, google] = await Promise.all([
+    tasksData.listCalendarTasksForOwner(profileId, from, to).catch(() => []),
+    accessToken ? listEventsAllCalendars(accessToken, from, to, skip).catch(() => null) : Promise.resolve(null),
+  ]);
+  const imported = new Set(tasks.map((t) => t.google_calendar_event_id).filter((id): id is string => Boolean(id)));
+  const events = (google?.events ?? []).filter((e) => !imported.has(e.id));
+  return { dayKey, tasks, events };
+}

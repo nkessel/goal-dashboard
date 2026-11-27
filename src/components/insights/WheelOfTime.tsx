@@ -11,7 +11,7 @@ import { StoneWheel, WHEEL_STEP } from "@/components/insights/StoneWheel";
 import { DateField } from "@/components/ui/DateField";
 import { MAX_WEIGHT, weightOf, clockFromNight, minutesLabel, nightMinutes, prettyTime, recentAverages, shiftDay, turnings, wheelTurns, type NightLog, type WheelState } from "@/lib/wheel-of-time";
 import { Fold } from "@/components/ui/Fold";
-import { CloseIcon } from "@/components/ui/Icons";
+import { CloseIcon, SpeakerIcon } from "@/components/ui/Icons";
 
 const CREAM = "#efe6cc";
 const SOFT = "rgba(239,230,204,.7)";
@@ -274,10 +274,10 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
             aria-pressed={sound}
             aria-label={sound ? "Mute the wheel" : "Let the wheel be heard"}
             title={sound ? "Mute the wheel" : "Let the wheel be heard"}
-            className="absolute right-0 top-0 flex h-9 w-9 items-center justify-center rounded-full text-[16px] hover:bg-white/10"
+            className="absolute right-0 top-0 flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/10"
             style={{ color: SOFT }}
           >
-            {sound ? "🔊" : "🔇"}
+            <SpeakerIcon on={sound} />
           </button>
         </div>
         {/* No count of turns (owner, Nov 9). Spun by hand past halfway, it waits for what turned it. */}

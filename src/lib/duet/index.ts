@@ -4,7 +4,8 @@ import { DuetError } from "./pure";
 import { recordChange } from "./log";
 import { today, find, board } from "./reads";
 import { addQuest, editQuest, placeQuest, moveQuest, completeQuest, reopenQuest, archiveQuest, restoreQuest } from "./quests";
-import { addHabit, editHabit, moveHabit, completeHabit, uncompleteHabit, removeHabit, restoreHabit } from "./habits";
+import { addHabit, editHabit, moveHabit, completeHabit, uncompleteHabit, removeHabit, restoreHabit, tickSubhabit } from "./habits";
+import { checkIn, checkIns, removeCheckIn } from "./checkins";
 import { addBoard, editBoard, moveBoard } from "./boards";
 import { undo } from "./undo";
 import type { Args, Out } from "./types";
@@ -12,11 +13,12 @@ import type { Args, Out } from "./types";
 type Handler = (ownerId: string, args: Args) => Promise<Out>;
 
 export const ACTIONS: Record<string, Handler> = {
-  today, find, board,
+  today, find, board, check_ins: checkIns,
   add_quest: addQuest, edit_quest: editQuest, place_quest: placeQuest, move_quest: moveQuest,
   complete_quest: completeQuest, reopen_quest: reopenQuest, archive_quest: archiveQuest, restore_quest: restoreQuest,
   add_habit: addHabit, edit_habit: editHabit, move_habit: moveHabit, complete_habit: completeHabit,
-  uncomplete_habit: uncompleteHabit, remove_habit: removeHabit, restore_habit: restoreHabit,
+  uncomplete_habit: uncompleteHabit, remove_habit: removeHabit, restore_habit: restoreHabit, tick_subhabit: tickSubhabit,
+  check_in: checkIn, remove_check_in: removeCheckIn,
   add_board: addBoard, edit_board: editBoard, move_board: moveBoard,
   undo,
 };

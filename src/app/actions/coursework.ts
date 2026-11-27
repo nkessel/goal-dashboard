@@ -7,11 +7,8 @@ import { revalidatePath } from "next/cache";
 import * as tasksData from "@/lib/data/tasks";
 import * as stepsData from "@/lib/data/steps";
 import * as ritesData from "@/lib/data/rites";
-import { stepsComplete } from "@/lib/habit-steps";
-import * as xp from "@/lib/data/xp";
-import * as rewardsData from "@/lib/data/rewards";
 import { requireProfileId, guideTasks, readExtras, assertDay } from "./_shared";
-import { completeRiteAction, uncompleteRiteAction } from "./evening";
+import { payRiteStep, tickRiteStepForOwner } from "@/lib/data/quest-ops";
 
 // ---- Getting up to date on coursework.
 /** Your boards with dated quests (imports included), for the catch-up plan. */
@@ -267,29 +264,8 @@ export async function setRiteStepsAction(riteId: string, steps: { id: string; ti
  */
 export async function tickRiteStepAction(riteId: string, stepId: string, day: string, on: boolean) {
   const ownerId = await requireProfileId();
-  assertDay(day);
-  const rite = await ritesData.getRite(riteId, ownerId);
-  if (!rite) throw new Error("That habit isn't here anymore.");
-  const changed = await ritesData.setRiteStepCheck(ownerId, riteId, stepId, day, on);
-  const steps = ritesData.cleanRiteSteps(rite.steps);
-  // A sub-habit with its own XP or coins pays them when ticked (and takes them back when unticked).
-  const step = steps.find((st) => st.id === stepId);
-  if (changed && step) await payStep(ownerId, step, on ? 1 : -1);
-  const checks = ((await ritesData.listRiteStepChecks(ownerId, day)) ?? []).filter((c) => c.rite_id === riteId && c.day === day);
-  const ticked = new Set(checks.map((c) => c.step_id));
-  // Only the required sub-habits finish it; with none required, ticks never complete or undo it.
-  const all = stepsComplete(steps, (id) => ticked.has(id));
-  const { data: doneRow } = await supabaseAdmin().from("rite_completions").select("id").eq("owner_id", ownerId).eq("rite_id", riteId).eq("day", day).maybeSingle();
-  let completed: { xp: number; coinsEarned: number } | null = null;
-  if (all === true && !doneRow) completed = await completeRiteAction(riteId, day);
-  else if (all === false && doneRow) await uncompleteRiteAction(riteId, day);
-  revalidatePath("/");
-  return { done: all ?? !!doneRow, xp: completed?.xp ?? 0 };
-}
-
-async function payStep(ownerId: string, step: ritesData.RiteStep, sign: 1 | -1) {
-  if (step.xp) await xp.awardXp(ownerId, sign * step.xp, "task_completed").catch(() => {});
-  if (step.coins) await rewardsData.addCoins(ownerId, sign * step.coins).catch(() => {});
+  const r = await tickRiteStepForOwner(ownerId, riteId, stepId, day, on);
+  return { done: r.done, xp: r.xp };
 }
 
 /** Check (or clear) every sub-habit at once, with the habit itself. */
@@ -300,7 +276,7 @@ export async function tickAllRiteStepsAction(riteId: string, day: string, on: bo
   if (!rite) return;
   for (const st of ritesData.cleanRiteSteps(rite.steps)) {
     const changed = await ritesData.setRiteStepCheck(ownerId, riteId, st.id, day, on).catch(() => false);
-    if (changed) await payStep(ownerId, st, on ? 1 : -1);
+    if (changed) await payRiteStep(ownerId, st, on ? 1 : -1);
   }
 }
 

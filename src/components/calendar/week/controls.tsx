@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { MAX_SPAN } from "./zoom-store";
 
 /** "3 days", "2½ days". */
@@ -15,6 +16,15 @@ function spanWords(s: number): string {
 export function DaysZoom({ span, isAdventure, onChange, onStep }: { span: number; isAdventure: boolean; onChange: (s: number) => void; onStep: (s: number) => void }) {
   const LOG = Math.log(MAX_SPAN);
   const v = Math.round((Math.log(span) / LOG) * 1000);
+  // Where the thumb is while a finger slides it: the calendar takes the new span at most once a frame, so the
+  // thumb follows the finger here instead of waiting for it (and jumping back in between).
+  const [live, setLive] = useState<number | null>(null);
+  const [seen, setSeen] = useState(span);
+  if (seen !== span) {
+    setSeen(span);
+    setLive(null);
+  }
+  const at = live ?? 1000 - v;
   const btn = "flex h-7 w-7 shrink-0 items-center justify-center rounded-full";
   const ink = isAdventure ? "#6b5531" : "var(--t-ink-soft)";
   const glass = (plus: boolean) => (
@@ -35,13 +45,17 @@ export function DaysZoom({ span, isAdventure, onChange, onStep }: { span: number
         min={0}
         max={1000}
         step={1}
-        value={1000 - v}
+        value={at}
         aria-label="Days shown"
         aria-valuetext={spanWords(span)}
         title="Slide right to come closer, left for more days"
-        onChange={(e) => onChange(Math.exp(((1000 - Number(e.target.value)) / 1000) * LOG))}
+        onChange={(e) => {
+          const n = Number(e.target.value);
+          setLive(n);
+          onChange(Math.exp(((1000 - n) / 1000) * LOG));
+        }}
         className="gilded-range w-24 sm:w-36 lg:w-48"
-        style={{ "--p": `${(1000 - v) / 10}%` } as React.CSSProperties}
+        style={{ "--p": `${at / 10}%` } as React.CSSProperties}
       />
       <button type="button" className={btn} aria-label="Fewer days (closer)" title="Fewer days (closer)" onClick={() => onStep(Math.max(1, Math.ceil(span - 0.01) - 1))}>
         {glass(true)}

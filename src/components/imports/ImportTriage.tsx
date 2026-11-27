@@ -161,7 +161,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
     setFocusId(c.id);
     const d = draftFor(c);
     const a = attrsOf(c.id);
-    const full: Draft = { ...d, boardId: a.board === undefined ? findBoard(boards, c.board_hint)?.id : a.board, minutes: a.minutes === undefined ? d.minutes : a.minutes, due: a.due === undefined ? d.due : a.due, importance: a.importance || d.importance, urgency: a.urgency || d.urgency, rated: d.rated || !!a.slot || !!(a.due === undefined ? d.due : a.due) };
+    const full: Draft = { ...d, boardId: a.board === undefined ? findBoard(boards, c.board_hint)?.id : a.board, minutes: a.minutes === undefined ? d.minutes : a.minutes, due: a.due === undefined ? d.due : a.due, importance: a.importance || d.importance, urgency: a.urgency || d.urgency, rated: d.rated || !!a.slot || !!a.oneDay || !!(a.due === undefined ? d.due : a.due), ...(a.oneDay && !a.slot && !(a.due === undefined ? d.due : a.due) ? { planDays: null } : {}) };
     // Everything already set on the card's pills: import it straight away, no questions.
     if (!all && withAttrs(full.kind) && baseFor(full).length === 0) return save(full, c);
     setDraft(full);

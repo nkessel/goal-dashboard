@@ -26,6 +26,7 @@ import { setHabitTicks, useHabitTicks } from "@/lib/use-habit-ticks";
 import type { HabitTicksSeed } from "@/lib/habit-ticks";
 import { setHabitManyAction, setHabitXpNowAction, tickHabitAgainAction, undoHabitTickAction } from "@/app/actions";
 import { SwipeReveal } from "@/components/ui/SwipeReveal";
+import { xpGained } from "@/lib/xp-live";
 import { Fold } from "@/components/ui/Fold";
 
 /**
@@ -52,8 +53,11 @@ export function DailyHabits({
   core = [],
   bare = false,
   additional = false,
+  nested = null,
   ticks: ticksSeed = null,
 }: {
+  /** Additional Habits, nested at the foot of this section's tray, as Additional Quests sits under Today's Quests (owner, Nov 25). */
+  nested?: React.ReactNode;
   /** The habits not up today, as their own section under Daily Habits, like Additional Quests (owner, Nov 18). */
   additional?: boolean;
   /** Habits that count every tick, and today's ticks after the first, so cards are right from the first paint. */
@@ -80,10 +84,10 @@ export function DailyHabits({
   const day = useLocalDay();
   // Closed until opened (the header still shows how the day is going).
   // Kept across a redraw (ticking a habit refreshes Today, which can draw the list anew), so the tray stays open.
-  const [open, setOpen] = useState(() => trayOpen.get(bare ? "bare" : "main") ?? false);
+  const [open, setOpen] = useState(() => trayOpen.get(bare ? "bare" : additional ? "more" : "main") ?? false);
   useEffect(() => {
-    trayOpen.set(bare ? "bare" : "main", open);
-  }, [open, bare]);
+    trayOpen.set(bare ? "bare" : additional ? "more" : "main", open);
+  }, [open, bare, additional]);
   const [look, setLook] = useState<HeaderLook>("togo");
   const [mark, setMark] = useState<HabitMark>("seedling");
   const [lookMenu, setLookMenu] = useState(false);
@@ -376,6 +380,7 @@ export function DailyHabits({
     setError(null);
     const before = ticks.today[h.id] ?? 0;
     setHabitTicks({ today: { ...ticks.today, [h.id]: before + 1 } });
+    xpGained(h.xp_value);
     startTransition(async () => {
       try {
         const r = await tickHabitAgainAction(h.id, day);
@@ -383,6 +388,7 @@ export function DailyHabits({
         celebrateTick(h, r.xp, r.coinsEarned, r.extra + 1);
       } catch (e) {
         setHabitTicks({ today: { ...ticks.today, [h.id]: before } });
+        xpGained(-h.xp_value);
         setError(e instanceof Error ? e.message : "Couldn't save that.");
       }
     });
@@ -393,12 +399,14 @@ export function DailyHabits({
     const extra = ticks.today[h.id] ?? 0;
     if (extra < 1) return toggle(h, true);
     setHabitTicks({ today: { ...ticks.today, [h.id]: extra - 1 } });
+    xpGained(-h.xp_value);
     startTransition(async () => {
       try {
         const r = await undoHabitTickAction(h.id, day);
         setHabitTicks({ today: { ...ticks.today, [h.id]: r.extra } });
       } catch {
         setHabitTicks({ today: { ...ticks.today, [h.id]: extra } });
+        xpGained(h.xp_value);
         setError("Couldn't undo that.");
       }
     });
@@ -412,6 +420,8 @@ export function DailyHabits({
     if (next && isMany(h.id)) celebrateTick(h, h.xp_value, h.coin_value ?? coinsForXp(h.xp_value), 1);
     setError(null);
     setOptimistic((o) => ({ ...o, [h.id]: next }));
+    // The XP on screen moves now, not when the page's refresh lands (owner's note 2983ab5d).
+    xpGained(next ? h.xp_value : -h.xp_value);
     if (next && h.xp_value > 0 && !isMany(h.id)) {
       setPop({ id: h.id, xp: h.xp_value });
       setTimeout(() => setPop((p) => (p?.id === h.id ? null : p)), 1400);
@@ -431,6 +441,7 @@ export function DailyHabits({
         }
       } catch (e) {
         setOptimistic((o) => ({ ...o, [h.id]: !next }));
+        xpGained(next ? -h.xp_value : h.xp_value);
         setError(e instanceof Error ? e.message : "Couldn't save that.");
       }
     });
@@ -447,6 +458,10 @@ export function DailyHabits({
     const all = stepsComplete(subs, (id) => !!after.get(id)) ?? wasDone;
     setError(null);
     setStepOpt((o) => ({ ...o, ...Object.fromEntries(subs.map((st) => [`${h.id}|${st.id}`, after.get(st.id)!])) }));
+    // This sub-habit's own XP, and the habit's if this tick finishes (or reopens) it, show at once.
+    const stepXp = (subs.find((st) => st.id === stepId)?.xp ?? 0) * (on ? 1 : -1);
+    const habitXp = all === wasDone ? 0 : all ? h.xp_value : -h.xp_value;
+    xpGained(stepXp + habitXp, habitXp);
     if (all !== wasDone) {
       setOptimistic((o) => ({ ...o, [h.id]: all }));
       if (all && h.xp_value > 0) {
@@ -460,6 +475,7 @@ export function DailyHabits({
       } catch (e) {
         setStepOpt((o) => ({ ...o, [`${h.id}|${stepId}`]: !on }));
         setOptimistic((o) => ({ ...o, [h.id]: wasDone }));
+        xpGained(-(stepXp + habitXp), -habitXp);
         setError(e instanceof Error ? e.message : "Couldn't save that.");
       }
     });
@@ -1060,6 +1076,7 @@ export function DailyHabits({
               </button>
             </li>
           </ul>
+          {nested && <div className="mt-3">{nested}</div>}
           </>)}
           </div>
         </div>
@@ -1070,6 +1087,8 @@ export function DailyHabits({
           rite={editing === "new" ? undefined : editing}
           slot="day"
           startWithSub={editSub}
+          stepDone={editing !== "new" ? (id) => ticked(editing, id) : undefined}
+          onTickStep={editing !== "new" ? (id) => tickStep(editing, id) : undefined}
           extraSubs={
             editing !== "new" && editing.id === cleanId && cleaning ? (
               <CleaningParts

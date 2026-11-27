@@ -242,7 +242,7 @@ export function TimeRuler({ kind, value, onChange, onDone, label }: { kind: Rule
         <span aria-hidden className="time-ruler-needle" />
       </div>
       {/* Its foot: Clear (once set), Type (keys a time in), Done. Quiet words, one line. */}
-      <div className="flex h-8 items-center gap-3 px-1 text-[12.5px]" style={{ color: "var(--ec-soft, #6b5631)" }}>
+      <div className="flex h-8 items-center gap-3 px-1 text-[12.5px]" style={{ color: "var(--ec-soft, rgba(239,230,204,.8))" }}>
         {value && !typing && (
           <button type="button" onClick={() => onChange("")} className="underline underline-offset-2">
             Clear
@@ -279,7 +279,7 @@ export function TimeRuler({ kind, value, onChange, onDone, label }: { kind: Rule
             />
           </form>
         ) : (
-          <button type="button" onClick={() => setTyping(true)} title="Tap to type a time" className="font-display h-7 min-w-[84px] px-1 text-[16px] tabular-nums" style={{ color: "var(--t-ink, #2a1c10)" }}>
+          <button type="button" onClick={() => setTyping(true)} title="Tap to type a time" className="font-display h-7 min-w-[84px] px-1 text-[16px] tabular-nums" style={{ color: "var(--t-cream, #2a1c10)" }}>
             {cur === null ? "— : —" : spoken(cur)}
           </button>
         )}

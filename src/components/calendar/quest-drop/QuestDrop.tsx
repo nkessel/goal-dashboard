@@ -9,7 +9,7 @@ import { localDayKey } from "@/lib/auto-schedule";
 import { habitBlocksOn } from "@/lib/timed-habits";
 import { useEscape } from "@/lib/use-escape";
 import { Fold, useClosing } from "@/components/ui/Fold";
-import { CloseIcon, GearIcon } from "@/components/ui/Icons";
+import { CloseIcon, GearIcon, SpeakerIcon } from "@/components/ui/Icons";
 import {
   DROP_DEFAULTS,
   DROP_STEP,
@@ -894,15 +894,6 @@ function Arrow({ dir }: { dir: "left" | "right" | "down" | "up" }) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden style={{ transform: `rotate(${rot}deg)` }}>
       <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function SpeakerIcon({ on }: { on: boolean }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-      {on ? <path d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /> : <path d="M16 9.5l5 5M21 9.5l-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />}
     </svg>
   );
 }

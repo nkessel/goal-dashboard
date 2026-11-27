@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Fold } from "@/components/ui/Fold";
 import { dailyEvents, MEAL_NAMES, type DailyEvent, type MealKey, type SchedulerSettings } from "@/lib/auto-schedule";
+import { formatLocal } from "@/lib/calendar-dates";
 import { getSavedSettings, saveDailyEvent, subscribeSavedSettings } from "@/lib/day-holds";
 
 /**
@@ -15,7 +16,7 @@ import { getSavedSettings, saveDailyEvent, subscribeSavedSettings } from "@/lib/
 const clock = (m: number) => {
   const d = new Date(2000, 0, 1, 0, 0);
   d.setMinutes(((m % 1440) + 1440) % 1440);
-  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return formatLocal(d, { hour: "numeric", minute: "2-digit" });
 };
 const chip = "h-8 rounded-full px-2.5 text-[12.5px] font-semibold";
 const line = { border: "1px solid #b39a6a" } as const;

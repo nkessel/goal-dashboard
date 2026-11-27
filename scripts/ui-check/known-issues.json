@@ -122,5 +122,9 @@
   {
     "match": "^tabsinstant\\|layout-shift\\|.*(stand-in|loaded)",
     "reason": "In the tabsinstant flow the real screen replaces the tab's stand-in in place, which the shift check counts as a jump with no tap. That swap is the feature; the screens' own shifts are checked by their own flows."
+  },
+  {
+    "match": "^today\\|covered-by-bar\\|<aside .today-cal.*sits on .*<span \\.tr-label>",
+    "reason": "Tablet: the bedtime/wake time ruler scrolls sideways inside its own box; the hour labels scrolled past its right edge are clipped by the ruler (see the screenshot) and only sit under Today's calendar geometrically."
   }
 ]

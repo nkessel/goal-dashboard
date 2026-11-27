@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { HonoraryLevel } from "./HonoraryLevel";
+import { LiveXp } from "./LiveXp";
 import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
 import type { Profile } from "@/lib/data/types";
 import { xpToNextLevel } from "@/lib/data/xp";
@@ -183,7 +184,7 @@ export function XpSummary({
               iconSrc="/design/ui-xpshield.png"
               value={
                 <>
-                  +{(stats?.xpThisWeek ?? 0).toLocaleString("en-US")}
+                  +<LiveXp base={stats?.xpThisWeek ?? 0} kind="week" format />
                   <span className="ml-0.5 text-[0.62em]">XP</span>
                 </>
               }

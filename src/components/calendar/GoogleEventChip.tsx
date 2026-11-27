@@ -141,6 +141,8 @@ export function GoogleEventChip({
       setDeleteError(r.error);
       return;
     }
+    // Drop its slot from the grid at once, like Hide does, so nothing shifts while the page refreshes (Nov 25 18a22b59).
+    hideEventId(event.id);
     setHidden(true);
     setOpen(false);
     router.refresh();
@@ -437,7 +439,7 @@ export function GoogleEventChip({
                 {description}
               </p>
             )}
-            <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
               {event.htmlLink && (
                 <a href={event.htmlLink} target="_blank" rel="noreferrer" className="mr-auto text-[13px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
                   Open in Google Calendar
@@ -452,6 +454,27 @@ export function GoogleEventChip({
               >
                 Delete…
               </button>
+              {askDelete && (
+                <div className="reveal flex w-full flex-wrap items-center justify-end gap-2 rounded-xl p-2 text-sm sm:order-last" style={{ color: "var(--t-ink)", background: "rgba(155,44,26,.07)", border: "1px solid rgba(155,44,26,.25)" }}>
+                  <span className="mr-auto">Delete it from Google Calendar?</span>
+                  <button type="button" disabled={deleting} onClick={() => deleteEvent(false)} className="h-8 rounded-full px-3 font-semibold disabled:opacity-50" style={{ background: "#9b2c1a", color: "#fff" }}>
+                    {deleting ? "Deleting…" : event.recurringEventId ? (isToday(event.start) ? "Just today" : "Just this day") : "Delete"}
+                  </button>
+                  {event.recurringEventId && (
+                    <button type="button" disabled={deleting} onClick={() => deleteEvent(true)} className="h-8 rounded-full px-3 font-semibold disabled:opacity-50" style={{ border: "1.5px solid #9b2c1a", color: "#9b2c1a" }}>
+                      Every repeat
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setAskDelete(false)} className="h-8 rounded-full px-3 font-semibold" style={{ border: "1px solid #b39a6a", color: "var(--t-ink-soft)" }}>
+                    Cancel
+                  </button>
+                  {deleteError && (
+                    <p role="alert" className="m-0 w-full text-right text-[13px]" style={{ color: "#9b2c1a" }}>
+                      {deleteError}
+                    </p>
+                  )}
+                </div>
+              )}
               <button
                 type="button"
                 onClick={hideEvent}
@@ -469,27 +492,6 @@ export function GoogleEventChip({
                 {isAdventure ? "Make it a quest" : "Add as task"}
               </button>
             </div>
-            {askDelete && (
-              <div className="reveal flex flex-wrap items-center justify-end gap-2 text-sm" style={{ color: "var(--t-ink)" }}>
-                <span className="mr-auto">Delete it from Google Calendar?</span>
-                <button type="button" disabled={deleting} onClick={() => deleteEvent(false)} className="h-8 rounded-full px-3 font-semibold disabled:opacity-50" style={{ background: "#9b2c1a", color: "#fff" }}>
-                  {deleting ? "Deleting…" : event.recurringEventId ? "Just this day" : "Delete"}
-                </button>
-                {event.recurringEventId && (
-                  <button type="button" disabled={deleting} onClick={() => deleteEvent(true)} className="h-8 rounded-full px-3 font-semibold disabled:opacity-50" style={{ border: "1.5px solid #9b2c1a", color: "#9b2c1a" }}>
-                    Every repeat
-                  </button>
-                )}
-                <button type="button" onClick={() => setAskDelete(false)} className="h-8 rounded-full px-3" style={{ color: "var(--t-ink-soft)" }}>
-                  Keep it
-                </button>
-                {deleteError && (
-                  <p role="alert" className="m-0 w-full text-right text-[13px]" style={{ color: "#9b2c1a" }}>
-                    {deleteError}
-                  </p>
-                )}
-              </div>
-            )}
           </div>
         </div>,
         document.body
@@ -512,6 +514,14 @@ export function GoogleEventChip({
       )}
     </>
   );
+}
+
+/** Whether an event starts today, in the viewer's own time zone. */
+function isToday(iso: string) {
+  // An all-day event's start is a bare date: read it as that day here, not midnight in London.
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T12:00`) : new Date(iso);
+  const n = new Date();
+  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
 }
 
 /** "2026-10-18T09:30" in the viewer's own time zone, for a datetime-local field. */

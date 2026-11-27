@@ -16,7 +16,7 @@ import { keepImportant } from "@/lib/toucan-kept";
  * small floating target you can open all day (KeptTarget). Its background and mist are set in Settings › Toucan
  * Spirit › His look.
  */
-export function ToucanQuestion({ onClose }: { onClose: () => void }) {
+export function ToucanQuestion({ onClose, preview = false }: { onClose: () => void; preview?: boolean }) {
   const bg = useSyncExternalStore(subscribeFx, () => loadFx().toucanAskBg ?? "mist", () => "mist");
   const mist = useSyncExternalStore(subscribeFx, () => loadFx().toucanAskMist ?? 0.7, () => 0.7);
   const [text, setText] = useState("");
@@ -53,7 +53,8 @@ export function ToucanQuestion({ onClose }: { onClose: () => void }) {
 
   const finish = (keep: boolean) => {
     const words = text.trim();
-    if (!words) return close();
+    // A preview from Settings saves nothing.
+    if (!words || preview) return close();
     setBusy(true);
     setError(null);
     addJournalEntryAction(`Most important: ${words}`, null, "important")

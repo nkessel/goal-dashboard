@@ -8,30 +8,10 @@ import { Fold } from "@/components/ui/Fold";
 import { DateField } from "@/components/ui/DateField";
 import { eveningDayKey } from "@/components/evening/evening-clock";
 import { CloseIcon } from "@/components/ui/Icons";
+import { SLEEP_FACES as FACES, SleepFeel, sleepTone } from "./SleepFeel";
 
 const GILT = { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } as const;
 const SOFT = "#6b5631";
-
-/** How well you slept, 1–5: kept as the "Sleep quality" check-in metric (2…10 on its 1–10 scale). */
-const FACES = [
-  { v: 1, label: "Bad", mouth: "M8 17.5c1.6-2 6.4-2 8 0" },
-  { v: 2, label: "Poor", mouth: "M8.5 16.5c1.6-1 5.4-1 7 0" },
-  { v: 3, label: "OK", mouth: "M8.5 16h7" },
-  { v: 4, label: "Good", mouth: "M8.5 15c1.6 1.2 5.4 1.2 7 0" },
-  { v: 5, label: "Great", mouth: "M7.5 14.2c2 2.8 7 2.8 9 0" },
-] as const;
-const FACE_COLOR = ["#a33c2a", "#c0703a", "#a8893f", "#6f9a3a", "#3f7a2e"];
-
-function Face({ mouth, color }: { mouth: string; color: string }) {
-  return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="9.5" fill={color} fillOpacity=".16" stroke={color} strokeWidth="1.6" />
-      <circle cx="9" cy="10" r="1.1" fill={color} />
-      <circle cx="15" cy="10" r="1.1" fill={color} />
-      <path d={mouth} stroke={color} strokeWidth="1.7" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 /**
  * Sleep, its own part of the welcome screen: a gilded button that slides open
@@ -45,7 +25,6 @@ export function SleepCheckIn({ register, label, icon, onFilled }: { register: (s
   const [night, setNight] = useState<NightDraft>(EMPTY_NIGHT);
   const [base, setBase] = useState(JSON.stringify(EMPTY_NIGHT));
   const [logged, setLogged] = useState(false);
-  const [qualityOpen, setQualityOpen] = useState(false);
   const [quality, setQuality] = useState<number | null>(null);
   const [others, setOthers] = useState<{ id: number; day: string; bed: string; wake: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +66,7 @@ export function SleepCheckIn({ register, label, icon, onFilled }: { register: (s
       if (touched) await saveOrQueue("saveNight", night, `night:${night.today ? "today" : "last"}`);
       if (qualityNew) await saveOrQueue("saveCheckIn", { energy: null, metrics: [{ metric: "Sleep quality", level: quality * 2 }], at: new Date().toISOString() });
       if (noteNew) {
-        await saveOrQueue("logEvent", { title: "😴 Sleep note", details: note.trim().slice(0, 400), tone: quality ? (quality >= 4 ? 1 : quality <= 2 ? -1 : 0) : null, at: new Date().toISOString() });
+        await saveOrQueue("logEvent", { title: "😴 Sleep note", details: note.trim().slice(0, 400), tone: sleepTone(quality), at: new Date().toISOString() });
         setSavedNote(note.trim());
       }
       if (filled.length || touched || qualityNew || noteNew) onFilled?.();
@@ -117,7 +96,6 @@ export function SleepCheckIn({ register, label, icon, onFilled }: { register: (s
     }
     if (qualityNew) setSavedQuality(quality);
     if (filled.length) setOthers([]);
-    setQualityOpen(false);
     setOpen(false);
     setStamp((n) => n + 1);
     setSaved(true);
@@ -167,49 +145,16 @@ export function SleepCheckIn({ register, label, icon, onFilled }: { register: (s
                 Opening…
               </p>
             )}
-            {/* Sleep quality: five faces, one tap. */}
-            <div className="flex flex-wrap items-center justify-center gap-2">
-            <button type="button" onClick={() => setQualityOpen((v) => !v)} aria-expanded={qualityOpen} className="wheel-btn flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold">
-              {quality ? <Face mouth={FACES[quality - 1].mouth} color={FACE_COLOR[quality - 1]} /> : <span aria-hidden>☺</span>}
-              Sleep quality{quality ? ` · ${FACES[quality - 1].label}` : ""}
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-300" style={{ transform: qualityOpen ? "rotate(90deg)" : undefined }}>
-                <path d="M9 5.5l6.5 6.5L9 18.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-            {/* Its Save sits beside the Sleep quality button (owner, Nov 11), once there's something to save. */}
+            {/* How was your sleep? Five faces, then + Sleep notes (owner, Nov 24). */}
+            <SleepFeel quality={quality} onQuality={setQuality} note={note} onNote={setNote} />
+            {/* Its own Save, once there's something to save. */}
             {dirty && (
-              <button type="button" onClick={saveNow} disabled={saving} className="fade-in flex h-8 items-center gap-1 rounded-full px-4 text-[13px] font-bold disabled:opacity-70" style={GILT}>
-                {saving ? "Saving…" : "Save sleep check-in ✓"}
-              </button>
-            )}
-            </div>
-            <div className="drawer-body" data-open={qualityOpen ? "true" : "false"}>
-              <div className="drawer-inner" inert={!qualityOpen}>
-                <div role="radiogroup" aria-label="How well did you sleep?" className="flex justify-center gap-1.5 pt-1">
-                  {FACES.map((f, i) => {
-                    const on = quality === f.v;
-                    return (
-                      <button key={f.v} type="button" role="radio" aria-checked={on} onClick={() => setQuality(on ? null : f.v)} className="flex w-14 flex-col items-center gap-0.5 rounded-xl py-1.5 transition-transform duration-150 active:scale-95" style={{ background: on ? `${FACE_COLOR[i]}22` : "transparent", boxShadow: on ? `inset 0 0 0 1.5px ${FACE_COLOR[i]}` : undefined, transform: on ? "scale(1.06)" : undefined }}>
-                        <Face mouth={f.mouth} color={FACE_COLOR[i]} />
-                        <span className="text-[11.5px] font-semibold" style={{ color: on ? FACE_COLOR[i] : SOFT }}>
-                          {f.label}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+              <div className="flex justify-center">
+                <button type="button" onClick={saveNow} disabled={saving} className="fade-in flex h-8 items-center gap-1 rounded-full px-4 text-[13px] font-bold disabled:opacity-70" style={GILT}>
+                  {saving ? "Saving…" : "Save sleep check-in ✓"}
+                </button>
               </div>
-            </div>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={1}
-              maxLength={400}
-              aria-label="Sleep notes"
-              placeholder="Sleep notes (dreams, wake-ups, what helped…)"
-              className="min-h-[38px] w-full resize-none rounded-xl px-3 py-2 text-[16px] leading-snug"
-              style={{ background: "rgba(255,250,238,.7)", border: "1px solid rgba(139,112,64,.35)", color: "var(--t-ink)", fieldSizing: "content" } as React.CSSProperties}
-            />
+            )}
             {/* Other nights: a row only once you add one (no empty fields waiting). */}
             {others.map((n, i) => (
               <div key={n.id} className="reveal flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl px-2 py-1.5" style={{ background: "rgba(255,250,238,.55)", border: "1px solid rgba(139,112,64,.3)" }}>

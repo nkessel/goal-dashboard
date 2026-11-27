@@ -32,8 +32,13 @@ export function RiteEditorDialog({
   slot = rite?.slot === "day" ? "day" : "evening",
   startWithSub = false,
   extraSubs,
+  stepDone,
+  onTickStep,
   onClose,
 }: {
+  /** Today's ticks on its saved sub-habits, shown on their rows (owner's note 7ba2172e); a tap ticks one. */
+  stepDone?: (stepId: string) => boolean;
+  onTickStep?: (stepId: string) => void;
   /** More of this habit's parts shown with its sub-habits (the cleaning habit's spaces and chores). */
   extraSubs?: React.ReactNode;
   /** Opened from "Add a sub-habit": straight to a new sub-habit. */
@@ -247,7 +252,14 @@ export function RiteEditorDialog({
           <div data-mi="subs" className="relative z-[2] flex flex-col gap-1">
             <span className="text-[14.5px] font-semibold">{isHabit ? "Sub-habits" : "Subtasks"}</span>
             {extraSubs}
-            <SubHabitList list={subs} onChange={setSubs} autoFocus={focusSub} noun={isHabit ? "sub-habit" : "subtask"} />
+            <SubHabitList
+              list={subs}
+              onChange={setSubs}
+              autoFocus={focusSub}
+              noun={isHabit ? "sub-habit" : "subtask"}
+              done={stepDone && rite ? (id) => (rite.steps ?? []).some((st) => st.id === id) && stepDone(id) : undefined}
+              onTick={onTickStep && rite ? (id) => (rite.steps ?? []).some((st) => st.id === id) && onTickStep(id) : undefined}
+            />
           </div>
         )}
 

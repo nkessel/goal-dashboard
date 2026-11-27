@@ -96,12 +96,25 @@ export function formatDateParam(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/**
+ * `toLocaleDateString` / `toLocaleTimeString` with one formatter kept per set of options. Each of those calls
+ * builds a new formatter, and the calendar draws hundreds of them on every frame of a zoom (300+ a frame on the
+ * days slider, Nov 25): slow, and on iPhone the likely cause of the page crashing while sliding.
+ */
+const formatters = new Map<string, Intl.DateTimeFormat>();
+export function formatLocal(d: Date | number, opts: Intl.DateTimeFormatOptions): string {
+  const key = JSON.stringify(opts);
+  let f = formatters.get(key);
+  if (!f) formatters.set(key, (f = new Intl.DateTimeFormat(undefined, opts)));
+  return f.format(d);
+}
+
 export function formatDayHeading(d: Date): string {
-  return d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+  return formatLocal(d, { weekday: "long", month: "short", day: "numeric" });
 }
 
 export function formatMonthHeading(d: Date): string {
-  return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  return formatLocal(d, { month: "long", year: "numeric" });
 }
 
 export function formatWeekRangeHeading(weekStart: Date): string {
@@ -123,8 +136,7 @@ export function formatHourLabel(hour: number): string {
 }
 
 export function formatTimeRange(start: Date, end: Date): string {
-  const fmt = (d: Date) =>
-    d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const fmt = (d: Date) => formatLocal(d, { hour: "numeric", minute: "2-digit" });
   return `${fmt(start)} – ${fmt(end)}`;
 }
 

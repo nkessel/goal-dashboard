@@ -78,7 +78,8 @@ export const rangeLabel = (n: number) => RANGES.find((r) => r.days === n)?.label
 export const weekdayOf = (iso: string) => new Date(iso).toLocaleDateString(undefined, { weekday: "short" });
 
 /** The When pill's words: "Within a week", "Around Fri", "By Fri", "Thu 3pm", or "When". */
-export function whenFace(withinDays: number | null, due: string | null, firm: boolean, slot: { start: string; end: string } | null): string {
+export function whenFace(withinDays: number | null, due: string | null, firm: boolean, slot: { start: string; end: string } | null, oneDay = false): string {
+  if (oneDay && !due && withinDays == null && !slot) return "One day";
   const by = due ? `${firm ? "By" : "Around"} ${dueChipLabel(due)}` : withinDays != null ? rangeLabel(withinDays) : null;
   const at = slot ? `${weekdayOf(slot.start)} ${shortTime(slot.start).replace(":00", "")}` : null;
   return [by, at].filter(Boolean).join(" · ") || "When";
@@ -102,11 +103,17 @@ export function WhenPanel({ card, attrs, due, minutes, set, onRate }: { card: Im
   const pill = (on: boolean): React.CSSProperties => ({ ...pickOff, background: on ? "rgba(217,180,95,.45)" : pickOff.background });
   const pickDay = (day: string | null) => {
     if (within != null) onRate(null);
-    set({ due: day, firm: false });
+    set({ due: day, firm: false, oneDay: false });
   };
   const pickRange = (n: number | null) => {
     onRate(n);
-    set({ due: null, firm: false });
+    set({ due: null, firm: false, oneDay: false });
+  };
+  // One day (owner, Nov 25): "for items I don't want to set a timeframe for". Clears any range, date or time.
+  const oneDay = !!attrs.oneDay && !due && within == null && !attrs.slot;
+  const pickOneDay = () => {
+    if (within != null) onRate(null);
+    set({ due: null, firm: false, slot: null, oneDay: !oneDay });
   };
   const setFirm = (f: boolean) => {
     if (f && !due && within != null) {
@@ -132,6 +139,9 @@ export function WhenPanel({ card, attrs, due, minutes, set, onRate }: { card: Im
             {o.label}
           </button>
         ))}
+        <button type="button" aria-pressed={oneDay} onClick={pickOneDay} title="No timeframe: it goes on its board, and the auto-scheduler leaves it alone" className="h-8 rounded-full px-3 text-[13px] font-semibold" style={pill(oneDay)}>
+          One day
+        </button>
         <button type="button" aria-expanded={other} onClick={() => setOther((v) => !v)} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={pill(other || (!!due && !days.some((q) => q.day === due)))}>
           {due && !days.some((q) => q.day === due) ? dueChipLabel(due) : "Other…"}
         </button>
@@ -164,7 +174,7 @@ export function WhenPanel({ card, attrs, due, minutes, set, onRate }: { card: Im
           </span>
         </div>
       </Fold>
-      <CalendarRow title={card.title} minutes={minutes} slot={attrs.slot ?? null} onSlot={(slot) => set({ slot })} />
+      <CalendarRow title={card.title} minutes={minutes} slot={attrs.slot ?? null} onSlot={(slot) => set(slot ? { slot, oneDay: false } : { slot })} />
     </div>
   );
 }
@@ -206,7 +216,7 @@ export function AttrPills({ card, attrs, shown, onChange, onRate, small = false 
       <>
         <Glyph src="/design/ui-calendar.png" />
         {/* One "when" (owner, Nov 18): "Within a week", "Around Fri", "By Fri", then a picked time: "By Fri · Thu 3pm". */}
-        {whenFace(card.plan_within_days ?? null, due, firmOf(attrs, due), attrs.slot ?? null)}
+        {whenFace(card.plan_within_days ?? null, due, firmOf(attrs, due), attrs.slot ?? null, !!attrs.oneDay)}
       </>
     ),
     tiny: (

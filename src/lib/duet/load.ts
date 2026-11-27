@@ -9,7 +9,7 @@ export type Row = Task & { sort_order?: number | null; in_additional?: boolean |
 export type HabitRow = {
   id: string; owner_id: string; title: string; description: string | null; is_core: boolean; xp_value: number; slot?: string | null;
   days?: number[] | null; due_time?: string | null; window_to?: string | null; kind?: string | null; coin_value?: number | null;
-  estimate_minutes?: number | null; repeat?: unknown; sort_order: number; archived: boolean; created_at: string;
+  estimate_minutes?: number | null; repeat?: unknown; steps?: unknown; sort_order: number; archived: boolean; created_at: string;
 };
 
 export type BoardLabels = { boards: Board[]; label: (id: string | null | undefined) => string | null };
