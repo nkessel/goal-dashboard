@@ -10,7 +10,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 - **Run B scheduled run note (Nov 28, ~01:30 UTC):** no new notes (only 72002f7e, on `review/sleep-faces-in-card`); run 198 holds a fresh claim on the full UI check; `main` code unchanged. Nothing built.
 
-- **Dev loop 2 run 199 note (Nov 28, 01:56 UTC):** no new notes (the two open ones are on review branches); run 198 holds the full UI check claim; BUILD-PLAN has nothing unclaimed that ships straight. Nothing built.
+- **Dev loop 2 runs 199–200 note (Nov 28, 01:56 and 02:56 UTC):** no new notes (the two open ones are on review branches); run 198 holds the full UI check claim; BUILD-PLAN has nothing unclaimed that ships straight. Nothing built.
 
 - **Dev loop 2 run 198 (Nov 28, ~01:00 UTC):** UI check on all flows against `main` after the tabs-instant merge (38e61fe); fixes on `main`.
 
