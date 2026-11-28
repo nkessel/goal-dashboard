@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Run B scheduled run note (Nov 28, ~15:30 UTC):** no new notes (only 72002f7e, on `review/sleep-faces-in-card`); `main` code unchanged. Nothing built.
+
 - **Run B scheduled run note (Nov 28, ~13:30 UTC):** no new notes (only 72002f7e, on `review/sleep-faces-in-card`); `main` code unchanged. Nothing built.
 
 - **Run B scheduled run note (Nov 28, ~11:30 UTC):** no new notes (only 2220252c and 72002f7e, both on review branches); `main` code unchanged. Nothing built.
