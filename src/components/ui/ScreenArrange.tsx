@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GearIcon } from "@/components/ui/Icons";
-import { readLayout, saveLayout, subscribeLayout, type ScreenLayout } from "@/lib/screen-layout";
+import { cleanLayout, readLayout, saveLayout, subscribeLayout, writeLayoutCookie, type ScreenLayout } from "@/lib/screen-layout";
 
 const GOLD = "#8a6116";
 
@@ -25,14 +25,39 @@ export type ScreenPart = {
  * corner hides it, hidden parts wait as + chips. The same pattern as Today
  * and the welcome screen (HANDOFF §5, "Settings in context").
  */
-export function ScreenArrange({ screen, name, parts, gap = "gap-4", gearClass = "-top-3 right-0" }: { screen: string; name: string; parts: ScreenPart[]; gap?: string; gearClass?: string }) {
+export function ScreenArrange({
+  screen,
+  name,
+  parts,
+  gap = "gap-4",
+  gearClass = "-top-3 right-0",
+  saved,
+}: {
+  screen: string;
+  name: string;
+  parts: ScreenPart[];
+  gap?: string;
+  gearClass?: string;
+  /** The layout cookie as the server read it (`parseLayoutCookie`), so its first picture is already in your order; undefined where a screen doesn't pass it. */
+  saved?: unknown;
+}) {
   const keys = parts.map((p) => p.key);
   const keysId = keys.join("|");
   // eslint-disable-next-line react-hooks/exhaustive-deps -- the keys are compared by value
   const defaults = useMemo(() => keys, [keysId]);
   const read = useCallback(() => readLayout(screen, defaults), [screen, defaults]);
-  const server = useMemo<ScreenLayout>(() => ({ order: defaults, hidden: [] }), [defaults]);
+  const server = useMemo<ScreenLayout>(() => (saved ? cleanLayout(saved, defaults) : { order: defaults, hidden: [] }), [saved, defaults]);
   const layout = useSyncExternalStore(subscribeLayout, read, () => server);
+  // A layout saved before the cookie existed: copy it over, so the next load is drawn in that order.
+  useEffect(() => {
+    if (saved === null) {
+      try {
+        if (window.localStorage.getItem(`screen-layout:${screen}`)) writeLayoutCookie(screen, readLayout(screen, defaults));
+      } catch {
+        /* storage unavailable */
+      }
+    }
+  }, [saved, screen, defaults]);
   const [arranging, setArranging] = useState(false);
   const byKey = new Map(parts.map((p) => [p.key, p]));
   const shown = layout.order.filter((k) => !layout.hidden.includes(k) || byKey.get(k)?.keep);

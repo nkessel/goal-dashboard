@@ -7,6 +7,22 @@ export type ScreenLayout = { order: string[]; hidden: string[] };
 
 const EVENT = "screen-layout";
 const keyOf = (screen: string) => `screen-layout:${screen}`;
+/** The same layout in a cookie, so the server draws the screen in your order (no jump once the browser takes over). */
+export const layoutCookie = (screen: string) => `screen-layout-${screen}`;
+/** The cookie's value as the server reads it (anything broken: nothing). */
+export function parseLayoutCookie(raw: string | undefined | null): unknown {
+  if (!raw) return null;
+  try {
+    return JSON.parse(decodeURIComponent(raw));
+  } catch {
+    return null;
+  }
+}
+export function writeLayoutCookie(screen: string, l: ScreenLayout | null) {
+  document.cookie = l
+    ? `${layoutCookie(screen)}=${encodeURIComponent(JSON.stringify(l))}; path=/; max-age=31536000; samesite=lax`
+    : `${layoutCookie(screen)}=; path=/; max-age=0; samesite=lax`;
+}
 
 /** Known parts only, each once, with any new part slotted in where the default has it. */
 export function cleanLayout(raw: unknown, defaults: string[]): ScreenLayout {
@@ -46,6 +62,7 @@ export function saveLayout(screen: string, l: ScreenLayout | null) {
   } catch {
     /* storage unavailable */
   }
+  writeLayoutCookie(screen, l);
   window.dispatchEvent(new Event(EVENT));
 }
 

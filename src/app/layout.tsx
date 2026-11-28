@@ -12,6 +12,7 @@ import { LanguageWindow, PackingWindow } from "@/components/layout/LazyShell";
 import { ClickTrail } from "@/components/ui/ClickTrail";
 import { NoBrowserMenu } from "@/components/ui/NoBrowserMenu";
 import { LastScreen } from "@/components/ui/LastScreen";
+import { ShellChromeHost } from "@/components/layout/ShellChrome";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -104,6 +105,7 @@ export default function RootLayout({ children, drawer }: LayoutProps<"/">) {
         <ViewTransitionProvider>
           {children}
           {drawer}
+          <ShellChromeHost />
         </ViewTransitionProvider>
       </body>
     </html>

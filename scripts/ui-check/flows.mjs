@@ -605,6 +605,19 @@ export const FLOWS = [
             await h.check(`${name}: stand-in, mid-slide`);
             await h.settle(500);
             if (await h.page.locator("main[data-standin]").count()) await h.check(`${name}: stand-in, at rest`);
+            // TI-6: the +, the chat button, the bell and the corner button stay through the switch.
+            if (await h.page.locator("main[data-standin]").count()) {
+              const missing = await h.page.evaluate(() => {
+                const has = (sel) => !!document.querySelector(sel);
+                return [
+                  !has("button.fab-ring") && "the +",
+                  !has('button[aria-label="Feedback (F)"]') && "the chat button",
+                  !has("button[data-bell]") && "the bell",
+                  !has("a[data-owl-cage]") && "the corner button",
+                ].filter(Boolean);
+              });
+              if (missing.length) h.record({ kind: "tabsinstant", severity: "error", target: label, detail: `${href} (${pass}): missing on the stand-in: ${missing.join(", ")}` });
+            }
           }
           await h.page.waitForSelector("main[data-standin]", { state: "detached", timeout: 15000 }).catch(() => h.record({ kind: "tabsinstant", severity: "error", target: label, detail: `${href} (${pass}): the stand-in never gave way to the screen` }));
           await slowDb(0);
