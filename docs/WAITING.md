@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 201 note (Nov 28, 03:56 UTC):** no new notes (2220252c and 72002f7e are on review branches); run 198's full UI check just finished clean on `main`; BUILD-PLAN has nothing unclaimed that ships straight. Nothing built.
+
 - **Dev loop 2 run 198 note (Nov 28, 00:58 to ~03:50 UTC):** no new notes (only 2220252c and 72002f7e, both on review branches). Full UI check on `main` after the tabs-instant merge: 0 app errors; two check fixes shipped (see SHIPPED).
 
 - **Run B scheduled run note (Nov 28, ~03:30 UTC):** no new notes (only 72002f7e, on `review/sleep-faces-in-card`); `main` code unchanged. Nothing built.
