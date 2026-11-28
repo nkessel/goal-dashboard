@@ -4,9 +4,19 @@ import { startTransition, useEffect, useState } from "react";
 import { FloatingActionButton } from "@/components/ui/FloatingActionButton";
 import { useFabTarget } from "@/lib/fab-target";
 import { CreateSheet, JOURNAL_DRAFT_KEY, type CreateKind } from "./CreateSheet";
+import { useRegisterFab, type FabProps } from "@/lib/shell-chrome";
+
+/**
+ * The floating + for this screen. It is drawn by the app-wide host (`ShellChromeHost`), so it stays put
+ * and keeps its sheet open while a tab's stand-in gives way to the real screen (TI-6A).
+ */
+export function CreateFab(props: FabProps) {
+  useRegisterFab(props);
+  return null;
+}
 
 /** The floating + : opens the create sheet above it and becomes its ×. */
-export function CreateFab({
+export function CreateFabView({
   kinds,
   initial,
   boardId,

@@ -1,7 +1,7 @@
 "use client";
 
 import { TimeToken } from "@/components/xp/NightFields";
-import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { saveOrQueue } from "@/lib/offline";
@@ -40,8 +40,12 @@ function groupCheckIns(readings: Reading[]): { at: string; items: Reading[] }[] 
  * (newest first), then the tracking chart, with + to add an entry to it.
  */
 const CHART_KEY = "insights-chart";
+/** "open:<height>" or "shut", for the server's first picture of the chart. */
+function setChartCookie(v: string) {
+  document.cookie = `${CHART_KEY}=${v}; path=/; max-age=31536000; samesite=lax`;
+}
 
-export function CheckInHub({ zone, readings, metrics, wins, starred = [], nights }: { zone?: string; readings: Reading[]; metrics: string[]; wins: WinLite[]; starred?: string[]; nights?: Record<string, { bed: string | null; wake: string | null }> }) {
+export function CheckInHub({ zone, readings, metrics, wins, starred = [], nights, chartOpen, chartHeight }: { zone?: string; readings: Reading[]; metrics: string[]; wins: WinLite[]; starred?: string[]; nights?: Record<string, { bed: string | null; wake: string | null }>; /** The `insights-chart` cookie, read by the server, so the first picture is the final one; browser storage is the fallback. */ chartOpen?: boolean; /** The open chart's last height on this device (same cookie): the space it takes before the browser draws it. */ chartHeight?: number }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<{ at: string; items: Reading[] } | null>(null);
   const [chartPick, setChartPick] = useState<boolean | null>(null);
@@ -52,13 +56,32 @@ export function CheckInHub({ zone, readings, metrics, wins, starred = [], nights
       return false;
     }
   }, () => false);
-  const chart = chartPick ?? savedChart;
+  const chart = chartPick ?? chartOpen ?? savedChart;
   const showChart = (v: boolean) => {
     setChartPick(v);
     try {
       localStorage.setItem(CHART_KEY, v ? "open" : "shut");
     } catch {}
+    setChartCookie(v ? `open:${Math.round(chartBox.current?.getBoundingClientRect().height || chartHeight || 0)}` : "shut");
   };
+  // The chart draws in the browser only (its dates and times are the browser's); until then its space is kept.
+  const inBrowser = useSyncExternalStore(noop, () => true, () => false);
+  const chartBox = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = chartBox.current;
+    if (!chart || !inBrowser || !el) return;
+    let last = 0;
+    const ro = new ResizeObserver(() => {
+      const h = Math.round(el.getBoundingClientRect().height);
+      if (h > 0 && Math.abs(h - last) > 2) setChartCookie(`open:${(last = h)}`);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [chart, inBrowser]);
+  // A choice made before the cookie existed: copy it over, so the next load draws it on the server.
+  useEffect(() => {
+    if (chartOpen === undefined && savedChart) setChartCookie("open");
+  }, [chartOpen, savedChart]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -81,8 +104,8 @@ export function CheckInHub({ zone, readings, metrics, wins, starred = [], nights
         </svg>
       </button>
       <Fold open={chart}>
-        <div className="parchment parchment-framed relative flex flex-col gap-2 rounded-2xl px-3 py-3" style={{ borderRadius: 16 }}>
-          <TrackingChart metrics={metrics} readings={readings} wins={wins} nights={nights} onAdd={() => setAdding(true)} />
+        <div ref={chartBox} className="parchment parchment-framed relative flex flex-col gap-2 rounded-2xl px-3 py-3" style={{ borderRadius: 16, height: inBrowser ? undefined : (chartHeight ?? 360) }}>
+          {inBrowser && <TrackingChart metrics={metrics} readings={readings} wins={wins} nights={nights} onAdd={() => setAdding(true)} />}
         </div>
       </Fold>
       {adding && <AddEntry metrics={metrics} onClose={() => setAdding(false)} />}

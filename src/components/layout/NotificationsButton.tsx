@@ -8,6 +8,7 @@ import { CloseSettingsButton } from "@/components/settings/CloseSettingsButton";
 import { markNotificationReadAction, recentNotificationsAction } from "@/app/actions";
 import { useEscape } from "@/lib/use-escape";
 import { CloseIcon } from "@/components/ui/Icons";
+import { useShellChrome } from "@/lib/shell-chrome";
 
 const ICONS: Record<string, string> = {
   friend_request: "🤝",
@@ -30,18 +31,30 @@ type Row = Awaited<ReturnType<typeof recentNotificationsAction>>[number];
  * notifications; "See all" (a second tap) opens the full screen. On the
  * Notifications screen it becomes the close (X).
  */
-export function NotificationsButton({
-  unreadCount,
-  isAdventure,
-  iconColor,
-}: {
-  unreadCount: number;
-  isAdventure: boolean;
-  iconColor: string;
-}) {
+type BellProps = { unreadCount: number; isAdventure: boolean; iconColor: string };
+// As last drawn, so a tab's stand-in can show the same bell at once (TI-6D).
+let lastBell: BellProps | null = null;
+// The open preview outlives the stand-in → real screen swap (same chrome generation), not a navigation.
+let openPreview: { gen: number; at: DOMRect } | null = null;
+
+/** The bell for a stand-in screen: as last drawn, or nothing until a real screen has drawn one. */
+export function StandInBell() {
+  return lastBell ? <NotificationsButton {...lastBell} /> : null;
+}
+
+export function NotificationsButton({ unreadCount, isAdventure, iconColor }: BellProps) {
   const pathname = usePathname();
+  const { gen } = useShellChrome();
+  useEffect(() => {
+    // A stand-in's copy keeps the count the real screen last gave.
+    if (!lastBell || lastBell.unreadCount !== unreadCount || lastBell.isAdventure !== isAdventure || lastBell.iconColor !== iconColor) lastBell = { unreadCount, isAdventure, iconColor };
+  }, [unreadCount, isAdventure, iconColor]);
   // Where the bell sits while the preview is open (null = closed).
-  const [open, setOpen] = useState<DOMRect | null>(null);
+  const [open, setOpenHere] = useState<DOMRect | null>(() => (openPreview && openPreview.gen === gen ? openPreview.at : null));
+  const setOpen = (r: DOMRect | null) => {
+    openPreview = r ? { gen, at: r } : null;
+    setOpenHere(r);
+  };
   if (pathname.startsWith("/notifications")) {
     return <CloseSettingsButton isAdventure={isAdventure} size={40} label="Close notifications" />;
   }

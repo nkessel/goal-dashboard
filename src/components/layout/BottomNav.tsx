@@ -144,7 +144,20 @@ function onTab(item: { href: string; also?: string[] }, pathname: string) {
   return [item.href, ...(item.also ?? [])].some((h) => pathname.startsWith(h));
 }
 
-export function BottomNav({ theme, name = null, toucan = null, navOrder = null }: { theme: Theme; name?: string | null; toucan?: unknown; navOrder?: unknown }) {
+type NavProps = { theme: Theme; name?: string | null; toucan?: unknown; navOrder?: unknown };
+// The bar's props as last drawn, so a tab's stand-in can show the very same bar (same look, same
+// order) at once, before the real screen has told it anything.
+let lastNavProps: NavProps | null = null;
+
+/** The bar for a stand-in screen: as last drawn, or nothing until a real screen has drawn one. */
+export function StandInNav() {
+  return lastNavProps ? <BottomNav {...lastNavProps} /> : null;
+}
+
+export function BottomNav({ theme, name = null, toucan = null, navOrder = null }: NavProps) {
+  useEffect(() => {
+    lastNavProps = { theme, name, toucan, navOrder };
+  }, [theme, name, toucan, navOrder]);
   const pathname = usePathname();
   const chosen = useSyncExternalStore(subscribeOrder, () => chosenOrder, () => null);
   const order = chosen ?? normalizeNavOrder(navOrder);

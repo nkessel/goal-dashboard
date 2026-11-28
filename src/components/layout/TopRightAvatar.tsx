@@ -9,15 +9,23 @@ import Link from "next/link";
 
 /** Top-right corner: your avatar opens Settings; inside Settings it turns into
  * the close (X) button, which returns to the screen you came from. */
-export function TopRightAvatar({
-  profile,
-  isAdventure,
-  label,
-}: {
+type AvatarProps = {
   profile: Pick<Profile, "id" | "avatar_color" | "avatar_image_url">;
   isAdventure: boolean;
   label: string;
-}) {
+};
+// As last drawn, so a tab's stand-in can show the same corner at once (TI-6D).
+let lastAvatar: AvatarProps | null = null;
+
+/** The corner button for a stand-in screen: as last drawn, or nothing until a real screen has drawn one. */
+export function StandInAvatar() {
+  return lastAvatar ? <TopRightAvatar {...lastAvatar} /> : null;
+}
+
+export function TopRightAvatar({ profile, isAdventure, label }: AvatarProps) {
+  useEffect(() => {
+    lastAvatar = { profile, isAdventure, label };
+  }, [profile, isAdventure, label]);
   const pathname = usePathname();
   const router = useRouter();
   // Preload Settings (and the avatar editor) so opening it is instant;

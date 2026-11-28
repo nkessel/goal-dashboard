@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { CreateFab } from "@/components/create/CreateFab";
 import { InsightsView } from "@/components/insights/InsightsView";
 import { ScreenArrange } from "@/components/ui/ScreenArrange";
+import { layoutCookie, parseLayoutCookie } from "@/lib/screen-layout";
 import { CheckInHub } from "@/components/insights/CheckInHub";
 import { getProfileById } from "@/lib/data/profiles";
 import { getCheckMetrics, listCheckInsSince, listCheckNotesSince, listEnergySince } from "@/lib/data/energy";
@@ -30,6 +31,7 @@ export default async function InsightsPage() {
   const since = new Date(Date.now() - 92 * 86_400_000).toISOString();
   // Everything at once (these used to wait one after another).
   const uid = session.user.id;
+  const chartCookie = (await cookies()).get("insights-chart")?.value;
   const profileP = getProfileById(uid);
   const habitRowsP = listRites(uid).catch(() => null).then((rs) => (rs ?? []).filter((r) => r.slot === "day"));
   const since120 = new Date(Date.now() - 120 * 86_400_000).toISOString().slice(0, 10);
@@ -101,6 +103,7 @@ export default async function InsightsPage() {
         <ScreenArrange
           screen="insights"
           name="Insights"
+          saved={parseLayoutCookie((await cookies()).get(layoutCookie("insights"))?.value)}
           parts={[
             {
               key: "checkin",
@@ -128,7 +131,7 @@ export default async function InsightsPage() {
                 </h2>
                 {/* A fresh check-in each visit; today's earlier ones are listed under it, with the chart. */}
                 <EnergyCheck full sleepLink={false} today={null} init={buildCheckInInit(profile?.life_wheel, appDayKey(), (await cookies()).get(DRAFT_COOKIE)?.value)} metrics={metrics} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))} />
-                <CheckInHub zone={appTimeZone()} readings={readings} metrics={["Energy", ...metrics]} wins={chartWins} starred={marks.star ?? []} nights={cleanWheel((profile?.life_wheel as Record<string, unknown> | null | undefined)?.wheelOfTime).log} />
+                <CheckInHub zone={appTimeZone()} readings={readings} metrics={["Energy", ...metrics]} wins={chartWins} starred={marks.star ?? []} nights={cleanWheel((profile?.life_wheel as Record<string, unknown> | null | undefined)?.wheelOfTime).log} chartOpen={chartCookie?.startsWith("open") ? true : chartCookie === "shut" ? false : undefined} chartHeight={Number(chartCookie?.split(":")[1]) || undefined} />
                 </div>
               </section>
               ),

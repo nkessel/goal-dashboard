@@ -10,6 +10,7 @@ import { isAdmin } from "@/lib/data/feedback";
 import { AppShell, preloadShell } from "@/components/layout/AppShell";
 import { CreateFab } from "@/components/create/CreateFab";
 import { ScreenArrange } from "@/components/ui/ScreenArrange";
+import { layoutCookie, parseLayoutCookie } from "@/lib/screen-layout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { getProfileById } from "@/lib/data/profiles";
 import { listCalendarTasksForOwner, listWaitingBehind } from "@/lib/data/tasks";
@@ -235,6 +236,7 @@ export default async function CalendarPage({
         <ScreenArrange
           screen="calendar"
           name="the calendar"
+          saved={parseLayoutCookie((await cookies()).get(layoutCookie("calendar"))?.value)}
           parts={[
             {
               key: "synced",

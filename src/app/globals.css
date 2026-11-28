@@ -3062,6 +3062,24 @@ button.night-time:focus-visible { outline: none; border-color: #a88a3f; box-shad
 .bring-tab:hover, .bring-tab:focus-visible { padding-left: 6px; box-shadow: inset 1px 0 0 rgba(255, 250, 230, 0.8), -3px 2px 10px rgba(242, 210, 126, 0.45); outline: none; }
 /* Inventory while it loads: the pack's outline, gently breathing. */
 .inv-loading { animation: inv-breathe 1.2s ease-in-out infinite; }
+/* A tab's stand-in while its screen loads (TI-5A): panels shaped like the real tab, faint bars where words
+   will be, in each panel's own ink, and a slow gold shine sweeping across. */
+main[data-standin] .si-bar { background: currentColor; opacity: .14; }
+main[data-standin] .si-pill { border: 1.5px solid currentColor; opacity: .22; }
+main[data-standin] .si-inset { background: color-mix(in srgb, currentColor 7%, transparent); border: 1px solid color-mix(in srgb, currentColor 16%, transparent); }
+main[data-standin] { color: var(--t-cream, #f1e6c8); }
+.si-shine::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(100deg, transparent 30%, rgba(255,226,150,.22) 48%, rgba(255,240,200,.3) 50%, rgba(255,226,150,.22) 52%, transparent 70%);
+  transform: translateX(-100%); animation: si-sweep 2.4s ease-in-out infinite;
+}
+@keyframes si-sweep { 0% { transform: translateX(-100%); } 70%, 100% { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .si-shine::after { animation: none; opacity: 0; } }
+/* Over a stand-in, the loading look and its wise line shrink to a small note near the bottom, above the + (TI-5A). */
+html[data-nav-pending="standin"] .nav-loader { top: auto; bottom: calc(148px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); flex-direction: row; gap: 6px; width: max-content; max-width: 88vw; }
+html[data-nav-pending="standin"] .nav-loader > :not(.nav-loader-tip) { zoom: .42; }
+html[data-nav-pending="standin"] .nav-loader-tip { font-size: 12.5px; line-height: 1.3; padding: 5px 10px; max-width: min(320px, 78vw); box-shadow: 0 0 0 2px rgba(42,28,16,.3), 0 4px 10px rgba(0,0,0,.3); }
+
 @keyframes inv-breathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.85; } }
 
 /* Bring from home's place: an inked line on the parchment, never a box. */
@@ -3133,7 +3151,9 @@ html[data-welcome-open] .nav-loader-toucan { display: none; }
    closed fold never adds an extra gap in a flex column. */
 .drawer-body.fold { transition: grid-template-rows 320ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 240ms ease, display 320ms allow-discrete; }
 .drawer-body.fold[data-open="false"] { display: none; }
-@starting-style { .drawer-body.fold[data-open="true"] { grid-template-rows: 0fr; opacity: 0; } }
+@starting-style { html:not([data-quiet-reveal]) .drawer-body.fold[data-open="true"] { grid-template-rows: 0fr; opacity: 0; } }
+/* A screen streamed in behind its tab's stand-in on a full page load (TabStandIn sets this): its open folds are
+   simply open, as on a load without a stand-in, instead of sliding open after the page has appeared. */
 @media (prefers-reduced-motion: reduce) { .drawer-body.fold { transition: none; } }
 /* A popup on its way out (useLinger): it fades and sinks instead of vanishing. */
 .pop-leave { animation: card-pop-out 170ms ease both !important; pointer-events: none; }
