@@ -8,7 +8,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 - **Run B scheduled run note (Nov 28, ~06:30 UTC):** no new notes (only 72002f7e, on `review/sleep-faces-in-card`); `main` code unchanged. Nothing built.
 
-- **Dev loop 2 runs 202–204 note (Nov 28, ~04:56, ~05:56 and ~06:56 UTC):** no new notes (2220252c and 72002f7e are on review branches); `main` code unchanged since run 198's check fixes; BUILD-PLAN has nothing unclaimed that ships straight. Nothing built.
+- **Dev loop 2 runs 202–205 note (Nov 28, ~04:56, ~05:56, ~06:56 and ~07:56 UTC):** no new notes (2220252c and 72002f7e are on review branches); `main` code unchanged since run 198's check fixes; BUILD-PLAN has nothing unclaimed that ships straight. Nothing built.
 
 - **Dev loop 2 run 201 note (Nov 28, 03:56 UTC):** no new notes (2220252c and 72002f7e are on review branches); run 198's full UI check just finished clean on `main`; BUILD-PLAN has nothing unclaimed that ships straight. Nothing built.
 
