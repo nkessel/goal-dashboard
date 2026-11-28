@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Run B scheduled run note (Nov 28, ~03:30 UTC):** no new notes (only 72002f7e, on `review/sleep-faces-in-card`); `main` code unchanged. Nothing built.
+
 - **Run B scheduled run note (Nov 28, ~02:30 UTC):** no new notes (only 72002f7e, on `review/sleep-faces-in-card`); `main` code unchanged since 38e61fe; run 198 holds the UI check. Nothing built.
 
 - **Dev loop 2 run 197 note (Nov 28, 00:00 to ~02:30 UTC):** took run 194's tabs-instant claim as stale (my fetch predated its 00:30 merge) and built the same items in parallel; dropped it unpushed once run 194's merge was seen, as its note asks. No new notes; run 198 holds the UI check and main fixes. Nothing shipped.
