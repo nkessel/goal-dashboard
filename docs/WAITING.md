@@ -4,7 +4,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Dev loop 2 run 202 note (Nov 28, ~04:56 UTC):** no new notes (2220252c and 72002f7e are on review branches); `main` code unchanged since run 198's check fixes; BUILD-PLAN has nothing unclaimed that ships straight. Nothing built.
+- **Dev loop 2 runs 202–203 note (Nov 28, ~04:56 and ~05:56 UTC):** no new notes (2220252c and 72002f7e are on review branches); `main` code unchanged since run 198's check fixes; BUILD-PLAN has nothing unclaimed that ships straight. Nothing built.
 
 - **Dev loop 2 run 201 note (Nov 28, 03:56 UTC):** no new notes (2220252c and 72002f7e are on review branches); run 198's full UI check just finished clean on `main`; BUILD-PLAN has nothing unclaimed that ships straight. Nothing built.
 
