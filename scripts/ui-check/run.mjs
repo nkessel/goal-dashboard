@@ -160,6 +160,12 @@ const snapSeen = new Map();
 const steps = [];
 let shotN = 0;
 
+// Resolves true when p settles within ms, false when it doesn't (p keeps running; its result is dropped).
+const within = (ms, p) => {
+  let t;
+  return Promise.race([Promise.resolve(p).then(() => true, () => true), new Promise((r) => (t = setTimeout(() => r(false), ms)))]).finally(() => clearTimeout(t));
+};
+
 async function walk({ browser, device, time, tz, cookie }) {
   const ctx = await browser.newContext({ ...DEVICES[device], timezoneId: tz.startsWith("Etc/GMT") ? tz : tz, locale: "en-US" });
   await ctx.addCookies([{ name: "authjs.session-token", value: cookie, domain: "localhost", path: "/", httpOnly: true, sameSite: "Lax" }]);
@@ -439,11 +445,19 @@ async function walk({ browser, device, time, tz, cookie }) {
       await page.screenshot({ path: `${OUT}shots/${String(++shotN).padStart(3, "0")}-${device}-${time}-${flow.name}-CRASH.png` }).catch(() => {});
     }
     // A flow that went offline never leaves the next flows without a connection.
-    await page.context().setOffline(false).catch(() => {});
-    await flushErrors().catch(() => {});
+    // A page that stopped answering (page.evaluate has no timeout) would hang the whole run here: give up on this walk instead.
+    const answered = await within(30_000, (async () => {
+      await page.context().setOffline(false).catch(() => {});
+      await flushErrors().catch(() => {});
+    })());
     process.stdout.write(`  ${device} ${time} ${flow.name}: done\n`);
+    if (!answered) {
+      record({ kind: "page-hung", severity: "error", target: flow.name, detail: `the page stopped answering after flow ${flow.name} (screen "${screen}"); the rest of ${device} ${time} was skipped` });
+      process.stdout.write(`  ${device} ${time}: page stopped answering, skipping the rest of this walk\n`);
+      break;
+    }
   }
-  await ctx.close();
+  await within(30_000, ctx.close());
 }
 
 // ------------------------------------------------------------------ main

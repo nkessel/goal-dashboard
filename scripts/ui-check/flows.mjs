@@ -660,7 +660,13 @@ export const FLOWS = [
       await h.check("Calendar tab moved to the end");
       // Today → Calendar is now a step to the right: the screen leaves to the left.
       await h.page.locator('nav[data-app-nav] a[href="/calendar"]').click({ timeout: 3000 }).catch(() => {});
-      const dir = await h.page.evaluate(() => document.documentElement.getAttribute("data-nav-pending") ?? document.documentElement.getAttribute("data-enter"));
+      // data-enter is the slide once the route commits; data-nav-pending the direction before it, or
+      // "standin" (not a direction: the tab's stand-in is up and the screen still loading).
+      const dir = await h.page.evaluate(() => {
+        const html = document.documentElement;
+        const pending = html.getAttribute("data-nav-pending");
+        return html.getAttribute("data-enter") ?? (pending === "standin" ? null : pending);
+      });
       if (dir && dir !== "nav-forward") h.record({ kind: "nav-order", severity: "error", target: "navorder", detail: `slide to the moved Calendar went ${dir}` });
       await h.page.waitForURL(/\/calendar/, { timeout: 15000 }).catch(() => {});
       await h.settle(1500);

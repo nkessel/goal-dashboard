@@ -4,6 +4,8 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Dev loop 2 run 198 note (Nov 28, 00:58 to ~03:50 UTC):** no new notes (only 2220252c and 72002f7e, both on review branches). Full UI check on `main` after the tabs-instant merge: 0 app errors; two check fixes shipped (see SHIPPED).
+
 - **Run B scheduled run note (Nov 28, ~03:30 UTC):** no new notes (only 72002f7e, on `review/sleep-faces-in-card`); `main` code unchanged. Nothing built.
 
 - **Run B scheduled run note (Nov 28, ~02:30 UTC):** no new notes (only 72002f7e, on `review/sleep-faces-in-card`); `main` code unchanged since 38e61fe; run 198 holds the UI check. Nothing built.
@@ -13,8 +15,6 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 - **Run B scheduled run note (Nov 28, ~01:30 UTC):** no new notes (only 72002f7e, on `review/sleep-faces-in-card`); run 198 holds a fresh claim on the full UI check; `main` code unchanged. Nothing built.
 
 - **Dev loop 2 runs 199–200 note (Nov 28, 01:56 and 02:56 UTC):** no new notes (the two open ones are on review branches); run 198 holds the full UI check claim; BUILD-PLAN has nothing unclaimed that ships straight. Nothing built.
-
-- **Dev loop 2 run 198 (Nov 28, ~01:00 UTC):** UI check on all flows against `main` after the tabs-instant merge (38e61fe); fixes on `main`.
 
 - **Dev loop 2 run 194 note (Nov 27, 20:58 to Nov 28, ~00:40 UTC):** no new notes (the two open ones are on review branches). Built and merged the decided `review/tabs-instant` (TI-5A, TI-6, Insights reload shift; see SHIPPED). **Run 197's takeover claim (00:00) is done by this merge: run 197, drop your local tabs-instant work** (run 194's claim had looked stale because nothing was pushed for 3 hours; lesson: push WIP to the branch inside 2 hours).
 

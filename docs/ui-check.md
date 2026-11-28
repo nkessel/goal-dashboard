@@ -10,6 +10,8 @@ npm run ui-check -- --no-build --only evening,today --devices phone --times even
 
 Devices: `phone` (390px) and `tablet` (820px) by default; `desktop` (1440×900, mouse, no touch) on request, e.g. `--devices phone,tablet,desktop` for anything that changes the calendar's close-ups or other wide-screen layouts. On a 2–4 GB machine the build needs `NODE_OPTIONS=--max-old-space-size=6144`.
 
+A full run (all flows, phone and tablet, morning and evening) takes about three hours in a cloud container, and the report is only written at the end: for a full sweep, run one device and time per call (`--devices phone --times evening`) and copy each `report.md` before the next.
+
 Then read `ui-check-out/report.md` (git-ignored). Every step has a screenshot in `ui-check-out/shots/`, with the problems boxed: red = error, orange = warning. A step whose page had to be scrolled to the bottom to show a problem gets a second `…-bottom.png`.
 
 Exit code 1 means there are errors not in `scripts/ui-check/known-issues.json`.
@@ -63,6 +65,7 @@ npm run ui-check -- --no-build --compare ui-check-out/before --only today,create
 | `layout-shift` | error (>0.08) / warn | The page jumped with no tap (late content pushing things down). |
 | `not-restored` | warn | Opening and closing a section left the rest of the screen somewhere else. |
 | `console-error`, `page-error`, `server-error` | error | Includes React hydration errors (#418) and 5xx responses. |
+| `flow-crashed`, `page-hung` | error | A flow went over its time limit, or the page stopped answering afterwards; on `page-hung` the rest of that device and time is skipped (it used to hang the whole run). Re-run the flow alone (`--only <flow> --devices <d> --times <t>`) before calling it an app bug: in long full runs the headless browser sometimes stalls (Nov 28: `faces` on tablet, passed alone). |
 | `step-skipped`, `tap-failed` (optional step) | info | The walk couldn't find something: update `flows.mjs` if the screen changed. |
 
 ## False alarms
